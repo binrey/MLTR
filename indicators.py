@@ -1,6 +1,6 @@
 import numpy as np
 from easydict import EasyDict
-
+from loguru import logger
 
 class ZigZag:
     def __init__(self):
@@ -27,32 +27,11 @@ class ZigZag:
                 if h.Low[i-2] < h.Low[i-1]:
                     self.mask[i-2] = 1
             self.min_last, self.max_last = h.Low[i], h.High[i]
+        return self.mask
 
     def update(self, h):
         self._get_mask(h)
         return self.mask2zigzag(h, self.mask, use_min_max=True)
-        # ids, dates, values, types = [], [], [], []
-        # def upd_buffers(i, d, v, t):
-        #     ids.append(i)
-        #     dates.append(d)
-        #     values.append(v)
-        #     types.append(t)
-        # L = h.shape[0] - 1    
-        # for i in range(self.mask.shape[0]):
-        #     if len(ids) and i <= L - ids[-1]:
-        #         continue
-        #     x = h.index[i]
-        #     #y = h.Close.values[i]
-        #     y = h.Low.values[i] if self.mask[i] > 0 else h.High.values[i]
-        #     if i > 0: 
-        #         if self.mask[i] != self.node:
-        #             upd_buffers(L-i, x, y, self.node)
-        #             self.node = self.mask[i]
-        #     else:
-        #         self.node = self.mask[i]
-        #         upd_buffers(L-i, x, y, 0)
-        # upd_buffers(0, h.index[-1], h.Low.values[-1] if -self.mask[i] > 0 else h.High.values[-1], 0)
-        # return ids[::-1], dates[::-1], values[::-1], types[::-1]
 
     def mask2zigzag(self, h, mask, use_min_max=False):
         ids, dates, values, types = [], [], [], []
@@ -93,7 +72,7 @@ def zigzag_simplify(data, mask, only_calc=False):
                 mask = swap_node(mask, node)
                 s = (data*mask).sum()
                 # print(f"{i}, {nnodes}, {node}, {s:+5.3f}", end=" ")
-                if s > smax:
+                if s >= smax:
                     smax = s
                     nodemax = node
                     nodemax.metric = s
@@ -107,4 +86,28 @@ def zigzag_simplify(data, mask, only_calc=False):
         nnodes -= 1
     else:
         return mask, nnodes, (data*mask).sum()
+    if nodemax.metric is None:
+        nodemax.metric = (data*mask).sum()
     return mask, nnodes, nodemax.metric
+
+
+def zz_opt(h, minnodes=1, simp_while_grow=True):
+    hclose = h.Close.values
+    dh = hclose[1:] - hclose[:-1]
+    zz = ZigZag()
+    mask = zz._get_mask(h)
+    i, d, v, t = zz.mask2zigzag(h, mask, True) 
+    _, nnodes, res = zigzag_simplify(dh, mask, only_calc=True)
+    res_list = [res]
+    nnodes_list = [nnodes]
+    while nnodes > minnodes:
+        mask, nnodes, res = zigzag_simplify(dh, mask)
+        if simp_while_grow:
+            if res < res_list[-1]:
+                return zz.mask2zigzag(h, mask, True)
+        res_list.append(res)
+        nnodes_list.append(nnodes)
+        # i, d, v, t = zz.mask2zigzag(h, mask, True)
+        # lines = [(x, y) for x, y in zip(d, v)]
+        # mpf.plot(h, type="candle", alines=lines, title=str(nnodes))   
+    return zz.mask2zigzag(h, mask, True)
