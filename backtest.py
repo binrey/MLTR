@@ -4,11 +4,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import sys
-from utils import Triangle, Trend, Broker
+from utils import Broker
+from experts import Trend
 from pathlib import Path
 from shutil import rmtree
 from loguru import logger
 
+pd.options.mode.chained_assignment = None
 # data_file = Path("TSLA.scv")
 # msft = yf.Ticker("TSLA")
 # hist = msft.history(period="70y", interval="1d")
@@ -19,9 +21,11 @@ data_file = Path("data/SBER_M30_200801091100_202309292330.csv")
 hist = pd.read_csv(data_file)
 hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(hist.Date.values, hist.Time.values)])
 hist.set_index("Date", inplace=True, drop=True)
+hist.drop("Time", axis=1)
+hist["Id"] = list(range(hist.shape[0]))
 
 
-
+period, n, tp, sl = 30, 3, 4, 2
 broker = Broker()
 nplot, tstart, tend = 1, 100, hist.shape[0] - 500
 #fig = mpf.figure(figsize=(10, 10))
@@ -30,36 +34,39 @@ if save_path.exists():
     rmtree(save_path)
 save_path.mkdir()
 CFig = Trend
-candlefig = CFig(60, 3, 2, 1)
+candlefig = CFig(period, n, tp, sl)
+
+def get_data(hist, t, size):
+    current_row = hist.iloc[t:t+1].copy()
+    current_row.Close[0] = current_row.Open.values[0]
+    current_row.High[0] = current_row.Open[0]
+    current_row.Low[0] = current_row.Open[0]
+    current_row.Volume[0] = 0
+    return pd.concat([hist[t-size-1:t], current_row])
+
 for t in range(tstart, tend):
-    if t > tstart and len(broker.active_orders) > 0:
-        pos = broker.update(hist[:t])
-        # mpf.plot(hist[t-candlefig.body_length-1:t], type='candle', alines=dict(alines=candlefig.lines))
-        if pos is not None:
-            logger.debug(f"t = {t} -> postprocess closed position")
-            broker.close_orders()
-            # fig = mpf.figure(figsize=(16, 10))
-            # ax = fig.add_subplot(2,3,nplot) # main candle stick chart subplot, you can also pass in the self defined style here only for this subplot
-            
-            # candlefig.lines.append([(pos.open_date, pos.open_price), (pos.close_date, pos.close_price)])
-            colors = ["blue"]*(len(candlefig.lines)-1) + ["green" if pos.profit > 0 else "red"]
-            widths = [1]*len(candlefig.lines)
-            dt = pos.close_indx-pos.open_indx
-            try:
-                fig = mpf.plot(hist.loc[candlefig.lines[0][0][0]:hist.index[t+1]], 
-                            type='candle', 
-                            block=False,
-                            alines=dict(alines=candlefig.lines, colors=colors, linewidths=widths),
-                            savefig=save_path / f"fig-{pos.open_date}.png")
-            except Exception as ex:
-                logger.error(f"{t} -> {ex}")
-            finally:
-                del fig
-            candlefig = CFig(60, 3, 2, 1)
-                          
-    else:
-        candlefig.update(hist, t)
+    h = get_data(hist, t, period)
+    if t < tstart or len(broker.active_orders) == 0:
+        candlefig.update(h)
         broker.active_orders = candlefig.orders
+        
+    pos = broker.update(h)
+    # mpf.plot(hist[t-candlefig.body_length-1:t], type='candle', alines=dict(alines=candlefig.lines))
+    if pos is not None:
+        logger.debug(f"t = {t} -> postprocess closed position")
+        broker.close_orders(h.index[-2])
+        ords_lines = [ord.lines for ord in broker.orders if ord.open_date in h.index and h.loc[ord.open_date].Id >= pos.open_indx]
+        lines2plot = [candlefig.lines] + ords_lines + [pos.lines]
+        colors = ["blue"]*(len(lines2plot)-1) + ["green" if pos.profit > 0 else "red"]
+        widths = [1]*len(lines2plot)
+        # fig = mpf.plot(hist.loc[lines2plot[0][0][0]:lines2plot[-1][-1][0]], 
+        #             type='candle', 
+        #             block=False,
+        #             alines=dict(alines=lines2plot, colors=colors, linewidths=widths),
+        #             savefig=save_path / f"fig-{pos.open_date}.png")
+        # del fig
+        candlefig = CFig(period, n, tp, sl)
+
 
 
 import numpy as np
