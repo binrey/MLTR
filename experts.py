@@ -36,6 +36,7 @@ class ExpertFormation(ExpertBase):
         self.wait_entry_point = 0
         self.lprice = None
         self.sprice = None
+        self.cprice = None
             
     def get_body(self, h):
         if self.formation_found == False:
@@ -45,13 +46,21 @@ class ExpertFormation(ExpertBase):
             else:
                 return
             
-        logger.debug(f"{h.index[-1]} long level: {self.lprice}, short level: {self.sprice}, close: {h.Close[-2]}")
+        logger.debug(f"{h.index[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.sprice}, close: {h.Close[-2]}")
         
         self.order_dir = 0
-        if self.lprice and h.Open[-1] >= self.lprice:
-            self.order_dir = 1
-        elif self.sprice and h.Open[-1] <= self.sprice:
-            self.order_dir = -1
+        if self.lprice:
+            if h.Open[-1] > self.lprice:
+                self.order_dir = 1
+            if h.Open[-1] < self.cprice:
+                self.reset_state()
+                return
+        elif self.sprice:
+            if h.Open[-1] < self.sprice:
+                self.order_dir = -1
+            if h.Open[-1] > self.cprice:
+                self.reset_state()
+                return            
             
         if self.order_dir != 0:        
             tp, sl = self.stops_processor(self, h)
@@ -103,7 +112,7 @@ def cls_trend(self, h, cfg) -> bool:
         # self.get_trend(h[:-self.body_length+2])
         self.lprice = max(self.lines[-1][1], self.lines[-2][1]) if trend_type > 0 else None
         self.sprice = min(self.lines[-1][1], self.lines[-2][1]) if trend_type < 0 else None
-
+        self.cprice = self.lines[-2][1]
     return is_fig
 
 
@@ -128,7 +137,6 @@ def cls_triangle_simple(self, h, cfg) -> bool:
         # self.get_trend(h[:-self.body_length+2])
         self.lprice = max(self.lines[-1][1], self.lines[-2][1])
         self.sprice = min(self.lines[-1][1], self.lines[-2][1]) 
-        
         self.tp = abs(values[0] - values[1])
 
     return is_fig
@@ -175,8 +183,7 @@ def cls_triangle_complex(self, h, cfg):
 
 def stops_fixed(self, h, cfg):
     tp = -self.order_dir*h.Open[-1]*(1+self.order_dir*cfg.tp/100)
-    # sl = -self.order_dir*h.Open[-1]*(1-self.order_dir*cfg.sl/100)
-    sl = -self.order_dir*self.lines[-2][1]
+    sl = -self.order_dir*h.Open[-1]*(1-self.order_dir*cfg.sl/100)
     return tp, sl
     
 
