@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
-from indicators import ZigZag, zz_opt
-import numpy as np
-from loguru import logger
-from utils import Order
-import yaml
-from easydict import EasyDict
 from functools import partial
 
+import numpy as np
+import yaml
+from easydict import EasyDict
+from loguru import logger
+
+from indicators import ZigZag, zz_opt
+from utils import Order
 
 
 class ExpertBase(ABC):

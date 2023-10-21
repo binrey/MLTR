@@ -2,6 +2,7 @@ import numpy as np
 from easydict import EasyDict
 from loguru import logger
 
+
 class ZigZag:
     def __init__(self):
         self.mask, self.min_last, self.max_last = None, None, None

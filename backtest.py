@@ -1,16 +1,17 @@
-import yfinance as yf
+import pickle
+from pathlib import Path
+from shutil import rmtree
+
 import finplot as fplt
-import pandas as pd
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import numpy as np
-import pickle
-from utils import Broker
-from experts import pyconfig, ExpertFormation
-from pathlib import Path
-from shutil import rmtree
+import pandas as pd
+import yfinance as yf
 from loguru import logger
 
+from experts import ExpertFormation, pyconfig
+from utils import Broker
 
 # data_file = Path("TSLA.scv")
 # msft = yf.Ticker("TSLA")
