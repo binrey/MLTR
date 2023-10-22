@@ -10,7 +10,7 @@ import pandas as pd
 import yfinance as yf
 from loguru import logger
 
-from experts import ExpertFormation, pyconfig
+from experts import ExpertFormation, PyConfig
 from utils import Broker
 
 # data_file = Path("TSLA.scv")
@@ -20,10 +20,16 @@ from utils import Broker
 # print(hist.shape[0])
 
 class DataParser():
-    def load_from_file(self, data_file):
-        data_file = Path(data_file)
-        data_type = data_file.parent.parent.stem
-        return {"metatrader": self.metatrader}.get(data_type, None)(data_file)
+    def __init__(self, cfg):
+        self.cfg = cfg     
+        
+    def load(self):
+        p = Path("data") / self.cfg.data_type / self.cfg.period
+        flist = [f for f in p.glob("*") if self.cfg.ticker in f.stem]
+        if len(flist) == 1:
+            return {"metatrader": self.metatrader}.get(self.cfg.data_type, None)(flist[0])
+        else:
+            raise FileNotFoundError()
         
     @staticmethod
     def metatrader(data_file):
@@ -44,12 +50,10 @@ def get_data(hist, t, size):
     return pd.concat([hist[t-size-1:t], current_row])
 
 def backtest(cfg):
-    cfg = pyconfig()#.read("configs/expert_triangle_simple.yaml")
     exp = ExpertFormation(cfg)
     broker = Broker()
-    data_file = Path(cfg.data_file)
-    hist = DataParser().load_from_file(data_file)
-    save_path = Path(f"runs/{data_file.stem}")
+    hist = DataParser(cfg).load()
+    save_path = Path("runs") / f"{cfg.ticker}-{cfg.period}"
     if save_path.exists():
         rmtree(save_path)
     save_path.mkdir()
@@ -82,6 +86,6 @@ def backtest(cfg):
         
         
 if __name__ == "__main__":
-    brok_results = backtest("configs/default.py")
+    brok_results = backtest(PyConfig().test())
     plt.plot(brok_results.profits.cumsum())
     plt.show()

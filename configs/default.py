@@ -2,30 +2,36 @@ from easydict import EasyDict
 
 from experts import *
 
-body_classifiers = {
-    "trngl_simp": {
-        "func": cls_triangle_simple,
-        "params": dict(npairs=3)
-        },
-    "trend": dict( 
-        func=cls_trend,
-        params=dict(npairs=3)
-        )    
-}
+class Param:
+    def __init__(self, test, optim):
+        self.test = test
+        self.optim = optim
+        
 
-stops_processors = {
-    "stops_fixed": {
+body_classifiers = EasyDict(
+    trngl_simp = dict(
+        func=cls_triangle_simple,
+        params=dict(npairs=Param(3, [2, 3]))
+    ),
+    trend = dict( 
+        func=cls_trend,
+        params=dict(npairs=Param(3, [2, 3]))
+        )    
+)
+
+stops_processors = EasyDict(
+    stops_fixed = {
         "func": stops_fixed,
         "params": dict(
-            tp=4, 
-            sl=2
+            tp=Param(2, [1, 2, 4]), 
+            sl=Param(2, [1, 2, 4])
             )
     },
-    "stops_dynamic": {
+    stops_dynamic = {
         "func": stops_dynamic,
         "params": dict()
     }    
-}
+)
 # ----------------------------------------------------------------
 # Test configuration
 test_config = EasyDict(
@@ -35,14 +41,24 @@ test_config = EasyDict(
     hist_buffer_size=20,
     tstart=0,
     tend=None,
-    data_file="data/metatrader/M30/SBER_M30_200801091100_202309292330.csv",
+    period="M30",
+    ticker="SBER",
+    data_type="metatrader",
     save_plots=False,
     backtest_metrics="max_profit"
 )
 # ----------------------------------------------------------------
 # Optimization configuration
 optim_config = EasyDict(
-    body_classifier=body_classifiers,
-    stops_processor=stops_processors,
-    wait_entry_point=9999
-)
+    body_classifier=list(body_classifiers.values()),
+    stops_processor=[stops_processors["stops_fixed"]],
+    wait_entry_point=[9999],
+    hist_buffer_size=[20],
+    tstart=[0],
+    tend=[None],
+    period=["M15", "H1", "H4"],
+    ticker=["SBER", "GAZP"],
+    data_type=["metatrader"],
+    save_plots=[False],
+    backtest_metrics=["max_profit"]
+,)

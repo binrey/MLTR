@@ -211,12 +211,35 @@ class YAMLConfigReader:
         return cfg
 
         
-def pyconfig():
-    from configs.default import test_config
-    for k, v in test_config.items():
-        if type(v) is EasyDict and "func" in v.keys():
-            v.func = partial(v.func, cfg=v.params)
-    return test_config
+class PyConfig():
+    def test(self):
+        from configs.default import test_config
+        for k, v in test_config.items():
+            if type(v) is EasyDict and "func" in v.keys():
+                params = EasyDict({pk: pv.test for pk, pv in v.params.items()})
+                v.func = partial(v.func, cfg=params)
+        return test_config
+
+    def optim(self):
+        from configs.default import optim_config
+        for k, vlist in optim_config.items():
+            vlist_new = []
+            for v in vlist:
+                if type(v) is EasyDict and "func" in v.keys():
+                    v.params = {pk: pv.optim for pk, pv in v.params.items()}
+                    # v.func = partial(v.func, cfg=params)
+                    params_list = self.unroll_params(v.params)
+                    vlist_new += [EasyDict(func=partial(v.func, cfg=params)) for params in params_list]
+                else:
+                    vlist_new.append(v)
+            optim_config[k] = vlist_new
+        return optim_config
+    
+    @staticmethod
+    def unroll_params(cfg):
+        import itertools
+        keys, values = zip(*cfg.items())
+        return [dict(zip(keys, v)) for v in itertools.product(*values)]
 
 
 class Config(EasyDict):
