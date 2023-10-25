@@ -224,7 +224,7 @@ class PyConfig():
         from configs.default import optim_config
         for k, vlist in optim_config.items():
             vlist_new = []
-            for v in vlist:
+            for v in vlist.optim:
                 if type(v) is EasyDict and "func" in v.keys():
                     v.params = {pk: pv.optim for pk, pv in v.params.items()}
                     # v.func = partial(v.func, cfg=params)

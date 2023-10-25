@@ -13,11 +13,7 @@ from loguru import logger
 from experts import ExpertFormation, PyConfig
 from utils import Broker
 
-# data_file = Path("TSLA.scv")
-# msft = yf.Ticker("TSLA")
-# hist = msft.history(period="70y", interval="1d")
-# hist.head()
-# print(hist.shape[0])
+
 
 class DataParser():
     def __init__(self, cfg):

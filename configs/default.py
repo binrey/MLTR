@@ -50,15 +50,15 @@ test_config = EasyDict(
 # ----------------------------------------------------------------
 # Optimization configuration
 optim_config = EasyDict(
-    body_classifier=list(body_classifiers.values()),
-    stops_processor=[stops_processors["stops_fixed"]],
-    wait_entry_point=[9999],
-    hist_buffer_size=[20],
-    tstart=[0],
-    tend=[None],
-    period=["M15", "H1", "H4"],
-    ticker=["SBER", "GAZP"],
-    data_type=["metatrader"],
-    save_plots=[False],
-    backtest_metrics=["max_profit"]
+    body_classifier=Param(body_classifiers["trend"], list(body_classifiers.values())),
+    stops_processor=Param(stops_processors["stops_fixed"], [stops_processors["stops_fixed"]]),
+    wait_entry_point=Param(9999, [9999]),
+    hist_buffer_size=Param(20, [20]),
+    tstart=Param(0, [0]),
+    tend=Param(5000, [None]),
+    period=Param("M30", ["M30"]),
+    ticker=Param("SBER", ["SBER", "GAZP"]),
+    data_type=Param("metatrader", ["metatrader"]),
+    save_plots=Param(False, [False]),
+    backtest_metrics=Param("max_profit", ["max_profit"])
 ,)
