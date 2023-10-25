@@ -26,12 +26,15 @@ for k in param_summary.keys():
 
 
 logger.info("\n".join(["const params:"]+[f"{k}={v[0]}" for k, v in optim_cfg.items() if len(param_summary[k])==1]))
-opt_summary = {k:[] for k in param_summary.keys()}
+opt_summary = {}
+for k in param_summary.keys():
+      if type(cfg[k]) is EasyDict and "func" in cfg[k].keys():
+            opt_summary[k] = f""
 for cfg in cfgs:
       logger.info("\n".join(["current params:"]+[f"{k}={v}" for k, v in cfg.items() if len(param_summary[k])>1]))
       for k, v in opt_summary.items():
-            if type(cfg[k]) is EasyDict and "func" in cfg[k].keys():
-                  v.append(cfg[k].func.keywords["cfg"])
+            
+                  v.append(cfg[k].name cfg[k].func.keywords["cfg"])
       btest = backtest(cfg)
       
       

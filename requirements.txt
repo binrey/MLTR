@@ -1,0 +1,8 @@
+easydict==1.11
+loguru==0.7.2
+pandas==2.1.1
+numpy==1.26.1
+finplot==1.9.3
+matplotlib==3.8.0
+mplfinance==0.12.10b0
+pyyaml==6.0.1
