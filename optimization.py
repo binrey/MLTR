@@ -12,7 +12,7 @@ optim_cfg = PyConfig().optim()
 import itertools
 keys, values = zip(*optim_cfg.items())
 cfgs = [EasyDict(zip(keys, v)) for v in itertools.product(*values)]
-
+logger.info(f"optimization steps number: {len(cfgs)}")
 
 param_summary = {k:[] for k in cfgs[0].keys()}
 for k in param_summary.keys():
@@ -26,16 +26,28 @@ for k in param_summary.keys():
 
 
 logger.info("\n".join(["const params:"]+[f"{k}={v[0]}" for k, v in optim_cfg.items() if len(param_summary[k])==1]))
-opt_summary = {}
-for k in param_summary.keys():
-      if type(cfg[k]) is EasyDict and "func" in cfg[k].keys():
-            opt_summary[k] = f""
+opt_summary = {k:[] for k, v in optim_cfg.items() if len(param_summary[k])>1}
+opt_summary["btest"] = []
+# for k in param_summary.keys():
+#       v = cfg[k]
+#       if type(v) is EasyDict and "func" in v.keys():
+#             params = {f"{v.name}.{k}" for k, v in v.items()}
+#             opt_summary.update(params)
+#       else:
+#             opt_summary.update({k:v})
 for cfg in cfgs:
       logger.info("\n".join(["current params:"]+[f"{k}={v}" for k, v in cfg.items() if len(param_summary[k])>1]))
       for k, v in opt_summary.items():
-            
-                  v.append(cfg[k].name cfg[k].func.keywords["cfg"])
+            if k in cfg.keys():
+                  v.append(cfg[k])
       btest = backtest(cfg)
+      btest_res = btest.profits.sum()
+      opt_summary["btest"].append(btest_res)
+      logger.info(f"back test: {btest}")
+      
+opt_summary = pd.DataFrame(opt_summary)
+print(opt_summary)
+      
       
       
         

@@ -53,13 +53,13 @@ class ExpertFormation(ExpertBase):
         if self.lprice:
             if h.Open[-1] > self.lprice:
                 self.order_dir = 1
-            if h.Open[-1] < self.cprice:
+            if self.cprice and h.Open[-1] < self.cprice:
                 self.reset_state()
                 return
         elif self.sprice:
             if h.Open[-1] < self.sprice:
                 self.order_dir = -1
-            if h.Open[-1] > self.cprice:
+            if self.cprice and h.Open[-1] > self.cprice:
                 self.reset_state()
                 return            
             
@@ -239,7 +239,7 @@ class PyConfig():
     def unroll_params(cfg):
         import itertools
         keys, values = zip(*cfg.items())
-        return [dict(zip(keys, v)) for v in itertools.product(*values)]
+        return [EasyDict(zip(keys, v)) for v in itertools.product(*values)]
 
 
 class Config(EasyDict):

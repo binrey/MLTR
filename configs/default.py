@@ -9,22 +9,25 @@ class Param:
         
 
 body_classifiers = EasyDict(
-    trngl_simp = dict(
+    trngl_simp = EasyDict(
+        name="trngl_simp",
         func=cls_triangle_simple,
-        params=dict(npairs=Param(3, [2, 3]))
+        params=EasyDict(npairs=Param(3, [2, 3]))
     ),
-    trend = dict( 
+    trend = EasyDict( 
+        name="trend",
         func=cls_trend,
-        params=dict(npairs=Param(3, [2, 3]))
+        params=EasyDict(npairs=Param(3, [2, 3]))
         )    
 )
 
 stops_processors = EasyDict(
     stops_fixed = {
+        "name": "stops_fixed",
         "func": stops_fixed,
         "params": dict(
-            tp=Param(2, [1, 2, 4]), 
-            sl=Param(2, [1, 2, 4])
+            tp=Param(2, [1, 2]), 
+            sl=Param(2, [1, 2])
             )
     },
     stops_dynamic = {
@@ -55,7 +58,7 @@ optim_config = EasyDict(
     wait_entry_point=Param(9999, [9999]),
     hist_buffer_size=Param(20, [20]),
     tstart=Param(0, [0]),
-    tend=Param(5000, [None]),
+    tend=Param(None, [1000]),
     period=Param("M30", ["M30"]),
     ticker=Param("SBER", ["SBER", "GAZP"]),
     data_type=Param("metatrader", ["metatrader"]),

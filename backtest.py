@@ -54,7 +54,8 @@ def backtest(cfg):
         rmtree(save_path)
     save_path.mkdir()
     tstart = max(cfg.hist_buffer_size+1, cfg.tstart)
-    for t in range(tstart, hist.shape[0]):
+    tend = cfg.tend if cfg.tend is not None else hist.shape[0]
+    for t in range(tstart, tend):
         h = get_data(hist, t, cfg.hist_buffer_size)
         if t < tstart or len(broker.active_orders) == 0:
             exp.update(h)
@@ -77,7 +78,7 @@ def backtest(cfg):
                             savefig=save_path / f"fig-{pos.open_date}.png")
                 del fig
             exp.reset_state()
-    pickle.dump(brok_results, open(str(save_path / f"broker.pickle"), "wb"))
+    # pickle.dump(brok_results, open(str(save_path / f"broker.pickle"), "wb"))
     return broker
         
         
