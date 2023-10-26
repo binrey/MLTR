@@ -16,7 +16,7 @@ body_classifiers = EasyDict(
     ),
     trend = EasyDict( 
         name="trend",
-        func=cls_trend,
+        func=ClsTrend,
         params=EasyDict(npairs=Param(3, [2, 3]))
         )    
 )
@@ -25,43 +25,29 @@ stops_processors = EasyDict(
     stops_fixed = {
         "name": "stops_fixed",
         "func": stops_fixed,
-        "params": dict(
+        "params": EasyDict(
             tp=Param(2, [1, 2]), 
             sl=Param(2, [1, 2])
             )
     },
     stops_dynamic = {
-        "func": stops_dynamic,
-        "params": dict()
+        "name": "stops_dynamic",
+        "func": StopsDynamic,
+        "params": EasyDict(dummy=Param(0, [0]))
     }    
 )
 # ----------------------------------------------------------------
-# Test configuration
-test_config = EasyDict(
-    body_classifier=body_classifiers["trend"],
-    stops_processor=stops_processors["stops_fixed"],
-    wait_entry_point=9999,
-    hist_buffer_size=20,
-    tstart=0,
-    tend=None,
-    period="M30",
-    ticker="SBER",
-    data_type="metatrader",
-    save_plots=False,
-    backtest_metrics="max_profit"
-)
-# ----------------------------------------------------------------
-# Optimization configuration
-optim_config = EasyDict(
+# Configuration
+config = EasyDict(
     body_classifier=Param(body_classifiers["trend"], list(body_classifiers.values())),
-    stops_processor=Param(stops_processors["stops_fixed"], [stops_processors["stops_fixed"]]),
+    stops_processor=Param(stops_processors["stops_dynamic"], list(stops_processors.values())),
     wait_entry_point=Param(9999, [9999]),
-    hist_buffer_size=Param(20, [20]),
+    hist_buffer_size=Param(40, [20]),
     tstart=Param(0, [0]),
     tend=Param(None, [1000]),
-    period=Param("M30", ["M30"]),
-    ticker=Param("SBER", ["SBER", "GAZP"]),
-    data_type=Param("metatrader", ["metatrader"]),
+    period=Param("H1", ["H1"]),
+    ticker=Param("BTCUSD", ["BTCUSD", "ETHUSD", "TRXUSD", "XRPUSD"]),
+    data_type=Param("bitfinex", ["bitfinex"]),
     save_plots=Param(False, [False]),
     backtest_metrics=Param("max_profit", ["max_profit"])
 ,)

@@ -1,7 +1,7 @@
 import pickle
 from pathlib import Path
 from shutil import rmtree
-
+from time import time
 # import finplot as fplt
 import matplotlib.pyplot as plt
 import mplfinance as mpf
@@ -23,7 +23,9 @@ class DataParser():
         p = Path("data") / self.cfg.data_type / self.cfg.period
         flist = [f for f in p.glob("*") if self.cfg.ticker in f.stem]
         if len(flist) == 1:
-            return {"metatrader": self.metatrader}.get(self.cfg.data_type, None)(flist[0])
+            return {"metatrader": self.metatrader,
+                    "bitfinex":self.bitfinex,
+                    }.get(self.cfg.data_type, None)(flist[0])
         else:
             raise FileNotFoundError()
         
@@ -35,6 +37,19 @@ class DataParser():
         hist.set_index("Date", inplace=True, drop=True)
         hist.drop("Time", axis=1)
         hist["Id"] = list(range(hist.shape[0]))
+        return hist
+    
+    @staticmethod
+    def bitfinex(data_file):
+        pd.options.mode.chained_assignment = None
+        hist = pd.read_csv(data_file, header=1)
+        hist = hist.iloc[::-1]
+        hist["Date"] = pd.to_datetime(hist.date.values)
+        hist.set_index("Date", inplace=True, drop=True)
+        hist["Id"] = list(range(hist.shape[0]))
+        hist.drop(["unix", "symbol", "date"], axis=1)
+        hist.columns = map(str.capitalize, hist.columns)
+        hist["Volume"] = hist.iloc[:, -2]
         return hist
 
 def get_data(hist, t, size):
@@ -55,6 +70,7 @@ def backtest(cfg):
     save_path.mkdir()
     tstart = max(cfg.hist_buffer_size+1, cfg.tstart)
     tend = cfg.tend if cfg.tend is not None else hist.shape[0]
+    t0 = time()
     for t in range(tstart, tend):
         h = get_data(hist, t, cfg.hist_buffer_size)
         if t < tstart or len(broker.active_orders) == 0:
@@ -79,6 +95,8 @@ def backtest(cfg):
                 del fig
             exp.reset_state()
     # pickle.dump(brok_results, open(str(save_path / f"broker.pickle"), "wb"))
+    logger.debug("-"*40 + "\n")
+    logger.debug(f"\nbacktest time: {time() - t0:.1f} sec")
     return broker
         
         

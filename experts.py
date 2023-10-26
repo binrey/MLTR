@@ -90,31 +90,36 @@ class ExpertFormation(ExpertBase):
             self.body_length += -tmin + 1
             
 
-def cls_trend(self, h, cfg) -> bool:
-    # cfg = self.cfg.body_classifier
-    ids, dates, values, types = ZigZag().update(h)
-    #ids, dates, values, types = zz_opt(h, self.npairs*2+2, simp_while_grow=False)
-    is_fig = False
-    if len(ids) > 6:
-        flag2, flag3 = False, False
-        if types[-2] > 0:
-            flag2 = values[-2] > values[-4] and values[-3] > values[-5]
-            flag3 = values[-4] > values[-6] and values[-5] > values[-7]
-        if types[-2] < 0:
-            flag2 = values[-2] < values[-4] and values[-3] < values[-5]
-            flag3 = values[-4] < values[-6] and values[-5] < values[-7]
-        if (cfg.npairs <= 2 and flag2) or (cfg.npairs == 3 and flag2 and flag3):
-            is_fig = True
-            trend_type = types[-2]
-                
-    if is_fig:
-        i = cfg.npairs*2 + 1
-        self.lines = [(x, y) for x, y in zip(dates[-i:-1], values[-i:-1])]
-        # self.get_trend(h[:-self.body_length+2])
-        self.lprice = max(self.lines[-1][1], self.lines[-2][1]) if trend_type > 0 else None
-        self.sprice = min(self.lines[-1][1], self.lines[-2][1]) if trend_type < 0 else None
-        self.cprice = self.lines[-2][1]
-    return is_fig
+class ClsTrend:
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.zigzag = ZigZag()
+        
+    def __call__(self, common, h) -> bool:
+        # ids, dates, values, types = ZigZag().update(h)
+        ids, dates, values, types = self.zigzag.update(h)
+        #ids, dates, values, types = zz_opt(h, self.npairs*2+2, simp_while_grow=False)
+        is_fig = False
+        if len(ids) > 6:
+            flag2, flag3 = False, False
+            if types[-2] > 0:
+                flag2 = values[-2] > values[-4] and values[-3] > values[-5]
+                flag3 = values[-4] > values[-6] and values[-5] > values[-7]
+            if types[-2] < 0:
+                flag2 = values[-2] < values[-4] and values[-3] < values[-5]
+                flag3 = values[-4] < values[-6] and values[-5] < values[-7]
+            if (self.cfg.npairs <= 2 and flag2) or (self.cfg.npairs == 3 and flag2 and flag3):
+                is_fig = True
+                trend_type = types[-2]
+                    
+        if is_fig:
+            i = self.cfg.npairs*2 + 1
+            common.lines = [(x, y) for x, y in zip(dates[-i:-1], values[-i:-1])]
+            # self.get_trend(h[:-self.body_length+2])
+            common.lprice = max(common.lines[-1][1], common.lines[-2][1]) if trend_type > 0 else None
+            common.sprice = min(common.lines[-1][1], common.lines[-2][1]) if trend_type < 0 else None
+            common.cprice = common.lines[-2][1]
+        return is_fig
 
 
 def cls_triangle_simple(self, h, cfg) -> bool:
@@ -188,41 +193,48 @@ def stops_fixed(self, h, cfg):
     return tp, sl
     
 
-def stops_dynamic(self, h, cfg):
-    tp = -self.order_dir*(h.Open[-1] + self.order_dir*abs(self.lines[-1][1]-self.lines[-4][1]))
-    sl = -self.order_dir*self.lines[-2][1]#(h.Open[-1] - abs(self.lines[-2][1]-self.lines[-3][1]))
-    return tp, sl
-
-class YAMLConfigReader:
-    func_lib = {"cls_trend": cls_trend,
-                "cls_trngl_simp": cls_triangle_simple}
-    
-    def __init__(self):
-        pass
+class StopsDynamic:
+    def __init__(self, cfg):
+        self.cfg = cfg
         
-    def read(self, cfg):
-        cfg = Config(yaml.safe_load(open(cfg, "r")))
-        ftype = cfg.body_classifier.type
-        if ftype in self.func_lib.keys():
-            cfg.body_classifier["func"] = partial(self.func_lib[ftype], cfg=Config(cfg.body_classifier.copy()))
-        else:
-            logger.error(f"{ftype} wrong body_classifier type")
-        logger.info(cfg)
-        return cfg
+    def __call__(self, common, h):
+        tp = -common.order_dir*(h.Open[-1] + common.order_dir*abs(common.lines[0][1]-common.lines[-1][1]))
+        sl = -common.order_dir*common.lines[-2][1]
+        return tp, sl
+
+# class YAMLConfigReader:
+#     func_lib = {"cls_trend": cls_trend,
+#                 "cls_trngl_simp": cls_triangle_simple}
+    
+#     def __init__(self):
+#         pass
+        
+#     def read(self, cfg):
+#         cfg = Config(yaml.safe_load(open(cfg, "r")))
+#         ftype = cfg.body_classifier.type
+#         if ftype in self.func_lib.keys():
+#             cfg.body_classifier["func"] = partial(self.func_lib[ftype], cfg=Config(cfg.body_classifier.copy()))
+#         else:
+#             logger.error(f"{ftype} wrong body_classifier type")
+#         logger.info(cfg)
+#         return cfg
 
         
 class PyConfig():
     def test(self):
-        from configs.default import test_config
-        for k, v in test_config.items():
+        from configs.default import config
+        for k, v in config.items():
+            v = v.test
             if type(v) is EasyDict and "func" in v.keys():
                 params = EasyDict({pk: pv.test for pk, pv in v.params.items()})
-                v.func = partial(v.func, cfg=params)
-        return test_config
+                config[k].func = v.func(params)
+            else:
+                config[k] = v
+        return config
 
     def optim(self):
-        from configs.default import optim_config
-        for k, vlist in optim_config.items():
+        from configs.default import config
+        for k, vlist in config.items():
             vlist_new = []
             for v in vlist.optim:
                 if type(v) is EasyDict and "func" in v.keys():
@@ -232,8 +244,8 @@ class PyConfig():
                     vlist_new += [EasyDict(func=partial(v.func, cfg=params)) for params in params_list]
                 else:
                     vlist_new.append(v)
-            optim_config[k] = vlist_new
-        return optim_config
+            config[k] = vlist_new
+        return config
     
     @staticmethod
     def unroll_params(cfg):

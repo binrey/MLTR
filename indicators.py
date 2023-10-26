@@ -1,20 +1,24 @@
 import numpy as np
 from easydict import EasyDict
 from loguru import logger
+import numba
+from numba import jit
 
 
 class ZigZag:
     def __init__(self):
-        self.mask, self.min_last, self.max_last = None, None, None
-        
+        self.mask, self.min_last, self.max_last, self.last_id = None, None, None, 0
+      
     def _get_mask(self, h):
-        if self.mask is None:
+        if self.mask is None or h.Id[-1] - self.last_id > 1:
             self.min_last, self.max_last = h.Low[0], h.High[0]
             self.mask = np.zeros(h.shape[0] - 1)
             self.mask[0] = 1 if h.High[1] > self.max_last else -1
         else:
-            size2add = max(0, h.shape[0] - self.mask.shape[0] - 1)
-            self.mask = np.append(self.mask, np.zeros((size2add,)))
+            self.mask[:-1] = self.mask[1:]
+            self.mask[-1] = 0
+            # size2add = 1
+            # self.mask = np.append(self.mask[1:], np.zeros((size2add,)))
         for i in range(2, h.shape[0]):
             if self.mask[i-1] != 0:
                 continue
@@ -28,12 +32,13 @@ class ZigZag:
                 if h.Low[i-2] < h.Low[i-1]:
                     self.mask[i-2] = 1
             self.min_last, self.max_last = h.Low[i], h.High[i]
+        self.last_id = h.Id[-1]
         return self.mask
 
     def update(self, h):
         self._get_mask(h)
         return self.mask2zigzag(h, self.mask, use_min_max=True)
-
+    
     def mask2zigzag(self, h, mask, use_min_max=False):
         ids, dates, values, types = [], [], [], []
         def upd_buffers(i, d, v, t):
@@ -56,7 +61,6 @@ class ZigZag:
                 upd_buffers(i, x, y, mask[i])
         upd_buffers(i+1, h.index[-1], h.Low.values[-1] if - mask[i] > 0 else h.High.values[-1], mask[i])
         return ids, dates, values, types   
-    
     
 def zigzag_simplify(data, mask, only_calc=False):
     def swap_node(data, node):
