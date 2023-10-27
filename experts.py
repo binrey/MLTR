@@ -122,30 +122,36 @@ class ClsTrend:
         return is_fig
 
 
-def cls_triangle_simple(self, h, cfg) -> bool:
-    ids, dates, values, types = ZigZag().update(h)
-    # ids, dates, values, types = zz_opt(h, self.npairs*2+2, simp_while_grow=False)
-    is_fig = False
-    if len(ids) > 6:
-        flag2, flag3 = False, False
-        if types[-2] > 0:
-            flag2 = values[-2] < values[-4] and values[-3] > values[-5]
-            flag3 = values[-4] < values[-6] and values[-5] > values[-7]
-        if types[-2] < 0:
-            flag2 = values[-2] > values[-4] and values[-3] < values[-5]
-            flag3 = values[-4] > values[-6]  and values[-5] < values[-7]
-        if (cfg.npairs <= 2 and flag2) or (cfg.npairs == 3 and flag2 and flag3):
-            is_fig = True
-                
-    if is_fig:
-        i = cfg.npairs*2 + 1
-        self.lines = [(x, y) for x, y in zip(dates[-i:-1], values[-i:-1])]
-        # self.get_trend(h[:-self.body_length+2])
-        self.lprice = max(self.lines[-1][1], self.lines[-2][1])
-        self.sprice = min(self.lines[-1][1], self.lines[-2][1]) 
-        self.tp = abs(values[0] - values[1])
-
-    return is_fig
+class ClsTrangleSimp:
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.zigzag = ZigZag()
+        
+    def __str__(self):
+        return " ".join([f"{k}:{v}" for k, v in self.cfg.items()])
+        
+    def __call__(self, common, h) -> bool:
+        ids, dates, values, types = self.zigzag.update(h)
+        # ids, dates, values, types = zz_opt(h, self.npairs*2+2, simp_while_grow=False)
+        is_fig = False
+        if len(ids) > 6:
+            flag2, flag3 = False, False
+            if types[-2] > 0:
+                flag2 = values[-2] < values[-4] and values[-3] > values[-5]
+                flag3 = values[-4] < values[-6] and values[-5] > values[-7]
+            if types[-2] < 0:
+                flag2 = values[-2] > values[-4] and values[-3] < values[-5]
+                flag3 = values[-4] > values[-6]  and values[-5] < values[-7]
+            if (self.cfg.npairs <= 2 and flag2) or (self.cfg.npairs == 3 and flag2 and flag3):
+                is_fig = True
+                    
+        if is_fig:
+            i = self.cfg.npairs*2 + 1
+            common.lines = [(x, y) for x, y in zip(dates[-i:-1], values[-i:-1])]
+            # self.get_trend(h[:-self.body_length+2])
+            common.lprice = max(common.lines[-1][1], common.lines[-2][1])
+            common.sprice = min(common.lines[-1][1], common.lines[-2][1]) 
+        return is_fig
 
 
 def cls_triangle_complex(self, h, cfg):
@@ -187,10 +193,14 @@ def cls_triangle_complex(self, h, cfg):
     return is_fig, lprice, sprice
 
 
-def stops_fixed(self, h, cfg):
-    tp = -self.order_dir*h.Open[-1]*(1+self.order_dir*cfg.tp/100)
-    sl = -self.order_dir*h.Open[-1]*(1-self.order_dir*cfg.sl/100)
-    return tp, sl
+class StopsFixed:
+    def __init__(self, cfg):
+        self.cfg = cfg
+        
+    def __call__(self, common, h):
+        tp = -common.order_dir*h.Open[-1]*(1+common.order_dir*self.cfg.tp/100)
+        sl = -common.order_dir*h.Open[-1]*(1-common.order_dir*self.cfg.sl/100)
+        return tp, sl
     
 
 class StopsDynamic:
@@ -241,7 +251,7 @@ class PyConfig():
                     v.params = {pk: pv.optim for pk, pv in v.params.items()}
                     # v.func = partial(v.func, cfg=params)
                     params_list = self.unroll_params(v.params)
-                    vlist_new += [EasyDict(func=partial(v.func, cfg=params)) for params in params_list]
+                    vlist_new += [EasyDict(func=v.func(params)) for params in params_list]
                 else:
                     vlist_new.append(v)
             config[k] = vlist_new

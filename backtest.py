@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 # import yfinance as yf
 from loguru import logger
-
+pd.options.mode.chained_assignment = None
 from experts import ExpertFormation, PyConfig
 from utils import Broker
 
@@ -41,7 +41,6 @@ class DataParser():
     
     @staticmethod
     def bitfinex(data_file):
-        pd.options.mode.chained_assignment = None
         hist = pd.read_csv(data_file, header=1)
         hist = hist.iloc[::-1]
         hist["Date"] = pd.to_datetime(hist.date.values)
@@ -54,9 +53,9 @@ class DataParser():
 
 def get_data(hist, t, size):
     current_row = hist.iloc[t:t+1].copy()
-    current_row.Close[0] = current_row.Open.values[0]
-    current_row.High[0] = current_row.Open[0]
-    current_row.Low[0] = current_row.Open[0]
+    current_row.Close.iloc[0] = current_row.Open.iloc[0]
+    current_row.High.iloc[0] = current_row.Open.iloc[0]
+    current_row.Low.iloc[0] = current_row.Open.iloc[0]
     current_row.Volume[0] = 0
     return pd.concat([hist[t-size-1:t], current_row])
 
@@ -96,10 +95,10 @@ def backtest(cfg):
             exp.reset_state()
     # pickle.dump(brok_results, open(str(save_path / f"broker.pickle"), "wb"))
     logger.debug("-"*40 + "\n")
-    logger.debug(f"\nbacktest time: {time() - t0:.1f} sec")
+    logger.debug(f"backtest time: {time() - t0:.1f} sec")
     return broker
-        
-        
+    
+    
 if __name__ == "__main__":
     brok_results = backtest(PyConfig().test())
     plt.plot(brok_results.profits.cumsum())

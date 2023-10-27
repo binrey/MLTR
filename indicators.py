@@ -1,8 +1,8 @@
 import numpy as np
 from easydict import EasyDict
 from loguru import logger
-import numba
-from numba import jit
+# import numba
+# from numba import jit
 
 
 class ZigZag:

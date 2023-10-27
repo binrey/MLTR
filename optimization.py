@@ -4,6 +4,9 @@ from loguru import logger
 import pandas as pd
 from backtest import backtest
 from experts import PyConfig
+import pickle
+from pathlib import Path
+
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
@@ -36,17 +39,18 @@ opt_summary["btest"] = []
 #       else:
 #             opt_summary.update({k:v})
 for cfg in cfgs:
-      logger.info("\n".join(["current params:"]+[f"{k}={v}" for k, v in cfg.items() if len(param_summary[k])>1]))
+      logger.info("\n".join(["current params:"]+[f"{k}={str(v)}" for k, v in cfg.items() if len(param_summary[k])>1]))
       for k, v in opt_summary.items():
             if k in cfg.keys():
                   v.append(cfg[k])
       btest = backtest(cfg)
       btest_res = btest.profits.sum()
       opt_summary["btest"].append(btest_res)
-      logger.info(f"back test: {btest}")
+      logger.info(f"back test: {btest_res}")
       
 opt_summary = pd.DataFrame(opt_summary)
 print(opt_summary)
+pickle.dump(opt_summary, open(str(Path(".") / f"optim_results.pickle"), "wb"))
       
       
       
