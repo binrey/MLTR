@@ -39,8 +39,8 @@ stops_processors = EasyDict(
 # ----------------------------------------------------------------
 # Configuration
 config = EasyDict(
-    body_classifier=Param(body_classifiers["trngl_simp"], list(body_classifiers.values())),
-    stops_processor=Param(stops_processors["stops_fixed"], list(stops_processors.values())),
+    body_classifier=Param(body_classifiers["trend"], list(body_classifiers.values())),
+    stops_processor=Param(stops_processors["stops_dynamic"], list(stops_processors.values())),
     wait_entry_point=Param(9999, [9999]),
     hist_buffer_size=Param(30, [30]),
     tstart=Param(0, [0]),
@@ -49,5 +49,5 @@ config = EasyDict(
     ticker=Param("BTCUSD", ["BTCUSD", "ETHUSD", "TRXUSD", "XRPUSD"]),
     data_type=Param("bitfinex", ["bitfinex"]),
     save_plots=Param(False, [False]),
-    backtest_metrics=Param("max_profit", ["max_profit"])
-,)
+    # backtest_metrics=Param("max_profit", ["max_profit"])
+)

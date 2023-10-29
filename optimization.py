@@ -6,53 +6,62 @@ from backtest import backtest
 from experts import PyConfig
 import pickle
 from pathlib import Path
+import multiprocessing
+from multiprocessing import Process, Queue, Pool
+import itertools
+from time import time
+from shutil import rmtree
 
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
-optim_cfg = PyConfig().optim()
 
-import itertools
-keys, values = zip(*optim_cfg.items())
-cfgs = [EasyDict(zip(keys, v)) for v in itertools.product(*values)]
-logger.info(f"optimization steps number: {len(cfgs)}")
-
-param_summary = {k:[] for k in cfgs[0].keys()}
-for k in param_summary.keys():
-      for cfg in cfgs:
-            v = cfg[k]
-            if type(v) is EasyDict and "func" in v.keys():
-                  param_summary[k].append(v.func)
-            else:
-                  param_summary[k].append(v)
-      param_summary[k] = set(param_summary[k])
-
-
-logger.info("\n".join(["const params:"]+[f"{k}={v[0]}" for k, v in optim_cfg.items() if len(param_summary[k])==1]))
-opt_summary = {k:[] for k, v in optim_cfg.items() if len(param_summary[k])>1}
-opt_summary["btest"] = []
-# for k in param_summary.keys():
-#       v = cfg[k]
-#       if type(v) is EasyDict and "func" in v.keys():
-#             params = {f"{v.name}.{k}" for k, v in v.items()}
-#             opt_summary.update(params)
-#       else:
-#             opt_summary.update({k:v})
-for cfg in cfgs:
-      logger.info("\n".join(["current params:"]+[f"{k}={str(v)}" for k, v in cfg.items() if len(param_summary[k])>1]))
-      for k, v in opt_summary.items():
-            if k in cfg.keys():
-                  v.append(cfg[k])
+def backtest_process(args):
+      print(args)
+      num, cfg = args
+      # logger.info("\n".join(["current params:"]+[f"{k}={str(v)}" for k, v in cfg.items() if len(param_summary[k])>1]))
+      # for k, v in opt_summary.items():
+      #       if k in cfg.keys():
+      #             v.append(cfg[k])
+      logger.info(f"start backtest {num}")
       btest = backtest(cfg)
       btest_res = btest.profits.sum()
-      opt_summary["btest"].append(btest_res)
-      logger.info(f"back test: {btest_res}")
+      # opt_summary["btest"].append(btest_res)
+      logger.info(f"back test {num}: {btest_res}")
+      pickle.dump((cfg, btest), open(str(Path("optimization") / f"btest{num:003.0f}.pickle"), "wb"))
+
+
+
+def pool_handler():
+      ncpu = multiprocessing.cpu_count()
+      logger.info(f"Number of cpu : {ncpu}")
+      optim_cfg = PyConfig().optim()
+
+      keys, values = zip(*optim_cfg.items())
+      cfgs = [EasyDict(zip(keys, v)) for v in itertools.product(*values)]
+      logger.info(f"optimization steps number: {len(cfgs)}")
+
+      # logger.info("\n".join(["const params:"]+[f"{k}={v[0]}" for k, v in optim_cfg.items() if len(param_summary[k])==1]))
+      cfgs = [(i, cfg) for i, cfg in enumerate(cfgs)]
+      p = Pool(ncpu)
+      p.map(backtest_process, cfgs)
       
-opt_summary = pd.DataFrame(opt_summary)
-print(opt_summary)
-pickle.dump(opt_summary, open(str(Path(".") / f"optim_results.pickle"), "wb"))
+# for proc in procs:
+#       proc.join()
+      
+# opt_summary = pd.DataFrame(opt_summary)
+# pickle.dump(opt_summary, open(str(Path(".") / f"optim_results.pickle"), "wb"))
       
       
+if __name__ == "__main__":
+      save_path = Path("optimization")
+      if save_path.exists():
+            rmtree(save_path)
+      save_path.mkdir()
+      t0 = time()
+      pool_handler()
+      logger.info(f"optimization time: {time() - t0:.1f} sec")
+
       
         
         

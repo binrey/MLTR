@@ -59,14 +59,16 @@ def get_data(hist, t, size):
     current_row.Volume[0] = 0
     return pd.concat([hist[t-size-1:t], current_row])
 
+
 def backtest(cfg):
     exp = ExpertFormation(cfg)
     broker = Broker()
     hist = DataParser(cfg).load()
-    save_path = Path("runs") / f"{cfg.ticker}-{cfg.period}"
-    if save_path.exists():
-        rmtree(save_path)
-    save_path.mkdir()
+    if cfg.save_plots:
+        save_path = Path("backtests") / f"{cfg.ticker}-{cfg.period}"
+        if save_path.exists():
+            rmtree(save_path)
+        save_path.mkdir()
     tstart = max(cfg.hist_buffer_size+1, cfg.tstart)
     tend = cfg.tend if cfg.tend is not None else hist.shape[0]
     t0 = time()

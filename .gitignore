@@ -1,5 +1,7 @@
 data/
 runs/
+optimization/
+
 *.csv
 *.png
 *.pyc
