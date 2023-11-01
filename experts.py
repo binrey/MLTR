@@ -70,10 +70,14 @@ class ExpertFormation(ExpertBase):
             
         if self.order_dir != 0:        
             tp, sl = self.stops_processor(self, h)
-            self.orders = [Order(self.order_dir, Order.TYPE.MARKET, h.Id[-1], h.index[-1]),
-                           Order(tp, Order.TYPE.LIMIT, h.Id[-1], h.index[-1]),
-                           Order(sl, Order.TYPE.LIMIT, h.Id[-1], h.index[-1])]
-            logger.debug(f"{h.index[-1]} send order {self.orders[0]}, tp: {self.orders[1]}, sl: {self.orders[2]}")
+            self.orders = [Order(self.order_dir, Order.TYPE.MARKET, h.Id[-1], h.index[-1])]
+            if tp:
+                self.orders.append(Order(tp, Order.TYPE.LIMIT, h.Id[-1], h.index[-1]))
+            if sl:
+                self.orders.append(Order(sl, Order.TYPE.LIMIT, h.Id[-1], h.index[-1]))
+            logger.debug(f"{h.index[-1]} send order {self.orders[0]}, " + 
+                         f"tp: {self.orders[1] if len(self.orders)>1 else 'NO'}, " +
+                         f"sl: {self.orders[2] if len(self.orders)>2 else 'NO'}")
         
         if self.wait_entry_point == 0:
             self.formation_found = False
@@ -214,26 +218,12 @@ class StopsDynamic(ExtensionBase):
         super(StopsDynamic, self).__init__(cfg, name="stops_dyn")
         
     def __call__(self, common, h):
-        tp = -common.order_dir*(h.Open[-1] + common.order_dir*abs(common.lines[0][1]-common.lines[-1][1]))
-        sl = -common.order_dir*common.lines[-2][1]
+        tp, sl = None, None
+        if self.cfg.tp_active:
+            tp = -common.order_dir*(h.Open[-1] + common.order_dir*abs(common.lines[0][1]-common.lines[-1][1]))
+        if self.cfg.sl_active:    
+            sl = -common.order_dir*common.lines[-2][1]
         return tp, sl
-
-# class YAMLConfigReader:
-#     func_lib = {"cls_trend": cls_trend,
-#                 "cls_trngl_simp": cls_triangle_simple}
-    
-#     def __init__(self):
-#         pass
-        
-#     def read(self, cfg):
-#         cfg = Config(yaml.safe_load(open(cfg, "r")))
-#         ftype = cfg.body_classifier.type
-#         if ftype in self.func_lib.keys():
-#             cfg.body_classifier["func"] = partial(self.func_lib[ftype], cfg=Config(cfg.body_classifier.copy()))
-#         else:
-#             logger.error(f"{ftype} wrong body_classifier type")
-#         logger.info(cfg)
-#         return cfg
 
         
 class PyConfig():

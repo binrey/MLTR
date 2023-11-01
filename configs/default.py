@@ -29,7 +29,10 @@ stops_processors = EasyDict(
 ),
     stops_dynamic = EasyDict(
         func=StopsDynamic,
-        params=EasyDict(dummy=Param(0, [0]))
+        params=EasyDict(
+            tp_active=Param(False, [False]),
+            sl_active=Param(True, [False])
+            )
     )    
 )
 # ----------------------------------------------------------------

@@ -9,12 +9,13 @@ class Order:
     
     def __init__(self, directed_price, type, indx, date):
         self.dir = np.sign(directed_price)
-        self.price = abs(directed_price) if type == Order.TYPE.LIMIT else 0
         self.type = type
         self.indx = indx
         self.open_date = date
         self.close_date = None
-        
+        self._change_hist = []
+        self.change(date, abs(directed_price) if type == Order.TYPE.LIMIT else 0)
+
     def __str__(self):
         return f"{self.type} {self.id}"
     
@@ -28,7 +29,18 @@ class Order:
     
     @property
     def lines(self):
-        return [(self.open_date, self.price), (self.close_date, self.price)]
+        # return [(self.open_date, self.price), (self.close_date, self.price)]
+        return self._change_hist
+    
+    def change(self, date, price):
+        self.price = price
+        if price != 0:
+            self._change_hist.append((date, price))
+        
+    def close(self, date):
+        self.close_date = date
+        self._change_hist.append((date, self.price))       
+        
 
 class Position:
     def __init__(self, price, date, indx):
@@ -77,11 +89,11 @@ class Broker:
     
     def close_orders(self, close_date, i=None):
         if i is not None:
-            self.active_orders[i].close_date = close_date
+            self.active_orders[i].close(close_date)
             self.orders.append(self.active_orders.pop(i))
         else:            
             while len(self.active_orders):
-                self.active_orders[0].close_date = close_date
+                self.active_orders[0].close(close_date)
                 self.orders.append(self.active_orders.pop(0))
     
     @property
@@ -97,7 +109,7 @@ class Broker:
                 logger.debug(f"{date} process order {order.id} (O:{h.Open[-1]})")
                 triggered_price = h.Open[-1]*order.dir
                 triggered_date = date
-                order.price = h.Open[-1]
+                order.change(date, h.Open[-1])
             if order.type == Order.TYPE.LIMIT and order.indx != h.Id[-1]:
                 if (h.Low[-2] > order.price and h.Open[-1] < order.price) or (h.High[-2] < order.price and h.Open[-1] > order.price):
                     logger.debug(f"{date} process order {order.id}, and change price to O:{h.Open[-1]}")    
@@ -124,3 +136,11 @@ class Broker:
         return None    
                 
     
+def trailing_stop(orders:list[Order], position:Position, date, p, k):
+    if position is None:
+        return
+    for order in orders:
+        if position.dir == 1 and order.dir == -1 and p > order.price:
+            order.change(date, order.price + k*(p - order.price))
+        if position.dir == -1 and order.dir == 1 and p < order.price:
+            order.change(date, order.price - k*(order.price - p))

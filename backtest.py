@@ -11,7 +11,7 @@ import pandas as pd
 from loguru import logger
 pd.options.mode.chained_assignment = None
 from experts import ExpertFormation, PyConfig
-from utils import Broker
+from utils import Broker, trailing_stop
 
 
 
@@ -77,14 +77,15 @@ def backtest(cfg):
         if t < tstart or len(broker.active_orders) == 0:
             exp.update(h)
             broker.active_orders = exp.orders
-            
+        
+        trailing_stop(broker.active_orders, broker.active_position, h.Date.iloc[-2], h.Close.iloc[-2], 0.025)
         pos = broker.update(h)
         # mpf.plot(hist[t-exp.body_length-1:t], type='candle', alines=dict(alines=exp.lines))
         if pos is not None:
             logger.debug(f"t = {t} -> postprocess closed position")
             broker.close_orders(h.index[-2])
             if cfg.save_plots:
-                ords_lines = [ord.lines for ord in broker.orders if ord.open_date in h.index and h.loc[ord.open_date].Id >= pos.open_indx]
+                ords_lines = [ord.lines for ord in broker.orders if ord.open_date in hist.index and hist.loc[ord.open_date].Id >= pos.open_indx]
                 lines2plot = [exp.lines] + ords_lines + [pos.lines]
                 colors = ["blue"]*(len(lines2plot)-1) + ["green" if pos.profit > 0 else "red"]
                 widths = [1]*len(lines2plot)
