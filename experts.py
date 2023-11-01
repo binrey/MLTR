@@ -23,6 +23,11 @@ class ExpertBase(ABC):
         self.get_body(h)
 
 
+class ExtensionBase:
+    def __init__(self, cfg, name):
+         self.name = name + ":" + ",".join([f"{k}={v}" for k, v in cfg.items()])
+
+
 class ExpertFormation(ExpertBase):
     def __init__(self, cfg):
         self.trend_maxsize = 1  
@@ -90,9 +95,10 @@ class ExpertFormation(ExpertBase):
             self.body_length += -tmin + 1
             
 
-class ClsTrend:
+class ClsTrend(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
+        super(ClsTrend, self).__init__(cfg, name="trend")
         self.zigzag = ZigZag()
         
     def __call__(self, common, h) -> bool:
@@ -122,13 +128,11 @@ class ClsTrend:
         return is_fig
 
 
-class ClsTrangleSimp:
+class ClsTriangleSimp(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
+        super(ClsTriangleSimp, self).__init__(cfg, name="trngl_simp")
         self.zigzag = ZigZag()
-        
-    def __str__(self):
-        return " ".join([f"{k}:{v}" for k, v in self.cfg.items()])
         
     def __call__(self, common, h) -> bool:
         ids, dates, values, types = self.zigzag.update(h)
@@ -193,9 +197,10 @@ def cls_triangle_complex(self, h, cfg):
     return is_fig, lprice, sprice
 
 
-class StopsFixed:
+class StopsFixed(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
+        super(StopsFixed, self).__init__(cfg, name="stops_fix")
         
     def __call__(self, common, h):
         tp = -common.order_dir*h.Open[-1]*(1+common.order_dir*self.cfg.tp/100)
@@ -203,9 +208,10 @@ class StopsFixed:
         return tp, sl
     
 
-class StopsDynamic:
+class StopsDynamic(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
+        super(StopsDynamic, self).__init__(cfg, name="stops_dyn")
         
     def __call__(self, common, h):
         tp = -common.order_dir*(h.Open[-1] + common.order_dir*abs(common.lines[0][1]-common.lines[-1][1]))

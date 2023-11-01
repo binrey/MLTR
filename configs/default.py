@@ -10,12 +10,10 @@ class Param:
 
 body_classifiers = EasyDict(
     trngl_simp = EasyDict(
-        name="trngl_simp",
-        func=ClsTrangleSimp,
+        func=ClsTriangleSimp,
         params=EasyDict(npairs=Param(3, [2, 3]))
     ),
     trend = EasyDict( 
-        name="trend",
         func=ClsTrend,
         params=EasyDict(npairs=Param(3, [2, 3]))
         )    
@@ -23,15 +21,13 @@ body_classifiers = EasyDict(
 
 stops_processors = EasyDict(
     stops_fixed = EasyDict(
-        name="stops_fixed",
         func=StopsFixed,
         params=EasyDict(
-            tp=Param(2, [2, 4]), 
-            sl=Param(2, [2, 4])
+            tp=Param(2, [2, 4, 8]), 
+            sl=Param(2, [2, 4, 8])
             )
 ),
     stops_dynamic = EasyDict(
-        name="stops_dynamic",
         func=StopsDynamic,
         params=EasyDict(dummy=Param(0, [0]))
     )    
@@ -49,5 +45,4 @@ config = EasyDict(
     ticker=Param("BTCUSD", ["BTCUSD", "ETHUSD", "TRXUSD", "XRPUSD"]),
     data_type=Param("bitfinex", ["bitfinex"]),
     save_plots=Param(False, [False]),
-    # backtest_metrics=Param("max_profit", ["max_profit"])
 )

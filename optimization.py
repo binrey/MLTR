@@ -17,7 +17,7 @@ logger.remove()
 logger.add(sys.stderr, level="INFO")
 
 def backtest_process(args):
-      print(args)
+      logger.debug(args)
       num, cfg = args
       # logger.info("\n".join(["current params:"]+[f"{k}={str(v)}" for k, v in cfg.items() if len(param_summary[k])>1]))
       # for k, v in opt_summary.items():
