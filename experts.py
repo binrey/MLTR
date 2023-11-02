@@ -52,7 +52,7 @@ class ExpertFormation(ExpertBase):
             else:
                 return
             
-        logger.debug(f"{h.index[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.sprice}, close: {h.Close[-2]}")
+        logger.debug(f"{h.index[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, close: {h.Close[-2]}")
         
         self.order_dir = 0
         if self.lprice:
@@ -61,7 +61,7 @@ class ExpertFormation(ExpertBase):
             if self.cprice and h.Open[-1] < self.cprice:
                 self.reset_state()
                 return
-        elif self.sprice:
+        if self.sprice:
             if h.Open[-1] < self.sprice:
                 self.order_dir = -1
             if self.cprice and h.Open[-1] > self.cprice:
@@ -221,8 +221,12 @@ class StopsDynamic(ExtensionBase):
         tp, sl = None, None
         if self.cfg.tp_active:
             tp = -common.order_dir*(h.Open[-1] + common.order_dir*abs(common.lines[0][1]-common.lines[-1][1]))
-        if self.cfg.sl_active:    
-            sl = -common.order_dir*common.lines[-2][1]
+        if self.cfg.sl_active:
+            if common.order_dir > 0:
+                sl = min(common.lines[-2][1], common.lines[-3][1])
+            if common.order_dir < 0:
+                sl = max(common.lines[-2][1], common.lines[-3][1])
+            sl *= -common.order_dir
         return tp, sl
 
         
