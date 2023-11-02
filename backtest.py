@@ -105,4 +105,5 @@ def backtest(cfg):
 if __name__ == "__main__":
     brok_results = backtest(PyConfig().test())
     plt.plot(brok_results.profits.cumsum())
-    plt.show()
+    plt.savefig("backtest.png")
+    # plt.show()
