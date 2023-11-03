@@ -156,49 +156,58 @@ class ClsTriangleSimp(ExtensionBase):
         if is_fig:
             i = self.cfg.npairs*2 + 1
             common.lines = [(x, y) for x, y in zip(dates[-i:-1], values[-i:-1])]
-            # self.get_trend(h[:-self.body_length+2])
             common.lprice = max(common.lines[-1][1], common.lines[-2][1])
             common.sprice = min(common.lines[-1][1], common.lines[-2][1]) 
         return is_fig
 
 
-def cls_triangle_complex(self, h, cfg):
-    ids, dates, values, types = ZigZag().update(h[-self.body_maxsize:])
-    # ids, dates, values, types = zz_opt(h[-self.body_maxsize:])
-    
-    types_filt, vals_filt = [], []
-    for i in range(2, len(ids)):
-        cur_type = types[-i]
-        cur_val = values[-i]
-        if len(types_filt) < 2:
-            types_filt.append(cur_type)
-            vals_filt.append(cur_val)
-        else:
-            if len(types_filt) == 2:
-                valmax, valmin = max(vals_filt), min(vals_filt)
-            if types_filt[-1] == 1 and cur_type == -1:
-                if cur_val <= valmin:
-                    valmin = cur_val
-                    types_filt.append(cur_type)
-                    vals_filt.append(cur_val)
-            if types_filt[-1] == -1 and cur_type == 1:
-                if cur_val >= valmax:
-                    valmax = cur_val
-                    types_filt.append(cur_type)
-                    vals_filt.append(cur_val)  
+class ClsTriangleComp(ExtensionBase):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(ClsTriangleComp, self).__init__(cfg, name="trngl_comp")
+        self.zigzag = ZigZag()
+        
+    def __call__(self, common, h) -> bool:
+        ids, dates, values, types = self.zigzag.update(h)
+        # ids, dates, values, types = zz_opt(h[-self.body_maxsize:])
+        is_fig = False
+        types_filt, vals_filt, ids_ = [], [], []
+        for i in range(2, len(ids)):
+            cur_type = types[-i]
+            cur_val = values[-i]
+            if len(types_filt) < 2:
+                types_filt.append(cur_type)
+                vals_filt.append(cur_val)
+                ids_.append(-i)
+            else:
+                if len(types_filt) == 2:
+                    valmax, valmin = max(vals_filt), min(vals_filt)
+                if types_filt[-1] == 1 and cur_type == -1:
+                    if cur_val <= valmin:
+                        valmin = cur_val
+                        types_filt.append(cur_type)
+                        vals_filt.append(cur_val)
+                        ids_.append(-i)
+                if types_filt[-1] == -1 and cur_type == 1:
+                    if cur_val >= valmax:
+                        valmax = cur_val
+                        types_filt.append(cur_type)
+                        vals_filt.append(cur_val)  
+                        ids_.append(-i)
 
-    if len(types_filt) >= self.npairs*2:
-        is_fig = True
-        logger.debug(f"Found figure p-types : {types_filt}") 
-        logger.debug(f"Found figure p-values: {vals_filt}") 
-                
-    if is_fig:
-        self.lines = [(x, y) for x, y in zip(dates[-i:], values[-i:])]
-        # self.get_trend(h[:-self.body_length+2])
-        lprice = max(self.lines[-2][1], self.lines[-3][1])
-        sprice = min(self.lines[-2][1], self.lines[-3][1]) 
+        if len(types_filt) >= self.cfg.npairs*2:
+            is_fig = True
+            logger.debug(f"Found figure p-types : {types_filt}") 
+            logger.debug(f"Found figure p-values: {vals_filt}") 
+                    
+        if is_fig:
+            i = self.cfg.npairs*2 + 1
+            common.lines = [(x, y) for x, y in zip([dates[j] for j in ids_[-i:][::-1]], [values[j] for j in ids_[-i:][::-1]])]
+            # common.lines = [(x, y) for x, y in zip(dates[-ids_[-1]:-1], values[-ids_[-1]:-1])]
+            common.lprice = max(common.lines[-1][1], common.lines[-2][1])
+            common.sprice = min(common.lines[-1][1], common.lines[-2][1]) 
 
-    return is_fig, lprice, sprice
+        return is_fig
 
 
 class StopsFixed(ExtensionBase):

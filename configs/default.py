@@ -11,7 +11,11 @@ class Param:
 body_classifiers = EasyDict(
     trngl_simp = EasyDict(
         func=ClsTriangleSimp,
-        params=EasyDict(npairs=Param(3, [2, 3]))
+        params=EasyDict(npairs=Param(3, [3]))
+    ),
+    trngl_comp = EasyDict(
+        func=ClsTriangleComp,
+        params=EasyDict(npairs=Param(3, [3]))
     ),
     trend = EasyDict( 
         func=ClsTrend,
@@ -38,7 +42,7 @@ stops_processors = EasyDict(
 # ----------------------------------------------------------------
 # Configuration
 config = EasyDict(
-    body_classifier=Param(body_classifiers["trend"], list(body_classifiers.values())),
+    body_classifier=Param(body_classifiers["trngl_comp"], list(body_classifiers.values())),
     stops_processor=Param(stops_processors["stops_dynamic"], list(stops_processors.values())),
     wait_entry_point=Param(9999, [9999]),
     hist_buffer_size=Param(30, [30]),
