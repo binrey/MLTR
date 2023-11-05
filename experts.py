@@ -52,29 +52,29 @@ class ExpertFormation(ExpertBase):
             else:
                 return
             
-        logger.debug(f"{h.index[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, close: {h.Close[-2]}")
+        logger.debug(f"{h.Id.iloc[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, close: {h.Close.iloc[-2]}")
         
         self.order_dir = 0
         if self.lprice:
-            if h.Open[-1] > self.lprice:
+            if h.Open.iloc[-1] > self.lprice:
                 self.order_dir = 1
-            if self.cprice and h.Open[-1] < self.cprice:
+            if self.cprice and h.Open.iloc[-1] < self.cprice:
                 self.reset_state()
                 return
         if self.sprice:
-            if h.Open[-1] < self.sprice:
+            if h.Open.iloc[-1] < self.sprice:
                 self.order_dir = -1
-            if self.cprice and h.Open[-1] > self.cprice:
+            if self.cprice and h.Open.iloc[-1] > self.cprice:
                 self.reset_state()
                 return            
             
         if self.order_dir != 0:        
             tp, sl = self.stops_processor(self, h)
-            self.orders = [Order(self.order_dir, Order.TYPE.MARKET, h.Id[-1], h.index[-1])]
+            self.orders = [Order(self.order_dir, Order.TYPE.MARKET, h.Id.iloc[-1], h.index[-1])]
             if tp:
-                self.orders.append(Order(tp, Order.TYPE.LIMIT, h.Id[-1], h.index[-1]))
+                self.orders.append(Order(tp, Order.TYPE.LIMIT, h.Id.iloc[-1], h.index[-1]))
             if sl:
-                self.orders.append(Order(sl, Order.TYPE.LIMIT, h.Id[-1], h.index[-1]))
+                self.orders.append(Order(sl, Order.TYPE.LIMIT, h.Id.iloc[-1], h.index[-1]))
             logger.debug(f"{h.index[-1]} send order {self.orders[0]}, " + 
                          f"tp: {self.orders[1] if len(self.orders)>1 else 'NO'}, " +
                          f"sl: {self.orders[2] if len(self.orders)>2 else 'NO'}")
@@ -121,8 +121,10 @@ class ClsTrend(ExtensionBase):
             if (self.cfg.npairs <= 2 and flag2) or (self.cfg.npairs == 3 and flag2 and flag3):
                 is_fig = True
                 trend_type = types[-2]
-                    
+                            
         if is_fig:
+            # if trend_type<0:
+            #     return False
             i = self.cfg.npairs*2 + 1
             common.lines = [(x, y) for x, y in zip(dates[-i:-1], values[-i:-1])]
             # self.get_trend(h[:-self.body_length+2])

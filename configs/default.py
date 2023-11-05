@@ -19,7 +19,7 @@ body_classifiers = EasyDict(
     ),
     trend = EasyDict( 
         func=ClsTrend,
-        params=EasyDict(npairs=Param(3, [2, 3]))
+        params=EasyDict(npairs=Param(2, [2, 3]))
         )    
 )
 
@@ -27,29 +27,36 @@ stops_processors = EasyDict(
     stops_fixed = EasyDict(
         func=StopsFixed,
         params=EasyDict(
-            tp=Param(2, [2, 4, 8]), 
-            sl=Param(2, [2, 4, 8])
+            tp=Param(20, [2, 4]), 
+            sl=Param(4, [2, 4])
             )
 ),
     stops_dynamic = EasyDict(
         func=StopsDynamic,
         params=EasyDict(
             tp_active=Param(False, [False]),
-            sl_active=Param(True, [False])
+            sl_active=Param(True, [True])
             )
     )    
 )
 # ----------------------------------------------------------------
 # Configuration
+bitfinex_list = ["BTCUSD", "ETHUSD", "TRXUSD", "XRPUSD"]
+yahoo_list = ["MSFT", "AMZN", "AAPL", "GOOG", "NFLX", "TSLA"]
+moex_list = ["SBER", "ROSN", "NVTK", "LKOH", "GMKN", "GAZP"]
+moex_list = ["SBER", "ROSN", "NVTK", "LKOH", "GMKN", "GAZP"]
+forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
+
 config = EasyDict(
-    body_classifier=Param(body_classifiers["trngl_comp"], list(body_classifiers.values())),
-    stops_processor=Param(stops_processors["stops_dynamic"], list(stops_processors.values())),
+    trailing_stop_rate=Param(0.01, [0.01, 0.05]),
+    body_classifier=Param(body_classifiers["trngl_comp"], [body_classifiers[k] for k in ["trend", "trngl_simp", "trngl_comp"]]),
+    stops_processor=Param(stops_processors["stops_dynamic"], [stops_processors[k] for k in ["stops_dynamic"]]),
     wait_entry_point=Param(9999, [9999]),
     hist_buffer_size=Param(30, [30]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("H1", ["H1"]),
-    ticker=Param("BTCUSD", ["BTCUSD", "ETHUSD", "TRXUSD", "XRPUSD"]),
-    data_type=Param("bitfinex", ["bitfinex"]),
+    period=Param("H1", ["M5"]),
+    ticker=Param("SBRF", forts_list),
+    data_type=Param("FORTS", ["FORTS"]),
     save_plots=Param(False, [False]),
 )

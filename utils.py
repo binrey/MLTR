@@ -81,7 +81,8 @@ class Position:
         return [(self.open_date, self.open_price), (self.close_date, self.close_price)]
     
 class Broker:
-    def __init__(self):
+    def __init__(self, cfg):
+        self.cfg = cfg
         self.active_orders = []
         self.active_position = None
         self.positions = []
@@ -105,37 +106,56 @@ class Broker:
         for i, order in enumerate(self.active_orders): 
             triggered_price = None
             triggered_date = None
-            if order.type == Order.TYPE.MARKET and order.indx == h.Id[-1]:
-                logger.debug(f"{date} process order {order.id} (O:{h.Open[-1]})")
-                triggered_price = h.Open[-1]*order.dir
+            if order.type == Order.TYPE.MARKET and order.indx == h.Id.iloc[-1]:
+                logger.debug(f"{date} process order {order.id} (O:{h.Open.iloc[-1]})")
+                triggered_price = h.Open.iloc[-1]*order.dir
                 triggered_date = date
-                order.change(date, h.Open[-1])
-            if order.type == Order.TYPE.LIMIT and order.indx != h.Id[-1]:
-                if (h.Low[-2] > order.price and h.Open[-1] < order.price) or (h.High[-2] < order.price and h.Open[-1] > order.price):
-                    logger.debug(f"{date} process order {order.id}, and change price to O:{h.Open[-1]}")    
-                    triggered_price = h.Open[-1]*order.dir 
+                order.change(date, h.Open.iloc[-1])
+            if order.type == Order.TYPE.LIMIT and order.indx != h.Id.iloc[-1]:
+                if (h.Low.iloc[-2] > order.price and h.Open.iloc[-1] < order.price) or (h.High.iloc[-2] < order.price and h.Open.iloc[-1] > order.price):
+                    logger.debug(f"{date} process order {order.id}, and change price to O:{h.Open.iloc[-1]}")    
+                    triggered_price = h.Open.iloc[-1]*order.dir 
                     triggered_date = date                        
-                elif h.High[-2] >= order.price and h.Low[-2] <= order.price:
-                    logger.debug(f"{date} process order {order.id} (L:{h.Low[-2]} <= {order.price:.2f} <= H:{h.High[-2]})")
+                elif h.High.iloc[-2] >= order.price and h.Low.iloc[-2] <= order.price:
+                    logger.debug(f"{date} process order {order.id} (L:{h.Low.iloc[-2]} <= {order.price:.2f} <= H:{h.High.iloc[-2]})")
                     triggered_price = order.price*order.dir
                     triggered_date = h.index[-2]
                     
             if triggered_price is not None:
                 self.close_orders(triggered_date, i)
+                triggered_id = h.loc[triggered_date].Id
                 if self.active_position is None:
-                    self.active_position = Position(triggered_price, triggered_date, h.loc[triggered_date].Id)
+                    self.active_position = Position(triggered_price, triggered_date, triggered_id)
                 else:
                     if self.active_position.dir*triggered_price < 0:
-                        self.active_position.close(triggered_price, triggered_date, h.loc[triggered_date].Id)
+                        self.active_position.close(triggered_price, triggered_date, triggered_id)
                         closed_position = self.active_position
                         self.active_position = None
                         self.positions.append(closed_position)
                         return closed_position
                     else:
-                        raise NotImplementedError()
+                        # Докупка
+                        pass
+                        #raise NotImplementedError()
+                    
+        self.trailing_stop(h)
         return None    
                 
-    
+    def trailing_stop(self, h):
+        date, p = h.index[-1], h.Close.iloc[-1]
+        position = self.active_position
+        if position is None or self.cfg.trailing_stop_rate == 0 or 0:
+            return
+        for order in self.active_orders:
+            if date == order.open_date:
+                continue
+            if position.dir == 1 and order.dir == -1 and p > order.price:
+                order.change(date, order.price + self.cfg.trailing_stop_rate*(p - order.price))
+            if position.dir == -1 and order.dir == 1 and p < order.price:
+                order.change(date, order.price - self.cfg.trailing_stop_rate*(order.price - p))
+        ss=1
+                
+                
 def trailing_stop(orders:list[Order], position:Position, date, p, k):
     if position is None:
         return

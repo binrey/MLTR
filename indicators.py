@@ -2,7 +2,7 @@ import numpy as np
 from easydict import EasyDict
 from loguru import logger
 # import numba
-# from numba import jit
+from numba import jit
 
 
 class ZigZag:
@@ -10,10 +10,11 @@ class ZigZag:
         self.mask, self.min_last, self.max_last, self.last_id = None, None, None, 0
       
     def _get_mask(self, h):
-        if self.mask is None or h.Id[-1] - self.last_id > 1:
-            self.min_last, self.max_last = h.Low[0], h.High[0]
+        hlow = h.Low.values()
+        if self.mask is None or h.Id.iloc[-1] - self.last_id > 1:
+            self.min_last, self.max_last = h.Low.iloc[0], h.High.iloc[0]
             self.mask = np.zeros(h.shape[0] - 1)
-            self.mask[0] = 1 if h.High[1] > self.max_last else -1
+            self.mask[0] = 1 if h.High.iloc[1] > self.max_last else -1
         else:
             self.mask[:-1] = self.mask[1:]
             self.mask[-1] = 0
@@ -23,16 +24,16 @@ class ZigZag:
             if self.mask[i-1] != 0:
                 continue
             self.mask[i-1] = self.mask[i-2]
-            if h.Low[i] < self.min_last and h.High[i] < self.max_last:
+            if h.Low.iloc[i] < self.min_last and h.High.iloc[i] < self.max_last:
                 self.mask[i-1] = -1
-                if h.High[i-2] > h.High[i-1]:
+                if h.High.iloc[i-2] > h.High.iloc[i-1]:
                     self.mask[i-2] = -1
-            if h.High[i] > self.max_last and h.Low[i] > self.min_last:
+            if h.High.iloc[i] > self.max_last and h.Low.iloc[i] > self.min_last:
                 self.mask[i-1] = 1
-                if h.Low[i-2] < h.Low[i-1]:
+                if h.Low.iloc[i-2] < h.Low.iloc[i-1]:
                     self.mask[i-2] = 1
-            self.min_last, self.max_last = h.Low[i], h.High[i]
-        self.last_id = h.Id[-1]
+            self.min_last, self.max_last = h.Low.iloc[i], h.High.iloc[i]
+        self.last_id = h.Id.iloc[-1]
         return self.mask
 
     def update(self, h):
