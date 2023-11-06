@@ -1,5 +1,6 @@
 import numpy as np
 from loguru import logger
+from time import perf_counter
 
 
 class Order:
@@ -102,7 +103,9 @@ class Broker:
         return np.array([p.profit for p in self.positions])
         
     def update(self, h):
+        t0 = perf_counter()
         date = h.index[-1]
+        closed_position = None
         for i, order in enumerate(self.active_orders): 
             triggered_price = None
             triggered_date = None
@@ -132,14 +135,13 @@ class Broker:
                         closed_position = self.active_position
                         self.active_position = None
                         self.positions.append(closed_position)
-                        return closed_position
                     else:
                         # Докупка
                         pass
                         #raise NotImplementedError()
                     
         self.trailing_stop(h)
-        return None    
+        return closed_position, perf_counter() - t0
                 
     def trailing_stop(self, h):
         date, p = h.index[-1], h.Close.iloc[-1]

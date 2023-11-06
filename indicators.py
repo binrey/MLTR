@@ -2,15 +2,14 @@ import numpy as np
 from easydict import EasyDict
 from loguru import logger
 # import numba
-from numba import jit
+from numba import jit, njit
 
 
 class ZigZag:
     def __init__(self):
         self.mask, self.min_last, self.max_last, self.last_id = None, None, None, 0
-      
+
     def _get_mask(self, h):
-        hlow = h.Low.values()
         if self.mask is None or h.Id.iloc[-1] - self.last_id > 1:
             self.min_last, self.max_last = h.Low.iloc[0], h.High.iloc[0]
             self.mask = np.zeros(h.shape[0] - 1)
@@ -18,8 +17,6 @@ class ZigZag:
         else:
             self.mask[:-1] = self.mask[1:]
             self.mask[-1] = 0
-            # size2add = 1
-            # self.mask = np.append(self.mask[1:], np.zeros((size2add,)))
         for i in range(2, h.shape[0]):
             if self.mask[i-1] != 0:
                 continue
@@ -36,6 +33,39 @@ class ZigZag:
         self.last_id = h.Id.iloc[-1]
         return self.mask
 
+    def _get_mask2(self, h):
+        if self.mask is None or h.Id.iloc[-1] - self.last_id > 1:
+            self.min_last, self.max_last = h.Low.iloc[0], h.High.iloc[0]
+            self.mask = np.zeros(h.shape[0] - 1, dtype=np.int64)
+            self.mask[0] = 1 if h.High.iloc[1] > self.max_last else -1
+        else:
+            self.mask[:-1] = self.mask[1:]
+            self.mask[-1] = 0
+        hlow = h.Low.values
+        htop = h.High.values
+        hsize = h.shape[0]            
+        self.mask, self.max_last, self.min_last = self._zloop(self.mask, hlow, htop, hsize, self.max_last, self.min_last)
+        self.last_id = h.Id.iloc[-1]
+        return self.mask
+
+    @staticmethod
+    @jit(nopython=True)
+    def _zloop(mask, hlow, htop, hsize, max_last, min_last):
+        for i in range(2, hsize):
+            if mask[i-1] != 0:
+                continue
+            mask[i-1] = mask[i-2]
+            if hlow[i] < min_last and htop[i] < max_last:
+                mask[i-1] = -1
+                if htop[i-2] > htop[i-1]:
+                    mask[i-2] = -1
+            if htop[i] > max_last and hlow[i] > min_last:
+                mask[i-1] = 1
+                if hlow[i-2] < hlow[i-1]:
+                    mask[i-2] = 1
+            min_last, max_last = hlow[i], htop[i]     
+        return mask, max_last, min_last
+
     def update(self, h):
         self._get_mask(h)
         return self.mask2zigzag(h, self.mask, use_min_max=True)
@@ -50,9 +80,9 @@ class ZigZag:
         for i in range(mask.shape[0]):
             x = h.index[i]
             if use_min_max:
-                y = h.Low.values[i] if mask[i] > 0 else h.High.values[i]
+                y = h.Low.iloc[i] if mask[i] > 0 else h.High.iloc[i]
             else:
-                y = h.Close.values[i]
+                y = h.Close.iloc[i]
             if i > 0: 
                 if mask[i] != node:
                     upd_buffers(i, x, y, node)
@@ -60,7 +90,7 @@ class ZigZag:
             else:
                 node = mask[i]
                 upd_buffers(i, x, y, mask[i])
-        upd_buffers(i+1, h.index[-1], h.Low.values[-1] if - mask[i] > 0 else h.High.values[-1], mask[i])
+        upd_buffers(i+1, h.index[-1], h.Low.iloc[-1] if - mask[i] > 0 else h.High.iloc[-1], mask[i])
         return ids, dates, values, types   
     
 def zigzag_simplify(data, mask, only_calc=False):
@@ -117,3 +147,40 @@ def zz_opt(h, minnodes=1, simp_while_grow=True):
         # lines = [(x, y) for x, y in zip(d, v)]
         # mpf.plot(h, type="candle", alines=lines, title=str(nnodes))   
     return zz.mask2zigzag(h, mask, True)
+
+
+if __name__ == "__main__":
+    from time import perf_counter
+    # @jit(nopython=True)
+    def z(mask, hlow, htop, hsize, max_last, min_last):
+        for i in range(2, hsize):
+            # if mask[i-1] != 0:
+            #     continue
+            mask[i-1] = mask[i-2]
+            if hlow[i] < min_last and htop[i] < max_last:
+                mask[i-1] = -1
+                if htop[i-2] > htop[i-1]:
+                    mask[i-2] = -1
+            if htop[i] > max_last and hlow[i] > min_last:
+                mask[i-1] = 1
+                if hlow[i-2] < hlow[i-1]:
+                    mask[i-2] = 1
+            min_last, max_last = hlow[i], htop[i]     
+        return mask, max_last, min_last
+    
+    
+    mask = np.load("mask.npy").astype(np.float32)
+    hlow = np.load("hlow.npy")
+    htop = np.load("htop.npy")
+    hsize = 32
+    max_last = np.load("max_last.npy").item()
+    min_last = np.load("min_last.npy").item()
+    
+    t_tot, t_sum = 0, 0
+    t0 = perf_counter()
+    for i in range(100000):
+        tt0 = perf_counter()
+        output = z(mask, hlow, htop, hsize, max_last, min_last)
+        t_sum += perf_counter() - tt0
+    print(perf_counter() - t0, t_sum)
+        

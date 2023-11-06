@@ -1,7 +1,7 @@
 from pathlib import Path
 from shutil import rmtree
-from time import time
-
+from time import perf_counter
+from easydict import EasyDict
 # import finplot as fplt
 import matplotlib.pyplot as plt
 import mplfinance as mpf
@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from loguru import logger
+from tqdm import tqdm
 
 pd.options.mode.chained_assignment = None
 from experts import ExpertFormation, PyConfig
@@ -37,14 +38,15 @@ class DataParser():
         hist = pd.read_csv(data_file, sep="\t")
         hist.columns = map(lambda x:x[1:-1], hist.columns)
         hist.columns = map(str.capitalize, hist.columns)
-        hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(hist.Date.values, hist.Time.values)])
-        hist.set_index("Date", inplace=True, drop=True)
+        hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(hist.Date.values, hist.Time.values)], utc=True)
+        hist["Date"] = [dt.timestamp() for dt in hist.Date]
+        # hist.set_index("Date", inplace=True, drop=True)
         hist.drop("Time", axis=1, inplace=True)
         columns = list(hist.columns)
         columns[-2] = "Volume"
         hist.columns = columns
         hist["Id"] = list(range(hist.shape[0]))
-        return hist
+        return EasyDict(hist.to_dict("list"))
     
     @staticmethod
     def bitfinex(data_file):
@@ -56,7 +58,6 @@ class DataParser():
         hist.drop(["unix", "symbol", "date"], axis=1, inplace=True)
         hist.columns = map(str.capitalize, hist.columns)
         hist["Volume"] = hist.iloc[:, -3]
-        
         return hist
     
     @staticmethod
@@ -69,12 +70,17 @@ class DataParser():
         
 
 def get_data(hist, t, size):
-    current_row = hist.iloc[t:t+1].copy()
-    current_row.Close.iloc[0] = current_row.Open.iloc[0]
+    t0 = perf_counter()
+    data = EasyDict()
+    
+    data["Close"] = hist.Close[t-size-1:t]
+    data.Close[-1]
+    current_row.Open.iloc[0]
     current_row.High.iloc[0] = current_row.Open.iloc[0]
     current_row.Low.iloc[0] = current_row.Open.iloc[0]
     current_row.Volume[0] = 0
-    return pd.concat([hist[t-size-1:t], current_row])
+    data = pd.concat([hist[t-size-1:t], current_row])
+    return data, perf_counter() - t0
 
 
 def backtest(cfg):
@@ -88,16 +94,16 @@ def backtest(cfg):
         save_path.mkdir()
     tstart = max(cfg.hist_buffer_size+1, cfg.tstart)
     tend = cfg.tend if cfg.tend is not None else hist.shape[0]
-    t0 = time()
-    for t in range(tstart, tend):
-        h = get_data(hist, t, cfg.hist_buffer_size)
+    t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0
+    for t in tqdm(range(tstart, tend)):
+        h, dt = get_data(hist, t, cfg.hist_buffer_size)
+        tdata += dt
         if t < tstart or len(broker.active_orders) == 0:
-            exp.update(h)
+            texp += exp.update(h)
             broker.active_orders = exp.orders
         
-        # trailing_stop(broker.active_orders, broker.active_position, h.index[-2], h.Close.iloc[-2], 0.1)
-        pos = broker.update(h)
-        # mpf.plot(hist[t-exp.body_length-1:t], type='candle', alines=dict(alines=exp.lines))
+        pos, dt = broker.update(h)
+        tbrok += dt
         if pos is not None:
             logger.debug(f"t = {t} -> postprocess closed position")
             broker.close_orders(h.index[-2])
@@ -113,13 +119,22 @@ def backtest(cfg):
                             savefig=save_path / f"fig-{pos.open_date}.png")
                 del fig
             exp.reset_state()
-    # pickle.dump(brok_results, open(str(save_path / f"broker.pickle"), "wb"))
-    logger.debug("-"*40 + "\n")
-    logger.debug(f"backtest time: {time() - t0:.1f} sec")
+    
+    ttotal = perf_counter() - t0
+    logger.info("-"*40)
+    sformat = "{:>40}: {:>3.0f} %"
+    logger.info("{:>40}: {:.0f} sec".format("total backtest", ttotal))
+    logger.info(sformat.format("expert updates", texp/ttotal*100))
+    logger.info(sformat.format("broker updates", tbrok/ttotal*100))
+    logger.info(sformat.format("data loadings", tdata/ttotal*100))
+
     return broker
     
     
 if __name__ == "__main__":
+    import sys
+    logger.remove()
+    logger.add(sys.stderr, level="INFO")
     brok_results = backtest(PyConfig().test())
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
     plt.savefig("backtest.png")

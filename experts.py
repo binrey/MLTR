@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from functools import partial
+from time import perf_counter
 
 import numpy as np
 import yaml
@@ -20,7 +20,9 @@ class ExpertBase(ABC):
         pass
         
     def update(self, h):
+        t0 = perf_counter()
         self.get_body(h)
+        return perf_counter() - t0
 
 
 class ExtensionBase:
