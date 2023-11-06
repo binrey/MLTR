@@ -10,34 +10,34 @@ class ZigZag:
         self.mask, self.min_last, self.max_last, self.last_id = None, None, None, 0
 
     def _get_mask(self, h):
-        if self.mask is None or h.Id.iloc[-1] - self.last_id > 1:
-            self.min_last, self.max_last = h.Low.iloc[0], h.High.iloc[0]
-            self.mask = np.zeros(h.shape[0] - 1)
-            self.mask[0] = 1 if h.High.iloc[1] > self.max_last else -1
+        if self.mask is None or h.Id[-1] - self.last_id > 1:
+            self.min_last, self.max_last = h.Low[0], h.High[0]
+            self.mask = np.zeros(h.Id.shape[0] - 1)
+            self.mask[0] = 1 if h.High[1] > self.max_last else -1
         else:
             self.mask[:-1] = self.mask[1:]
             self.mask[-1] = 0
-        for i in range(2, h.shape[0]):
+        for i in range(2, h.Id.shape[0]):
             if self.mask[i-1] != 0:
                 continue
             self.mask[i-1] = self.mask[i-2]
-            if h.Low.iloc[i] < self.min_last and h.High.iloc[i] < self.max_last:
+            if h.Low[i] < self.min_last and h.High[i] < self.max_last:
                 self.mask[i-1] = -1
-                if h.High.iloc[i-2] > h.High.iloc[i-1]:
+                if h.High[i-2] > h.High[i-1]:
                     self.mask[i-2] = -1
-            if h.High.iloc[i] > self.max_last and h.Low.iloc[i] > self.min_last:
+            if h.High[i] > self.max_last and h.Low[i] > self.min_last:
                 self.mask[i-1] = 1
-                if h.Low.iloc[i-2] < h.Low.iloc[i-1]:
+                if h.Low[i-2] < h.Low[i-1]:
                     self.mask[i-2] = 1
-            self.min_last, self.max_last = h.Low.iloc[i], h.High.iloc[i]
-        self.last_id = h.Id.iloc[-1]
+            self.min_last, self.max_last = h.Low[i], h.High[i]
+        self.last_id = h.Id[-1]
         return self.mask
 
     def _get_mask2(self, h):
-        if self.mask is None or h.Id.iloc[-1] - self.last_id > 1:
-            self.min_last, self.max_last = h.Low.iloc[0], h.High.iloc[0]
+        if self.mask is None or h.Id[-1] - self.last_id > 1:
+            self.min_last, self.max_last = h.Low[0], h.High[0]
             self.mask = np.zeros(h.shape[0] - 1, dtype=np.int64)
-            self.mask[0] = 1 if h.High.iloc[1] > self.max_last else -1
+            self.mask[0] = 1 if h.High[1] > self.max_last else -1
         else:
             self.mask[:-1] = self.mask[1:]
             self.mask[-1] = 0
@@ -45,7 +45,7 @@ class ZigZag:
         htop = h.High.values
         hsize = h.shape[0]            
         self.mask, self.max_last, self.min_last = self._zloop(self.mask, hlow, htop, hsize, self.max_last, self.min_last)
-        self.last_id = h.Id.iloc[-1]
+        self.last_id = h.Id[-1]
         return self.mask
 
     @staticmethod
@@ -80,9 +80,9 @@ class ZigZag:
         for i in range(mask.shape[0]):
             x = h.index[i]
             if use_min_max:
-                y = h.Low.iloc[i] if mask[i] > 0 else h.High.iloc[i]
+                y = h.Low[i] if mask[i] > 0 else h.High[i]
             else:
-                y = h.Close.iloc[i]
+                y = h.Close[i]
             if i > 0: 
                 if mask[i] != node:
                     upd_buffers(i, x, y, node)
@@ -90,7 +90,7 @@ class ZigZag:
             else:
                 node = mask[i]
                 upd_buffers(i, x, y, mask[i])
-        upd_buffers(i+1, h.index[-1], h.Low.iloc[-1] if - mask[i] > 0 else h.High.iloc[-1], mask[i])
+        upd_buffers(i+1, h.index[-1], h.Low[-1] if - mask[i] > 0 else h.High[-1], mask[i])
         return ids, dates, values, types   
     
 def zigzag_simplify(data, mask, only_calc=False):

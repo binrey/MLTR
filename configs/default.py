@@ -49,7 +49,7 @@ forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
 
 config = EasyDict(
     trailing_stop_rate=Param(0.01, [0.01, 0.05]),
-    body_classifier=Param(body_classifiers["trngl_comp"], [body_classifiers[k] for k in ["trend", "trngl_simp", "trngl_comp"]]),
+    body_classifier=Param(body_classifiers["trend"], [body_classifiers[k] for k in ["trend", "trngl_simp", "trngl_comp"]]),
     stops_processor=Param(stops_processors["stops_dynamic"], [stops_processors[k] for k in ["stops_dynamic"]]),
     wait_entry_point=Param(9999, [9999]),
     hist_buffer_size=Param(60, [30]),
@@ -58,5 +58,5 @@ config = EasyDict(
     period=Param("H1", ["M5"]),
     ticker=Param("SBRF", forts_list),
     data_type=Param("FORTS", ["FORTS"]),
-    save_plots=Param(False, [False]),
+    save_plots=Param(True, [False]),
 )

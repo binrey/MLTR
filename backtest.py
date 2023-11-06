@@ -1,6 +1,7 @@
 from pathlib import Path
 from shutil import rmtree
 from time import perf_counter
+from datetime import datetime
 from easydict import EasyDict
 # import finplot as fplt
 import matplotlib.pyplot as plt
@@ -38,26 +39,27 @@ class DataParser():
         hist = pd.read_csv(data_file, sep="\t")
         hist.columns = map(lambda x:x[1:-1], hist.columns)
         hist.columns = map(str.capitalize, hist.columns)
-        hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(hist.Date.values, hist.Time.values)], utc=True)
-        hist["Date"] = [dt.timestamp() for dt in hist.Date]
-        # hist.set_index("Date", inplace=True, drop=True)
+        hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(hist.Date.values, hist.Time.values)])#, utc=True)
+        hist["timestamp"] = [dt.timestamp() for dt in hist.Date]
+        hist.set_index("Date", inplace=True, drop=True)
         hist.drop("Time", axis=1, inplace=True)
         columns = list(hist.columns)
         columns[-2] = "Volume"
         hist.columns = columns
         hist["Id"] = list(range(hist.shape[0]))
-        return EasyDict(hist.to_dict("list"))
+        hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
+        return hist, hist_dict
     
     @staticmethod
     def bitfinex(data_file):
         hist = pd.read_csv(data_file, header=1)
-        hist = hist.iloc[::-1]
+        hist = hist[::-1]
         hist["Date"] = pd.to_datetime(hist.date.values)
         hist.set_index("Date", inplace=True, drop=False)
         hist["Id"] = list(range(hist.shape[0]))
         hist.drop(["unix", "symbol", "date"], axis=1, inplace=True)
         hist.columns = map(str.capitalize, hist.columns)
-        hist["Volume"] = hist.iloc[:, -3]
+        hist["Volume"] = hist[:, -3]
         return hist
     
     @staticmethod
@@ -72,21 +74,25 @@ class DataParser():
 def get_data(hist, t, size):
     t0 = perf_counter()
     data = EasyDict()
-    
-    data["Close"] = hist.Close[t-size-1:t]
-    data.Close[-1]
-    current_row.Open.iloc[0]
-    current_row.High.iloc[0] = current_row.Open.iloc[0]
-    current_row.Low.iloc[0] = current_row.Open.iloc[0]
-    current_row.Volume[0] = 0
-    data = pd.concat([hist[t-size-1:t], current_row])
+
+    data["Id"] = hist.Id[t-size-1:t+1].copy()
+    data["index"] = hist.timestamp[t-size-1:t+1].copy()
+    data["Open"] = hist.Open[t-size-1:t+1].copy()
+    data["Close"] = hist.Close[t-size-1:t+1].copy()
+    data.Close[-1] = data.Open[-1]
+    data["High"] = hist.High[t-size-1:t+1].copy()
+    data.High[-1] = data.Open[-1]
+    data["Low"] = hist.Low[t-size-1:t+1].copy()
+    data.Low[-1] = data.Open[-1]
+    data["Volume"] = hist.Volume[t-size-1:t+1].copy()
+    data.Volume[-1] = 0
     return data, perf_counter() - t0
 
 
 def backtest(cfg):
     exp = ExpertFormation(cfg)
     broker = Broker(cfg)
-    hist = DataParser(cfg).load()
+    hist_pd, hist = DataParser(cfg).load()
     if cfg.save_plots:
         save_path = Path("backtests") / f"{cfg.ticker}-{cfg.period}"
         if save_path.exists():
@@ -108,11 +114,16 @@ def backtest(cfg):
             logger.debug(f"t = {t} -> postprocess closed position")
             broker.close_orders(h.index[-2])
             if cfg.save_plots:
-                ords_lines = [order.lines for order in broker.orders if hist.loc[order.open_date].Id >= pos.open_indx]
+                ords_lines = [order.lines for order in broker.orders if order.open_indx >= pos.open_indx]
                 lines2plot = [exp.lines] + ords_lines + [pos.lines]
                 colors = ["blue"]*(len(lines2plot)-1) + ["green" if pos.profit > 0 else "red"]
                 widths = [1]*len(lines2plot)
-                fig = mpf.plot(hist.loc[lines2plot[0][0][0]:lines2plot[-1][-1][0]], 
+                
+                for line in lines2plot:
+                    for i, point in enumerate(line):
+                        line[i] = (hist_pd.index[point[0]], point[1])
+                
+                fig = mpf.plot(hist_pd.loc[lines2plot[0][0][0]:lines2plot[-1][-1][0]], 
                             type='candle', 
                             block=False,
                             alines=dict(alines=lines2plot, colors=colors, linewidths=widths),

@@ -11,7 +11,7 @@ class Order:
     def __init__(self, directed_price, type, indx, date):
         self.dir = np.sign(directed_price)
         self.type = type
-        self.indx = indx
+        self.open_indx = indx
         self.open_date = date
         self.close_date = None
         self._change_hist = []
@@ -26,7 +26,7 @@ class Order:
 
     @property
     def id(self):
-        return f"{self.str_dir}-{self.indx}-{self.price:.2f}"
+        return f"{self.str_dir}-{self.open_indx}-{self.price:.2f}"
     
     @property
     def lines(self):
@@ -104,29 +104,29 @@ class Broker:
         
     def update(self, h):
         t0 = perf_counter()
-        date = h.index[-1]
+        date = h.Id[-1]
         closed_position = None
         for i, order in enumerate(self.active_orders): 
             triggered_price = None
             triggered_date = None
-            if order.type == Order.TYPE.MARKET and order.indx == h.Id.iloc[-1]:
-                logger.debug(f"{date} process order {order.id} (O:{h.Open.iloc[-1]})")
-                triggered_price = h.Open.iloc[-1]*order.dir
+            if order.type == Order.TYPE.MARKET and order.open_indx == h.Id[-1]:
+                logger.debug(f"{date} process order {order.id} (O:{h.Open[-1]})")
+                triggered_price = h.Open[-1]*order.dir
                 triggered_date = date
-                order.change(date, h.Open.iloc[-1])
-            if order.type == Order.TYPE.LIMIT and order.indx != h.Id.iloc[-1]:
-                if (h.Low.iloc[-2] > order.price and h.Open.iloc[-1] < order.price) or (h.High.iloc[-2] < order.price and h.Open.iloc[-1] > order.price):
-                    logger.debug(f"{date} process order {order.id}, and change price to O:{h.Open.iloc[-1]}")    
-                    triggered_price = h.Open.iloc[-1]*order.dir 
+                order.change(date, h.Open[-1])
+            if order.type == Order.TYPE.LIMIT and order.open_indx != h.Id[-1]:
+                if (h.Low[-2] > order.price and h.Open[-1] < order.price) or (h.High[-2] < order.price and h.Open[-1] > order.price):
+                    logger.debug(f"{date} process order {order.id}, and change price to O:{h.Open[-1]}")    
+                    triggered_price = h.Open[-1]*order.dir 
                     triggered_date = date                        
-                elif h.High.iloc[-2] >= order.price and h.Low.iloc[-2] <= order.price:
-                    logger.debug(f"{date} process order {order.id} (L:{h.Low.iloc[-2]} <= {order.price:.2f} <= H:{h.High.iloc[-2]})")
+                elif h.High[-2] >= order.price and h.Low[-2] <= order.price:
+                    logger.debug(f"{date} process order {order.id} (L:{h.Low[-2]} <= {order.price:.2f} <= H:{h.High[-2]})")
                     triggered_price = order.price*order.dir
-                    triggered_date = h.index[-2]
+                    triggered_date = h.Id[-2]
                     
             if triggered_price is not None:
                 self.close_orders(triggered_date, i)
-                triggered_id = h.loc[triggered_date].Id
+                triggered_id = triggered_date#.Id[np.where(h.index == triggered_date)[0].item()]
                 if self.active_position is None:
                     self.active_position = Position(triggered_price, triggered_date, triggered_id)
                 else:
@@ -144,7 +144,7 @@ class Broker:
         return closed_position, perf_counter() - t0
                 
     def trailing_stop(self, h):
-        date, p = h.index[-1], h.Close.iloc[-1]
+        date, p = h.Id[-1], h.Close[-1]
         position = self.active_position
         if position is None or self.cfg.trailing_stop_rate == 0 or 0:
             return
