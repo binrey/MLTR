@@ -47,7 +47,7 @@ class DataParser():
         columns[-2] = "Volume"
         hist.columns = columns
         hist["Id"] = list(range(hist.shape[0]))
-        hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
+        hist_dict = EasyDict({c:hist[c].values.squeeze() for c in hist.columns})
         return hist, hist_dict
     
     @staticmethod
@@ -112,18 +112,22 @@ def backtest(cfg):
         tbrok += dt
         if pos is not None:
             logger.debug(f"t = {t} -> postprocess closed position")
-            broker.close_orders(h.index[-2])
+            broker.close_orders(h.Id[-2])
             if cfg.save_plots:
                 ords_lines = [order.lines for order in broker.orders if order.open_indx >= pos.open_indx]
                 lines2plot = [exp.lines] + ords_lines + [pos.lines]
                 colors = ["blue"]*(len(lines2plot)-1) + ["green" if pos.profit > 0 else "red"]
                 widths = [1]*len(lines2plot)
                 
+                hist2plot = hist_pd.iloc[lines2plot[0][0][0]:lines2plot[-1][-1][0]]
                 for line in lines2plot:
                     for i, point in enumerate(line):
-                        line[i] = (hist_pd.index[point[0]], point[1])
+                        if hist_pd.index[point[0]] in hist2plot.index:
+                            line[i] = (hist_pd.index[point[0]], point[1].item())
+                        else:
+                            a=1
                 
-                fig = mpf.plot(hist_pd.loc[lines2plot[0][0][0]:lines2plot[-1][-1][0]], 
+                fig = mpf.plot(hist2plot, 
                             type='candle', 
                             block=False,
                             alines=dict(alines=lines2plot, colors=colors, linewidths=widths),
@@ -145,7 +149,7 @@ def backtest(cfg):
 if __name__ == "__main__":
     import sys
     logger.remove()
-    logger.add(sys.stderr, level="INFO")
+    logger.add(sys.stderr, level="DEBUG")
     brok_results = backtest(PyConfig().test())
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
     plt.savefig("backtest.png")

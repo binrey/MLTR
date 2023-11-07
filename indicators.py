@@ -85,11 +85,11 @@ class ZigZag:
                 y = h.Close[i]
             if i > 0: 
                 if mask[i] != node:
-                    upd_buffers(i, x, y, node)
+                    upd_buffers(h.Id[i], x, y, node)
                     node = mask[i]
             else:
                 node = mask[i]
-                upd_buffers(i, x, y, mask[i])
+                upd_buffers(h.Id[i], x, y, mask[i])
         upd_buffers(i+1, h.index[-1], h.Low[-1] if - mask[i] > 0 else h.High[-1], mask[i])
         return ids, dates, values, types   
     

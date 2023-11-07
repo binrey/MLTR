@@ -34,11 +34,15 @@ class Order:
         return self._change_hist
     
     def change(self, date, price):
+        date = date.item()
+        assert type(date) is int
         self.price = price
         if price != 0:
             self._change_hist.append((date, price))
         
     def close(self, date):
+        date = date.item()
+        assert type(date) is int
         self.close_date = date
         self._change_hist.append((date, self.price))       
         
