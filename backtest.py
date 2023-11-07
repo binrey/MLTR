@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import mplfinance as mpf
 import numpy as np
 import pandas as pd
-import yfinance as yf
+# import yfinance as yf
 from loguru import logger
 from tqdm import tqdm
 
@@ -59,7 +59,7 @@ class DataParser():
         hist["Id"] = list(range(hist.shape[0]))
         hist.drop(["unix", "symbol", "date"], axis=1, inplace=True)
         hist.columns = map(str.capitalize, hist.columns)
-        hist["Volume"] = hist[:, -3]
+        hist["Volume"] = hist.iloc[:, -3]
         return hist
     
     @staticmethod
@@ -99,7 +99,7 @@ def backtest(cfg):
             rmtree(save_path)
         save_path.mkdir()
     tstart = max(cfg.hist_buffer_size+1, cfg.tstart)
-    tend = cfg.tend if cfg.tend is not None else hist.shape[0]
+    tend = cfg.tend if cfg.tend is not None else hist.Id.shape[0]
     t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0
     for t in tqdm(range(tstart, tend)):
         h, dt = get_data(hist, t, cfg.hist_buffer_size)
@@ -117,15 +117,17 @@ def backtest(cfg):
                 ords_lines = [order.lines for order in broker.orders if order.open_indx >= pos.open_indx]
                 lines2plot = [exp.lines] + ords_lines + [pos.lines]
                 colors = ["blue"]*(len(lines2plot)-1) + ["green" if pos.profit > 0 else "red"]
-                widths = [1]*len(lines2plot)
+                widths = [1]*(len(lines2plot)-1) + [2]
                 
-                hist2plot = hist_pd.iloc[lines2plot[0][0][0]:lines2plot[-1][-1][0]]
+                hist2plot = hist_pd.iloc[lines2plot[0][0][0]:lines2plot[-1][-1][0]+1]
                 for line in lines2plot:
                     for i, point in enumerate(line):
-                        if hist_pd.index[point[0]] in hist2plot.index:
-                            line[i] = (hist_pd.index[point[0]], point[1].item())
-                        else:
-                            a=1
+                        y = point[1]
+                        try:
+                            y = y.item()
+                        except:
+                            pass
+                        line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)
                 
                 fig = mpf.plot(hist2plot, 
                             type='candle', 
@@ -138,7 +140,7 @@ def backtest(cfg):
     ttotal = perf_counter() - t0
     logger.info("-"*40)
     sformat = "{:>40}: {:>3.0f} %"
-    logger.info("{:>40}: {:.0f} sec".format("total backtest", ttotal))
+    logger.info("{:>40}: {:.1f} sec".format("total backtest", ttotal))
     logger.info(sformat.format("expert updates", texp/ttotal*100))
     logger.info(sformat.format("broker updates", tbrok/ttotal*100))
     logger.info(sformat.format("data loadings", tdata/ttotal*100))
@@ -149,7 +151,7 @@ def backtest(cfg):
 if __name__ == "__main__":
     import sys
     logger.remove()
-    logger.add(sys.stderr, level="DEBUG")
+    logger.add(sys.stderr, level="INFO")
     brok_results = backtest(PyConfig().test())
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
     plt.savefig("backtest.png")

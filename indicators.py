@@ -2,7 +2,7 @@ import numpy as np
 from easydict import EasyDict
 from loguru import logger
 # import numba
-from numba import jit, njit
+# from numba import jit, njit
 
 
 class ZigZag:
@@ -33,38 +33,38 @@ class ZigZag:
         self.last_id = h.Id[-1]
         return self.mask
 
-    def _get_mask2(self, h):
-        if self.mask is None or h.Id[-1] - self.last_id > 1:
-            self.min_last, self.max_last = h.Low[0], h.High[0]
-            self.mask = np.zeros(h.shape[0] - 1, dtype=np.int64)
-            self.mask[0] = 1 if h.High[1] > self.max_last else -1
-        else:
-            self.mask[:-1] = self.mask[1:]
-            self.mask[-1] = 0
-        hlow = h.Low.values
-        htop = h.High.values
-        hsize = h.shape[0]            
-        self.mask, self.max_last, self.min_last = self._zloop(self.mask, hlow, htop, hsize, self.max_last, self.min_last)
-        self.last_id = h.Id[-1]
-        return self.mask
+    # def _get_mask2(self, h):
+    #     if self.mask is None or h.Id[-1] - self.last_id > 1:
+    #         self.min_last, self.max_last = h.Low[0], h.High[0]
+    #         self.mask = np.zeros(h.shape[0] - 1, dtype=np.int64)
+    #         self.mask[0] = 1 if h.High[1] > self.max_last else -1
+    #     else:
+    #         self.mask[:-1] = self.mask[1:]
+    #         self.mask[-1] = 0
+    #     hlow = h.Low.values
+    #     htop = h.High.values
+    #     hsize = h.shape[0]            
+    #     self.mask, self.max_last, self.min_last = self._zloop(self.mask, hlow, htop, hsize, self.max_last, self.min_last)
+    #     self.last_id = h.Id[-1]
+    #     return self.mask
 
-    @staticmethod
-    @jit(nopython=True)
-    def _zloop(mask, hlow, htop, hsize, max_last, min_last):
-        for i in range(2, hsize):
-            if mask[i-1] != 0:
-                continue
-            mask[i-1] = mask[i-2]
-            if hlow[i] < min_last and htop[i] < max_last:
-                mask[i-1] = -1
-                if htop[i-2] > htop[i-1]:
-                    mask[i-2] = -1
-            if htop[i] > max_last and hlow[i] > min_last:
-                mask[i-1] = 1
-                if hlow[i-2] < hlow[i-1]:
-                    mask[i-2] = 1
-            min_last, max_last = hlow[i], htop[i]     
-        return mask, max_last, min_last
+    # @staticmethod
+    # @jit(nopython=True)
+    # def _zloop(mask, hlow, htop, hsize, max_last, min_last):
+    #     for i in range(2, hsize):
+    #         if mask[i-1] != 0:
+    #             continue
+    #         mask[i-1] = mask[i-2]
+    #         if hlow[i] < min_last and htop[i] < max_last:
+    #             mask[i-1] = -1
+    #             if htop[i-2] > htop[i-1]:
+    #                 mask[i-2] = -1
+    #         if htop[i] > max_last and hlow[i] > min_last:
+    #             mask[i-1] = 1
+    #             if hlow[i-2] < hlow[i-1]:
+    #                 mask[i-2] = 1
+    #         min_last, max_last = hlow[i], htop[i]     
+    #     return mask, max_last, min_last
 
     def update(self, h):
         self._get_mask(h)
