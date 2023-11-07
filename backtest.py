@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import mplfinance as mpf
 import numpy as np
 import pandas as pd
-import yfinance as yf
+# import yfinance as yf
 from loguru import logger
 
 pd.options.mode.chained_assignment = None

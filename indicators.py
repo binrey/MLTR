@@ -2,7 +2,7 @@ import numpy as np
 from easydict import EasyDict
 from loguru import logger
 # import numba
-from numba import jit
+# from numba import jit
 
 
 class ZigZag:
@@ -10,7 +10,6 @@ class ZigZag:
         self.mask, self.min_last, self.max_last, self.last_id = None, None, None, 0
       
     def _get_mask(self, h):
-        hlow = h.Low.values()
         if self.mask is None or h.Id.iloc[-1] - self.last_id > 1:
             self.min_last, self.max_last = h.Low.iloc[0], h.High.iloc[0]
             self.mask = np.zeros(h.shape[0] - 1)
