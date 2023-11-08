@@ -16,6 +16,8 @@ pd.options.mode.chained_assignment = None
 from experts import ExpertFormation, PyConfig
 from utils import Broker, trailing_stop
 
+# Если проблемы с отрисовкой графиков
+# export QT_QPA_PLATFORM=offscreen
 
 class DataParser():
     def __init__(self, cfg):
