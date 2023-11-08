@@ -60,7 +60,8 @@ class DataParser():
         hist.drop(["unix", "symbol", "date"], axis=1, inplace=True)
         hist.columns = map(str.capitalize, hist.columns)
         hist["Volume"] = hist.iloc[:, -3]
-        return hist
+        hist_dict = EasyDict({c:hist[c].values.squeeze() for c in hist.columns})
+        return hist, hist_dict
     
     @staticmethod
     def yahoo(data_file):
@@ -71,27 +72,38 @@ class DataParser():
         return hist
         
 
-def get_data(hist, t, size):
-    t0 = perf_counter()
-    data = EasyDict()
-
-    data["Id"] = hist.Id[t-size-1:t+1].copy()
-    data["Open"] = hist.Open[t-size-1:t+1].copy()
-    data["Close"] = hist.Close[t-size-1:t+1].copy()
-    data.Close[-1] = data.Open[-1]
-    data["High"] = hist.High[t-size-1:t+1].copy()
-    data.High[-1] = data.Open[-1]
-    data["Low"] = hist.Low[t-size-1:t+1].copy()
-    data.Low[-1] = data.Open[-1]
-    data["Volume"] = hist.Volume[t-size-1:t+1].copy()
-    data.Volume[-1] = 0
-    return data, perf_counter() - t0
+class MovingWindow():
+    def __init__(self, hist, size):
+        self.hist = hist
+        self.size = size
+        self.data = EasyDict(Id=np.zeros(size, dtype=np.int64),
+                             Open=np.zeros(size, dtype=np.float32),
+                             Close=np.zeros(size, dtype=np.float32),
+                             High=np.zeros(size, dtype=np.float32),
+                             Low=np.zeros(size, dtype=np.float32),
+                             Volume=np.zeros(size, dtype=np.int64)
+                             )
+        
+    def __call__(self, t):
+        t0 = perf_counter()
+        self.data.Id = self.hist.Id[t-self.size+1:t+1]
+        self.data.Open = self.hist.Open[t-self.size+1:t+1]
+        self.data.Close[:-1] = self.hist.Close[t-self.size+1:t]
+        self.data.Close[-1] = self.data.Open[-1]
+        self.data.High[:-1] = self.hist.High[t-self.size+1:t]
+        self.data.High[-1] = self.data.Open[-1]
+        self.data.Low[:-1] = self.hist.Low[t-self.size+1:t]
+        self.data.Low[-1] = self.data.Open[-1]
+        self.data.Volume[:-1] = self.hist.Volume[t-self.size+1:t]
+        self.data.Volume[-1] = 0      
+        return self.data, perf_counter() - t0
 
 
 def backtest(cfg):
     exp = ExpertFormation(cfg)
     broker = Broker(cfg)
     hist_pd, hist = DataParser(cfg).load()
+    mw = MovingWindow(hist, cfg.hist_buffer_size)
     if cfg.save_plots:
         save_path = Path("backtests") / f"{cfg.ticker}-{cfg.period}"
         if save_path.exists():
@@ -101,7 +113,7 @@ def backtest(cfg):
     tend = cfg.tend if cfg.tend is not None else hist.Id.shape[0]
     t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0
     for t in tqdm(range(tstart, tend)):
-        h, dt = get_data(hist, t, cfg.hist_buffer_size)
+        h, dt = mw(t)
         tdata += dt
         if t < tstart or len(broker.active_orders) == 0:
             texp += exp.update(h)

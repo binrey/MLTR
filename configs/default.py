@@ -27,8 +27,8 @@ stops_processors = EasyDict(
     stops_fixed = EasyDict(
         func=StopsFixed,
         params=EasyDict(
-            tp=Param(4, [2, 4]), 
-            sl=Param(2, [2, 4])
+            tp=Param(4, [2, 4, 8]), 
+            sl=Param(2, [2, 4, 8])
             )
 ),
     stops_dynamic = EasyDict(
@@ -48,15 +48,15 @@ moex_list = ["SBER", "ROSN", "NVTK", "LKOH", "GMKN", "GAZP"]
 forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
 
 config = EasyDict(
-    trailing_stop_rate=Param(0.0, [0.01, 0.05]),
-    body_classifier=Param(body_classifiers["trend"], [body_classifiers[k] for k in ["trend", "trngl_simp", "trngl_comp"]]),
-    stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_dynamic"]]),
+    trailing_stop_rate=Param(0.0, [0, 0.01, 0.02, 0.04]),
+    body_classifier=Param(body_classifiers["trngl_comp"], [body_classifiers[k] for k in ["trend", "trngl_simp", "trngl_comp"]]),
+    stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_dynamic", "stops_fixed"]]),
     wait_entry_point=Param(9999, [9999]),
     hist_buffer_size=Param(30, [30]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("H1", ["M5"]),
-    ticker=Param("SBER", forts_list),
-    data_type=Param("metatrader", ["FORTS"]),
-    save_plots=Param(False, [False]),
+    period=Param("H1", ["H1"]),
+    ticker=Param("BTCUSD", bitfinex_list),
+    data_type=Param("bitfinex", ["bitfinex"]),
+    save_plots=Param(True, [False]),
 )

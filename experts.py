@@ -172,7 +172,7 @@ class ClsTriangleComp(ExtensionBase):
         self.zigzag = ZigZag()
         
     def __call__(self, common, h) -> bool:
-        ids, dates, values, types = self.zigzag.update(h)
+        ids, values, types = self.zigzag.update(h)
         # ids, dates, values, types = zz_opt(h[-self.body_maxsize:])
         is_fig = False
         types_filt, vals_filt, ids_ = [], [], []
@@ -206,7 +206,7 @@ class ClsTriangleComp(ExtensionBase):
                     
         if is_fig:
             i = self.cfg.npairs*2 + 1
-            common.lines = [(x, y) for x, y in zip([dates[j] for j in ids_[-i:][::-1]], [values[j] for j in ids_[-i:][::-1]])]
+            common.lines = [(x, y) for x, y in zip([ids[j] for j in ids_[-i:][::-1]], [values[j] for j in ids_[-i:][::-1]])]
             # common.lines = [(x, y) for x, y in zip(dates[-ids_[-1]:-1], values[-ids_[-1]:-1])]
             common.lprice = max(common.lines[-1][1], common.lines[-2][1])
             common.sprice = min(common.lines[-1][1], common.lines[-2][1]) 
