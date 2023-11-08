@@ -72,26 +72,24 @@ class ZigZag:
     
     def mask2zigzag(self, h, mask, use_min_max=False):
         ids, dates, values, types = [], [], [], []
-        def upd_buffers(i, d, v, t):
+        def upd_buffers(i, v, t):
             ids.append(i)
-            dates.append(d)
             values.append(v)
             types.append(t)
         for i in range(mask.shape[0]):
-            x = h.index[i]
             if use_min_max:
                 y = h.Low[i] if mask[i] > 0 else h.High[i]
             else:
                 y = h.Close[i]
             if i > 0: 
                 if mask[i] != node:
-                    upd_buffers(h.Id[i], x, y, node)
+                    upd_buffers(h.Id[i], y, node)
                     node = mask[i]
             else:
                 node = mask[i]
-                upd_buffers(h.Id[i], x, y, mask[i])
-        upd_buffers(i+1, h.index[-1], h.Low[-1] if - mask[i] > 0 else h.High[-1], mask[i])
-        return ids, dates, values, types   
+                upd_buffers(h.Id[i], y, mask[i])
+        upd_buffers(h.Id[i]+1, h.Low[-1] if - mask[i] > 0 else h.High[-1], mask[i])
+        return ids, values, types   
     
 def zigzag_simplify(data, mask, only_calc=False):
     def swap_node(data, node):

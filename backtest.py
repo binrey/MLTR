@@ -76,7 +76,6 @@ def get_data(hist, t, size):
     data = EasyDict()
 
     data["Id"] = hist.Id[t-size-1:t+1].copy()
-    data["index"] = hist.timestamp[t-size-1:t+1].copy()
     data["Open"] = hist.Open[t-size-1:t+1].copy()
     data["Close"] = hist.Close[t-size-1:t+1].copy()
     data.Close[-1] = data.Open[-1]

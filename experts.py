@@ -109,7 +109,7 @@ class ClsTrend(ExtensionBase):
         
     def __call__(self, common, h) -> bool:
         # ids, dates, values, types = ZigZag().update(h)
-        ids, dates, values, types = self.zigzag.update(h)
+        ids, values, types = self.zigzag.update(h)
         #ids, dates, values, types = zz_opt(h, self.npairs*2+2, simp_while_grow=False)
         is_fig = False
         if len(ids) > 6:
@@ -143,7 +143,7 @@ class ClsTriangleSimp(ExtensionBase):
         self.zigzag = ZigZag()
         
     def __call__(self, common, h) -> bool:
-        ids, dates, values, types = self.zigzag.update(h)
+        ids, values, types = self.zigzag.update(h)
         # ids, dates, values, types = zz_opt(h, self.npairs*2+2, simp_while_grow=False)
         is_fig = False
         if len(ids) > 6:
@@ -159,7 +159,7 @@ class ClsTriangleSimp(ExtensionBase):
                     
         if is_fig:
             i = self.cfg.npairs*2 + 1
-            common.lines = [(x, y) for x, y in zip(dates[-i:-1], values[-i:-1])]
+            common.lines = [(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]
             common.lprice = max(common.lines[-1][1], common.lines[-2][1])
             common.sprice = min(common.lines[-1][1], common.lines[-2][1]) 
         return is_fig
