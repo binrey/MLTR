@@ -49,7 +49,7 @@ forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
 
 config = EasyDict(
     trailing_stop_rate=Param(0.0, [0, 0.01, 0.02, 0.04]),
-    body_classifier=Param(body_classifiers["trngl_comp"], [body_classifiers[k] for k in ["trend", "trngl_simp", "trngl_comp"]]),
+    body_classifier=Param(body_classifiers["trend"], [body_classifiers[k] for k in ["trend", "trngl_simp", "trngl_comp"]]),
     stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_dynamic", "stops_fixed"]]),
     wait_entry_point=Param(9999, [9999]),
     hist_buffer_size=Param(30, [30]),

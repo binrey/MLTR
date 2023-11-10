@@ -6,7 +6,7 @@ import yaml
 from easydict import EasyDict
 from loguru import logger
 
-from indicators import ZigZag, zz_opt
+from indicators import ZigZag, ZigZagOpt
 from utils import Order
 
 
@@ -105,7 +105,7 @@ class ClsTrend(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsTrend, self).__init__(cfg, name="trend")
-        self.zigzag = ZigZag()
+        self.zigzag = ZigZagOpt()
         
     def __call__(self, common, h) -> bool:
         # ids, dates, values, types = ZigZag().update(h)
