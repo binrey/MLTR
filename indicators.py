@@ -38,7 +38,7 @@ class ZigZag:
         return self.mask2zigzag(h, self.mask, use_min_max=True)
     
     def mask2zigzag(self, h, mask, use_min_max=False):
-        ids, dates, values, types = [], [], [], []
+        ids, values, types = [], [], []
         def upd_buffers(i, v, t):
             ids.append(i)
             values.append(v)
@@ -77,12 +77,12 @@ class ZigZagOpt(ZigZag):
                 if not only_calc:
                     mask = swap_node(mask, node)
                     s = (data*mask).sum()
-                    # print(f"{i}, {nnodes}, {node}, {s:+5.3f}", end=" ")
+                    logger.debug(f"{i}, {nnodes}, {node}, {s:+5.3f}")
                     if s >= smax:
                         smax = s
                         nodemax = node
                         nodemax.metric = s
-                        # print("OK")
+                        logger.debug("OK")
                     mask = swap_node(mask, node)
                     # print("")
                 node = EasyDict({"value": mask[i], "id1": i, "id2": i, "metric":None})
@@ -119,5 +119,35 @@ class ZigZagOpt(ZigZag):
 
 
 if __name__ == "__main__":
-    pass
+    from backtest import DataParser, MovingWindow
+    from experts import PyConfig
+    import mplfinance as mpf
+
+    
+    cfg = PyConfig().test()
+    hist_pd, hist = DataParser(cfg).load()
+    mw = MovingWindow(hist, cfg.hist_buffer_size)
+    data_wind, _ = mw(300)
+    indc = ZigZagOpt()
+    ids, values, types = indc.update(data_wind)
+    
+    
+    hist2plot = hist_pd.iloc[ids[0]:ids[-1]+1]
+
+    line = []
+    for t, y in zip(ids, values):
+        try:
+            y = y.item()
+        except:
+            pass
+        line.append((hist2plot.index[hist2plot.Id==t][0], y))
+
+    fig = mpf.plot(hist2plot, 
+                type='candle', 
+                block=False,
+                alines=dict(alines=line),
+                # savefig=save_path / f"fig-{pos.open_date}.png"
+                )
+    a=0
+
         
