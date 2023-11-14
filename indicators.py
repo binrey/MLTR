@@ -54,7 +54,7 @@ class ZigZag:
                     node = mask[i]
             else:
                 node = mask[i]
-                upd_buffers(h.Id[i], y, mask[i])
+                upd_buffers(h.Id[i], y, -node)
         upd_buffers(h.Id[i]+1, h.Low[-1] if - mask[i] > 0 else h.High[-1], mask[i])
         return ids, values, types   
     
@@ -77,12 +77,12 @@ class ZigZagOpt(ZigZag):
                 if not only_calc:
                     mask = swap_node(mask, node)
                     s = (data*mask).sum()
-                    logger.debug(f"{i}, {nnodes}, {node}, {s:+5.3f}")
                     if s >= smax:
+                        # logger.debug(f"{i}, {nnodes}, {node}, {s:+5.3f}")
                         smax = s
                         nodemax = node
                         nodemax.metric = s
-                        logger.debug("OK")
+                        # logger.debug("OK")
                     mask = swap_node(mask, node)
                     # print("")
                 node = EasyDict({"value": mask[i], "id1": i, "id2": i, "metric":None})
@@ -107,6 +107,7 @@ class ZigZagOpt(ZigZag):
         nnodes_list = [nnodes]
         while nnodes > minnodes:
             mask, nnodes, res = self.zigzag_simplify(dh, mask)
+            logger.debug(f"{nnodes}, {res:+5.3f}")
             if simp_while_grow:
                 if res < res_list[-1]:
                     return self.mask2zigzag(h, mask, True)
@@ -129,8 +130,8 @@ if __name__ == "__main__":
     mw = MovingWindow(hist, cfg.hist_buffer_size)
     data_wind, _ = mw(300)
     indc = ZigZagOpt()
-    ids, values, types = indc.update(data_wind)
-    
+    ids, values, types = indc.update(data_wind, 6, False)
+    print(ids, types, values)
     
     hist2plot = hist_pd.iloc[ids[0]:ids[-1]+1]
 
