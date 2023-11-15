@@ -105,11 +105,11 @@ class ClsTrend(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsTrend, self).__init__(cfg, name="trend")
-        self.zigzag = ZigZag()
+        self.zigzag = ZigZagOpt(max_drop=0.2)
         
     def __call__(self, common, h) -> bool:
-        ids, values, types = ZigZag().update(h)
-        # ids, values, types = self.zigzag.update(h, self.cfg.npairs*2+1, False)
+        # ids, values, types = ZigZag().update(h)
+        ids, values, types = self.zigzag.update(h)
         is_fig = False
         if len(ids) >= self.cfg.npairs*2+1:
             flag2, flag3 = False, False
@@ -141,11 +141,11 @@ class ClsTriangleSimp(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsTriangleSimp, self).__init__(cfg, name="trngl_simp")
-        self.zigzag = ZigZag()
+        self.zigzag = ZigZagOpt(max_drop=0.1)
         
     def __call__(self, common, h) -> bool:
-        ids, values, types = self.zigzag.update(h)
-        # ids, values, types = self.zigzag.update(h, self.cfg.npairs*2+1, False)        
+        # ids, values, types = self.zigzag.update(h)
+        ids, values, types = self.zigzag.update(h)        
         is_fig = False
         if len(ids) > self.cfg.npairs*2+1:
             flag2, flag3 = False, False

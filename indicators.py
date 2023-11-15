@@ -60,8 +60,11 @@ class ZigZag:
     
     
 class ZigZagOpt(ZigZag):
-    def __init__(self):
+    def __init__(self, min_nodes=1, max_drop=1, simp_while_grow=False):
         super(ZigZagOpt, self).__init__()
+        self.min_nodes = min_nodes
+        self.simp_while_grow = simp_while_grow
+        self.max_drop = max_drop
     
     def zigzag_simplify(self, data, mask, only_calc=False):
         def swap_node(data, node):
@@ -97,26 +100,34 @@ class ZigZagOpt(ZigZag):
         return mask, nnodes, nodemax.metric
 
 
-    def update(self, h, minnodes=1, simp_while_grow=True):
+    def update(self, h):
         hclose = h.Close
         dh = hclose[1:] - hclose[:-1]
         mask = self._get_mask(h)
         i, v, t = self.mask2zigzag(h, mask, True) 
         _, nnodes, res = self.zigzag_simplify(dh, mask, only_calc=True)
-        res_list = [res]
-        nnodes_list = [nnodes]
-        while nnodes > minnodes:
-            mask, nnodes, res = self.zigzag_simplify(dh, mask)
-            logger.debug(f"{nnodes}, {res:+5.3f}")
-            if simp_while_grow:
-                if res < res_list[-1]:
-                    return self.mask2zigzag(h, mask, True)
-            res_list.append(res)
-            nnodes_list.append(nnodes)
-            # i, d, v, t = zz.mask2zigzag(h, mask, True)
-            # lines = [(x, y) for x, y in zip(d, v)]
-            # mpf.plot(h, type="candle", alines=lines, title=str(nnodes))   
+        logger.debug(f"{nnodes}, {res:+5.3f}, {0}")    
+        self.res_list = [res]
+        self.nnodes_list = [nnodes]
+        while nnodes > self.min_nodes:
+            mask_, nnodes, res = self.zigzag_simplify(dh, mask.copy())
+            drop = (self.res_list[0] - res)/ self.res_list[0]
+            logger.debug(f"{nnodes}, {res:+5.3f}, {drop}")    
+                
+            if self.simp_while_grow:
+                if res < self.res_list[-1]:
+                    break
+            if drop > self.max_drop:
+                break
+            self.res_list.append(res)
+            self.nnodes_list.append(nnodes)
+            mask = mask_.copy()
         return self.mask2zigzag(h, mask, True)
+    
+    def plot(self):
+        import matplotlib.pylab as plt
+        plt.plot(self.nnodes_list, self.res_list, ".-")
+        plt.savefig("zz_opt.jpg")
 
 
 if __name__ == "__main__":
@@ -128,10 +139,11 @@ if __name__ == "__main__":
     cfg = PyConfig().test()
     hist_pd, hist = DataParser(cfg).load()
     mw = MovingWindow(hist, cfg.hist_buffer_size)
-    data_wind, _ = mw(300)
-    indc = ZigZagOpt()
-    ids, values, types = indc.update(data_wind, 6, False)
+    data_wind, _ = mw(700)
+    indc = ZigZagOpt(max_drop=0.1)
+    ids, values, types = indc.update(data_wind)
     print(ids, types, values)
+    indc.plot()
     
     hist2plot = hist_pd.iloc[ids[0]:ids[-1]+1]
 
@@ -147,8 +159,8 @@ if __name__ == "__main__":
                 type='candle', 
                 block=False,
                 alines=dict(alines=line),
-                # savefig=save_path / f"fig-{pos.open_date}.png"
+                savefig=f"zz_debug.jpg"
                 )
-    a=0
+    
 
         
