@@ -154,17 +154,6 @@ class Broker:
             if date == order.open_date:
                 continue
             if position.dir == 1 and order.dir == -1 and p > order.price:
-                order.change(date, order.price + self.cfg.trailing_stop_rate*(p - order.price))
+                order.change(date, order.price + self.cfg.trailing_stop_rate*(h.Low[-self.cfg.trailing_stop_type] - order.price))
             if position.dir == -1 and order.dir == 1 and p < order.price:
-                order.change(date, order.price - self.cfg.trailing_stop_rate*(order.price - p))
-        ss=1
-                
-                
-def trailing_stop(orders:list[Order], position:Position, date, p, k):
-    if position is None:
-        return
-    for order in orders:
-        if position.dir == 1 and order.dir == -1 and p > order.price:
-            order.change(date, order.price + k*(p - order.price))
-        if position.dir == -1 and order.dir == 1 and p < order.price:
-            order.change(date, order.price - k*(order.price - p))
+                order.change(date, order.price - self.cfg.trailing_stop_rate*(order.price - h.High[-self.cfg.trailing_stop_type]))

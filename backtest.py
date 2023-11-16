@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 pd.options.mode.chained_assignment = None
 from experts import ExpertFormation, PyConfig
-from utils import Broker, trailing_stop
+from utils import Broker
 
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen

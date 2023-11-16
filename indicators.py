@@ -111,7 +111,7 @@ class ZigZagOpt(ZigZag):
         self.nnodes_list = [nnodes]
         while nnodes > self.min_nodes:
             mask_, nnodes, res = self.zigzag_simplify(dh, mask.copy())
-            drop = (self.res_list[0] - res)/ self.res_list[0]
+            drop = (self.res_list[0] - res)/max(1, self.res_list[0])
             logger.debug(f"{nnodes}, {res:+5.3f}, {drop}")    
                 
             if self.simp_while_grow:
