@@ -106,7 +106,7 @@ class Broker:
         
     def update(self, h):
         t0 = perf_counter()
-        date = h.Id[-1]
+        date = h.Date[-1]
         closed_position = None
         for i, order in enumerate(self.active_orders): 
             triggered_price = None
@@ -114,21 +114,21 @@ class Broker:
             if order.type == Order.TYPE.MARKET and order.open_indx == h.Id[-1]:
                 logger.debug(f"{date} process order {order.id} (O:{h.Open[-1]})")
                 triggered_price = h.Open[-1]*order.dir
-                triggered_date = date
-                order.change(date, h.Open[-1])
+                triggered_date, triggered_id = date, h.Id[-1]
+                order.change(h.Id[-1], h.Open[-1])
             if order.type == Order.TYPE.LIMIT and order.open_indx != h.Id[-1]:
                 if (h.Low[-2] > order.price and h.Open[-1] < order.price) or (h.High[-2] < order.price and h.Open[-1] > order.price):
                     logger.debug(f"{date} process order {order.id}, and change price to O:{h.Open[-1]}")    
                     triggered_price = h.Open[-1]*order.dir 
-                    triggered_date = date                        
+                    triggered_date, triggered_id = date, h.Id[-1]                      
                 elif h.High[-2] >= order.price and h.Low[-2] <= order.price:
                     logger.debug(f"{date} process order {order.id} (L:{h.Low[-2]} <= {order.price:.2f} <= H:{h.High[-2]})")
                     triggered_price = order.price*order.dir
-                    triggered_date = h.Id[-2]
+                    triggered_date, triggered_id = h.Date[-2], h.Id[-2]
                     
             if triggered_price is not None:
-                self.close_orders(triggered_date, i)
-                triggered_id = triggered_date#.Id[np.where(h.index == triggered_date)[0].item()]
+                self.close_orders(triggered_id, i)
+                # triggered_id = triggered_date#.Id[np.where(h.index == triggered_date)[0].item()]
                 if self.active_position is None:
                     self.active_position = Position(triggered_price, triggered_date, triggered_id)
                 else:

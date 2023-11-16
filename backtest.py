@@ -28,25 +28,33 @@ class DataParser():
                     "FORTS": self.metatrader,
                     "bitfinex": self.bitfinex,
                     "yahoo": self.yahoo,
-                    }.get(self.cfg.data_type, None)(flist[0])
+                    }.get(self.cfg.data_type, None)(flist[0], self.cfg.date_start)
         else:
             raise FileNotFoundError(p)
         
     @staticmethod
-    def metatrader(data_file):
+    def metatrader(data_file, date_start):
         pd.options.mode.chained_assignment = None
         hist = pd.read_csv(data_file, sep="\t")
         hist.columns = map(lambda x:x[1:-1], hist.columns)
         hist.columns = map(str.capitalize, hist.columns)
         hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(hist.Date.values, hist.Time.values)])#, utc=True)
-        hist["timestamp"] = [dt.timestamp() for dt in hist.Date]
-        hist.set_index("Date", inplace=True, drop=True)
+        
+        if date_start is not None:
+            date_start = pd.to_datetime(date_start)
+            for i, d in enumerate(hist.Date):
+                if d >= date_start:
+                    break
+            hist = hist.iloc[i:]
+        
         hist.drop("Time", axis=1, inplace=True)
         columns = list(hist.columns)
         columns[-2] = "Volume"
         hist.columns = columns
         hist["Id"] = list(range(hist.shape[0]))
-        hist_dict = EasyDict({c:hist[c].values.squeeze() for c in hist.columns})
+        hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
+        # hist_dict["Date"] = hist["Date"].values
+        hist.set_index("Date", inplace=True, drop=True)
         return hist, hist_dict
     
     @staticmethod
@@ -59,7 +67,7 @@ class DataParser():
         hist.drop(["unix", "symbol", "date"], axis=1, inplace=True)
         hist.columns = map(str.capitalize, hist.columns)
         hist["Volume"] = hist.iloc[:, -3]
-        hist_dict = EasyDict({c:hist[c].values.squeeze() for c in hist.columns})
+        hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
         return hist, hist_dict
     
     @staticmethod
@@ -75,7 +83,8 @@ class MovingWindow():
     def __init__(self, hist, size):
         self.hist = hist
         self.size = size
-        self.data = EasyDict(Id=np.zeros(size, dtype=np.int64),
+        self.data = EasyDict(Date=np.empty(size, dtype=np.datetime64),
+                             Id=np.zeros(size, dtype=np.int64),
                              Open=np.zeros(size, dtype=np.float32),
                              Close=np.zeros(size, dtype=np.float32),
                              High=np.zeros(size, dtype=np.float32),
@@ -85,8 +94,9 @@ class MovingWindow():
         
     def __call__(self, t):
         t0 = perf_counter()
-        self.data.Id = self.hist.Id[t-self.size+1:t+1]
-        self.data.Open = self.hist.Open[t-self.size+1:t+1]
+        self.data.Date = self.hist.Date[t-self.size+1:t+1]
+        self.data.Id[:] = self.hist.Id[t-self.size+1:t+1]
+        self.data.Open[:] = self.hist.Open[t-self.size+1:t+1]
         self.data.Close[:-1] = self.hist.Close[t-self.size+1:t]
         self.data.Close[-1] = self.data.Open[-1]
         self.data.High[:-1] = self.hist.High[t-self.size+1:t]

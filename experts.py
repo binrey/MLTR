@@ -27,7 +27,7 @@ class ExpertBase(ABC):
 
 class ExtensionBase:
     def __init__(self, cfg, name):
-         self.name = name + ":" + ",".join([f"{k}={v}" for k, v in cfg.items()])
+         self.name = name + ":" + "-".join([f"{v}" for k, v in cfg.items()])
 
 
 class ExpertFormation(ExpertBase):
