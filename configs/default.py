@@ -43,11 +43,11 @@ stops_processors = EasyDict(
 # Configuration
 bitfinex_list = ["BTCUSD", "ETHUSD", "TRXUSD", "XRPUSD"]
 yahoo_list = ["MSFT", "AMZN", "AAPL", "GOOG", "NFLX", "TSLA"]
-moex_list = ["SBER", "ROSN", "NVTK", "LKOH", "GMKN", "GAZP"]
+moex_list = ["SBER", "ROSN", "LKOH", "GMKN", "GAZP"]
 forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
 
 config = EasyDict(
-    date_start=Param("2013-01-01", ["2008-01-01"]),
+    date_start=Param("2008-01-01", ["2008-01-01"]),
     trailing_stop_rate=Param(0.01, [0.01]),
     trailing_stop_type=Param(2, [1]),
     body_classifier=Param(body_classifiers["trend"], [body_classifiers[k] for k in ["trend"]]),
@@ -56,8 +56,8 @@ config = EasyDict(
     hist_buffer_size=Param(30, [30]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("M5", ["H1"]),
-    ticker=Param("SBER", moex_list),
+    period=Param("M15", ["M5", "M15", "H1"]),
+    ticker=Param("GAZP", moex_list),
     data_type=Param("metatrader", ["metatrader"]),
     save_plots=Param(False, [False]),
 )
