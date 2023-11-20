@@ -46,7 +46,9 @@ class Order:
         
 
 class Position:
-    def __init__(self, price, date, indx):
+    def __init__(self, price, date, indx, ticker="NoName", period="M5"):
+        self.ticker = ticker
+        self.period = period
         self.open_price = abs(price)
         self.open_date = date
         self.open_indx = indx
@@ -130,7 +132,7 @@ class Broker:
                 self.close_orders(triggered_id, i)
                 # triggered_id = triggered_date#.Id[np.where(h.index == triggered_date)[0].item()]
                 if self.active_position is None:
-                    self.active_position = Position(triggered_price, triggered_date, triggered_id)
+                    self.active_position = Position(triggered_price, triggered_date, triggered_id, self.cfg.ticker, self.cfg.period)
                 else:
                     if self.active_position.dir*triggered_price < 0:
                         self.active_position.close(triggered_price, triggered_date, triggered_id)
