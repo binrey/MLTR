@@ -27,8 +27,8 @@ stops_processors = EasyDict(
     stops_fixed = EasyDict(
         func=StopsFixed,
         params=EasyDict(
-            tp=Param(4, [25]), 
-            sl=Param(2, [2, 4, 8])
+            tp=Param(1, [25]), 
+            sl=Param(1, [1, 2, 3])
             )
 ),
     stops_dynamic = EasyDict(
@@ -48,15 +48,15 @@ forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
 
 config = EasyDict(
     date_start=Param("2008-01-01", ["2008-01-01"]),
-    trailing_stop_rate=Param(0.01, [0.01]),
+    trailing_stop_rate=Param(0., [0.01]),
     trailing_stop_type=Param(2, [1]),
-    body_classifier=Param(body_classifiers["trend"], [body_classifiers[k] for k in ["trend"]]),
-    stops_processor=Param(stops_processors["stops_dynamic"], [stops_processors[k] for k in ["stops_dynamic"]]),
+    body_classifier=Param(body_classifiers["trngl_simp"], [body_classifiers[k] for k in ["trngl_simp"]]),
+    stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_fixed"]]),
     wait_entry_point=Param(9999, [9999]),
     hist_buffer_size=Param(30, [30]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("M15", ["M5", "M15", "H1"]),
+    period=Param("M5", ["M15", "H1", "M5"]),
     ticker=Param("GAZP", moex_list),
     data_type=Param("metatrader", ["metatrader"]),
     save_plots=Param(False, [False]),
