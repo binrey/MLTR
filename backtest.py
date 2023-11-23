@@ -58,10 +58,18 @@ class DataParser():
         return hist, hist_dict
     
     @staticmethod
-    def bitfinex(data_file):
+    def bitfinex(data_file, date_start):
         hist = pd.read_csv(data_file, header=1)
         hist = hist[::-1]
         hist["Date"] = pd.to_datetime(hist.date.values)
+        
+        if date_start is not None:
+            date_start = pd.to_datetime(date_start)
+            for i, d in enumerate(hist.Date):
+                if d >= date_start:
+                    break
+            hist = hist.iloc[i:]
+        
         hist.set_index("Date", inplace=True, drop=False)
         hist["Id"] = list(range(hist.shape[0]))
         hist.drop(["unix", "symbol", "date"], axis=1, inplace=True)
