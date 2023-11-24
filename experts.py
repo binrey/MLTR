@@ -105,7 +105,7 @@ class ClsTrend(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsTrend, self).__init__(cfg, name="trend")
-        # self.zigzag = ZigZagOpt(max_drop=0.1)
+        # self.zigzag = ZigZagOpt(max_drop=0.0)
         self.zigzag = ZigZag()
         
     def __call__(self, common, h) -> bool:
@@ -124,7 +124,23 @@ class ClsTrend(ExtensionBase):
             if (self.cfg.npairs <= 2 and flag2) or (self.cfg.npairs == 3 and flag2 and flag3):
                 is_fig = True
                 trend_type = types[-2]
-                            
+                        
+        # if is_fig:
+        #     ids, values, types = self.zigzag_opt.update(h)  
+        #     is_fig = False
+        #     if len(ids) > self.cfg.npairs*2+1:
+        #         flag2, flag3 = False, False
+        #         if types[-2] > 0:
+        #             flag2 = values[-2] < values[-4] and values[-3] > values[-5]
+        #             if self.cfg.npairs == 3:
+        #                 flag3 = values[-4] < values[-6] and values[-5] > values[-7]
+        #         if types[-2] < 0:
+        #             flag2 = values[-2] > values[-4] and values[-3] < values[-5]
+        #             if self.cfg.npairs == 3:
+        #                 flag3 = values[-4] > values[-6]  and values[-5] < values[-7]
+        #         if (self.cfg.npairs <= 2 and flag2) or (self.cfg.npairs == 3 and flag2 and flag3):
+        #             is_fig = True                             
+    
         if is_fig:
             # if trend_type<0:
             #     return False
@@ -223,8 +239,8 @@ class StopsFixed(ExtensionBase):
         super(StopsFixed, self).__init__(cfg, name="stops_fix")
         
     def __call__(self, common, h):
-        tp = -common.order_dir*h.Open[-1]*(1+common.order_dir*self.cfg.tp/100)
-        sl = -common.order_dir*h.Open[-1]*(1-common.order_dir*self.cfg.sl/100)
+        tp = -common.order_dir*h.Open[-1]*(1+common.order_dir*self.cfg.tp/100) if self.cfg.tp is not None else self.cfg.tp
+        sl = -common.order_dir*h.Open[-1]*(1-common.order_dir*self.cfg.sl/100) if self.cfg.sl is not None else self.cfg.sl
         return tp, sl
     
 

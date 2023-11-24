@@ -83,7 +83,7 @@ class Position:
     
     @property
     def lines(self):
-        return [(self.open_date, self.open_price), (self.close_date, self.close_price)]
+        return [(self.open_indx, self.open_price), (self.close_indx, self.close_price)]
     
 class Broker:
     def __init__(self, cfg):
