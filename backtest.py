@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import mplfinance as mpf
 import numpy as np
 import pandas as pd
+# import yfinance as yf
 from loguru import logger
 from tqdm import tqdm
 
