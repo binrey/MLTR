@@ -19,10 +19,6 @@ logger.add(sys.stderr, level="INFO")
 def backtest_process(args):
       logger.debug(args)
       num, cfg = args
-      # logger.info("\n".join(["current params:"]+[f"{k}={str(v)}" for k, v in cfg.items() if len(param_summary[k])>1]))
-      # for k, v in opt_summary.items():
-      #       if k in cfg.keys():
-      #             v.append(cfg[k])
       logger.info(f"start backtest {num}")
       btest = backtest(cfg)
       btest_res = btest.profits.sum()

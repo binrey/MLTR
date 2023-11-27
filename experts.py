@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
-from functools import partial
+from time import perf_counter
 
 import numpy as np
 import yaml
 from easydict import EasyDict
 from loguru import logger
 
-from indicators import ZigZag, zz_opt
+from indicators import ZigZag, ZigZagOpt
 from utils import Order
 
 
@@ -20,12 +20,14 @@ class ExpertBase(ABC):
         pass
         
     def update(self, h):
+        t0 = perf_counter()
         self.get_body(h)
+        return perf_counter() - t0
 
 
 class ExtensionBase:
     def __init__(self, cfg, name):
-         self.name = name + ":" + ",".join([f"{k}={v}" for k, v in cfg.items()])
+         self.name = name + ":" + "-".join([f"{v}" for k, v in cfg.items()])
 
 
 class ExpertFormation(ExpertBase):
@@ -52,30 +54,30 @@ class ExpertFormation(ExpertBase):
             else:
                 return
             
-        logger.debug(f"{h.Id.iloc[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, close: {h.Close.iloc[-2]}")
+        logger.debug(f"{h.Id[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, close: {h.Close[-2]}")
         
         self.order_dir = 0
         if self.lprice:
-            if h.Open.iloc[-1] > self.lprice:
+            if h.Open[-1] > self.lprice:
                 self.order_dir = 1
-            if self.cprice and h.Open.iloc[-1] < self.cprice:
+            if self.cprice and h.Open[-1] < self.cprice:
                 self.reset_state()
                 return
         if self.sprice:
-            if h.Open.iloc[-1] < self.sprice:
+            if h.Open[-1] < self.sprice:
                 self.order_dir = -1
-            if self.cprice and h.Open.iloc[-1] > self.cprice:
+            if self.cprice and h.Open[-1] > self.cprice:
                 self.reset_state()
                 return            
             
         if self.order_dir != 0:        
             tp, sl = self.stops_processor(self, h)
-            self.orders = [Order(self.order_dir, Order.TYPE.MARKET, h.Id.iloc[-1], h.index[-1])]
+            self.orders = [Order(self.order_dir, Order.TYPE.MARKET, h.Id[-1], h.Id[-1])]
             if tp:
-                self.orders.append(Order(tp, Order.TYPE.LIMIT, h.Id.iloc[-1], h.index[-1]))
+                self.orders.append(Order(tp, Order.TYPE.LIMIT, h.Id[-1], h.Id[-1]))
             if sl:
-                self.orders.append(Order(sl, Order.TYPE.LIMIT, h.Id.iloc[-1], h.index[-1]))
-            logger.debug(f"{h.index[-1]} send order {self.orders[0]}, " + 
+                self.orders.append(Order(sl, Order.TYPE.LIMIT, h.Id[-1], h.Id[-1]))
+            logger.debug(f"{h.Id[-1]} send order {self.orders[0]}, " + 
                          f"tp: {self.orders[1] if len(self.orders)>1 else 'NO'}, " +
                          f"sl: {self.orders[2] if len(self.orders)>2 else 'NO'}")
         
@@ -103,30 +105,47 @@ class ClsTrend(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsTrend, self).__init__(cfg, name="trend")
+        # self.zigzag = ZigZagOpt(max_drop=0.0)
         self.zigzag = ZigZag()
         
     def __call__(self, common, h) -> bool:
-        # ids, dates, values, types = ZigZag().update(h)
-        ids, dates, values, types = self.zigzag.update(h)
-        #ids, dates, values, types = zz_opt(h, self.npairs*2+2, simp_while_grow=False)
+        ids, values, types = self.zigzag.update(h)
         is_fig = False
-        if len(ids) > 6:
+        if len(ids) >= self.cfg.npairs*2+1:
             flag2, flag3 = False, False
             if types[-2] > 0:
                 flag2 = values[-2] > values[-4] and values[-3] > values[-5]
-                flag3 = values[-4] > values[-6] and values[-5] > values[-7]
+                if self.cfg.npairs == 3:
+                    flag3 = values[-4] > values[-6] and values[-5] > values[-7]
             if types[-2] < 0:
                 flag2 = values[-2] < values[-4] and values[-3] < values[-5]
-                flag3 = values[-4] < values[-6] and values[-5] < values[-7]
+                if self.cfg.npairs == 3:
+                    flag3 = values[-4] < values[-6] and values[-5] < values[-7]
             if (self.cfg.npairs <= 2 and flag2) or (self.cfg.npairs == 3 and flag2 and flag3):
                 is_fig = True
                 trend_type = types[-2]
-                            
+                        
+        # if is_fig:
+        #     ids, values, types = self.zigzag_opt.update(h)  
+        #     is_fig = False
+        #     if len(ids) > self.cfg.npairs*2+1:
+        #         flag2, flag3 = False, False
+        #         if types[-2] > 0:
+        #             flag2 = values[-2] < values[-4] and values[-3] > values[-5]
+        #             if self.cfg.npairs == 3:
+        #                 flag3 = values[-4] < values[-6] and values[-5] > values[-7]
+        #         if types[-2] < 0:
+        #             flag2 = values[-2] > values[-4] and values[-3] < values[-5]
+        #             if self.cfg.npairs == 3:
+        #                 flag3 = values[-4] > values[-6]  and values[-5] < values[-7]
+        #         if (self.cfg.npairs <= 2 and flag2) or (self.cfg.npairs == 3 and flag2 and flag3):
+        #             is_fig = True                             
+    
         if is_fig:
             # if trend_type<0:
             #     return False
             i = self.cfg.npairs*2 + 1
-            common.lines = [(x, y) for x, y in zip(dates[-i:-1], values[-i:-1])]
+            common.lines = [(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]
             # self.get_trend(h[:-self.body_length+2])
             common.lprice = max(common.lines[-1][1], common.lines[-2][1]) if trend_type > 0 else None
             common.sprice = min(common.lines[-1][1], common.lines[-2][1]) if trend_type < 0 else None
@@ -138,26 +157,28 @@ class ClsTriangleSimp(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsTriangleSimp, self).__init__(cfg, name="trngl_simp")
+#        self.zigzag = ZigZagOpt(max_drop=0.1)
         self.zigzag = ZigZag()
         
     def __call__(self, common, h) -> bool:
-        ids, dates, values, types = self.zigzag.update(h)
-        # ids, dates, values, types = zz_opt(h, self.npairs*2+2, simp_while_grow=False)
+        ids, values, types = self.zigzag.update(h)        
         is_fig = False
-        if len(ids) > 6:
+        if len(ids) > self.cfg.npairs*2+1:
             flag2, flag3 = False, False
             if types[-2] > 0:
                 flag2 = values[-2] < values[-4] and values[-3] > values[-5]
-                flag3 = values[-4] < values[-6] and values[-5] > values[-7]
+                if self.cfg.npairs == 3:
+                    flag3 = values[-4] < values[-6] and values[-5] > values[-7]
             if types[-2] < 0:
                 flag2 = values[-2] > values[-4] and values[-3] < values[-5]
-                flag3 = values[-4] > values[-6]  and values[-5] < values[-7]
+                if self.cfg.npairs == 3:
+                    flag3 = values[-4] > values[-6]  and values[-5] < values[-7]
             if (self.cfg.npairs <= 2 and flag2) or (self.cfg.npairs == 3 and flag2 and flag3):
                 is_fig = True
                     
         if is_fig:
             i = self.cfg.npairs*2 + 1
-            common.lines = [(x, y) for x, y in zip(dates[-i:-1], values[-i:-1])]
+            common.lines = [(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]
             common.lprice = max(common.lines[-1][1], common.lines[-2][1])
             common.sprice = min(common.lines[-1][1], common.lines[-2][1]) 
         return is_fig
@@ -170,7 +191,7 @@ class ClsTriangleComp(ExtensionBase):
         self.zigzag = ZigZag()
         
     def __call__(self, common, h) -> bool:
-        ids, dates, values, types = self.zigzag.update(h)
+        ids, values, types = self.zigzag.update(h)
         # ids, dates, values, types = zz_opt(h[-self.body_maxsize:])
         is_fig = False
         types_filt, vals_filt, ids_ = [], [], []
@@ -204,7 +225,7 @@ class ClsTriangleComp(ExtensionBase):
                     
         if is_fig:
             i = self.cfg.npairs*2 + 1
-            common.lines = [(x, y) for x, y in zip([dates[j] for j in ids_[-i:][::-1]], [values[j] for j in ids_[-i:][::-1]])]
+            common.lines = [(x, y) for x, y in zip([ids[j] for j in ids_[-i:][::-1]], [values[j] for j in ids_[-i:][::-1]])]
             # common.lines = [(x, y) for x, y in zip(dates[-ids_[-1]:-1], values[-ids_[-1]:-1])]
             common.lprice = max(common.lines[-1][1], common.lines[-2][1])
             common.sprice = min(common.lines[-1][1], common.lines[-2][1]) 
@@ -218,8 +239,8 @@ class StopsFixed(ExtensionBase):
         super(StopsFixed, self).__init__(cfg, name="stops_fix")
         
     def __call__(self, common, h):
-        tp = -common.order_dir*h.Open[-1]*(1+common.order_dir*self.cfg.tp/100)
-        sl = -common.order_dir*h.Open[-1]*(1-common.order_dir*self.cfg.sl/100)
+        tp = -common.order_dir*h.Open[-1]*(1+common.order_dir*self.cfg.tp/100) if self.cfg.tp is not None else self.cfg.tp
+        sl = -common.order_dir*h.Open[-1]*(1-common.order_dir*self.cfg.sl/100) if self.cfg.sl is not None else self.cfg.sl
         return tp, sl
     
 
