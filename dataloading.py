@@ -44,7 +44,7 @@ def get_data(X, y, test_split=0.25):
     np.random.shuffle(ids_test) 
         
     # ids_test, ids_train = ids[:test_size], ids[test_size:]
-    X_train, X_test, y_train, y_test, profs_test = X[ids_train], X[ids_test], y[ids_train], y[ids_test], y[ids_test]
+    X_train, X_test, y_train, y_test, profs_test = X[ids_train], X[ids_test], y[ids_train], y[ids_test], y[ids_test].copy()
     tf_test = X_test[:, 0, -1, 0]
     X_train = X_train[:, :, :-2, :]
     X_test = X_test[:, :, :-2, :]
@@ -52,7 +52,7 @@ def get_data(X, y, test_split=0.25):
     y_train = np.tanh(y_train)
     y_test = np.tanh(y_test)
     
-    return X_train, X_test, y_train, y_test, profs_test, tf_test
+    return X_train, X_test, y_train, y_test, profs_test.copy(), tf_test
 
 class CustomImageDataset(Dataset):
     def __init__(self, X, y):
