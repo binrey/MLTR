@@ -8,6 +8,8 @@ from loguru import logger
 
 from indicators import ZigZag, ZigZagOpt
 from utils import Order
+from dataloading import build_features
+import torch
 
 
 class ExpertBase(ABC):
@@ -32,12 +34,18 @@ class ExtensionBase:
 
 class ExpertFormation(ExpertBase):
     def __init__(self, cfg):
+        self.cfg = cfg
         self.trend_maxsize = 1  
         super(ExpertFormation, self).__init__()  
         self.body_cls = cfg.body_classifier.func
         self.stops_processor = cfg.stops_processor.func
         self.wait_length = cfg.wait_entry_point
         self.reset_state()
+        
+        self.device = "cuda"
+        from ml import Net
+        self.model = Net(7, 32).to(self.device)
+        self.model.load_state_dict(torch.load("model.pth"))
         
     def reset_state(self):
         self.formation_found = False
@@ -70,7 +78,17 @@ class ExpertFormation(ExpertBase):
                 self.reset_state()
                 return            
             
-        if self.order_dir != 0:        
+        if self.order_dir != 0:
+            x = build_features(h, 
+                               self.order_dir, 
+                               self.stops_processor.cfg.sl,
+                               self.cfg.trailing_stop_rate)
+            y = self.model(torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.device))[0]
+            if y < -0.45:
+                self.reset_state()
+                return
+            
+        if self.order_dir != 0:
             tp, sl = self.stops_processor(self, h)
             self.orders = [Order(self.order_dir, Order.TYPE.MARKET, h.Id[-1], h.Id[-1])]
             if tp:
@@ -123,23 +141,7 @@ class ClsTrend(ExtensionBase):
                     flag3 = values[-4] < values[-6] and values[-5] < values[-7]
             if (self.cfg.npairs <= 2 and flag2) or (self.cfg.npairs == 3 and flag2 and flag3):
                 is_fig = True
-                trend_type = types[-2]
-                        
-        # if is_fig:
-        #     ids, values, types = self.zigzag_opt.update(h)  
-        #     is_fig = False
-        #     if len(ids) > self.cfg.npairs*2+1:
-        #         flag2, flag3 = False, False
-        #         if types[-2] > 0:
-        #             flag2 = values[-2] < values[-4] and values[-3] > values[-5]
-        #             if self.cfg.npairs == 3:
-        #                 flag3 = values[-4] < values[-6] and values[-5] > values[-7]
-        #         if types[-2] < 0:
-        #             flag2 = values[-2] > values[-4] and values[-3] < values[-5]
-        #             if self.cfg.npairs == 3:
-        #                 flag3 = values[-4] > values[-6]  and values[-5] < values[-7]
-        #         if (self.cfg.npairs <= 2 and flag2) or (self.cfg.npairs == 3 and flag2 and flag3):
-        #             is_fig = True                             
+                trend_type = types[-2]                        
     
         if is_fig:
             # if trend_type<0:

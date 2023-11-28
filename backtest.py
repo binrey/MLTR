@@ -29,24 +29,40 @@ class DataParser():
                     "FORTS": self.metatrader,
                     "bitfinex": self.bitfinex,
                     "yahoo": self.yahoo,
-                    }.get(self.cfg.data_type, None)(flist[0], self.cfg.date_start)
+                    }.get(self.cfg.data_type, None)(flist[0])
         else:
             raise FileNotFoundError(p)
+    
+    def _trim_by_date(self, hist):
+        if self.cfg.date_start is not None:
+            date_start = pd.to_datetime(self.cfg.date_start)
+            for i, d in enumerate(hist.Date):
+                if d >= date_start:
+                    break
+            hist = hist.iloc[i:]   
+            
+        if self.cfg.date_end is not None:
+            date_end = pd.to_datetime(self.cfg.date_end)
+            for i, d in enumerate(hist.Date):
+                if d >= date_end:
+                    break
+            hist = hist.iloc[:i]   
+        return hist           
         
-    @staticmethod
-    def metatrader(data_file, date_start):
+    def metatrader(self, data_file):
         pd.options.mode.chained_assignment = None
         hist = pd.read_csv(data_file, sep="\t")
         hist.columns = map(lambda x:x[1:-1], hist.columns)
         hist.columns = map(str.capitalize, hist.columns)
         hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(hist.Date.values, hist.Time.values)])#, utc=True)
         
-        if date_start is not None:
-            date_start = pd.to_datetime(date_start)
-            for i, d in enumerate(hist.Date):
-                if d >= date_start:
-                    break
-            hist = hist.iloc[i:]
+        self._trim_by_date(hist)
+        # if date_start is not None:
+        #     date_start = pd.to_datetime(date_start)
+        #     for i, d in enumerate(hist.Date):
+        #         if d >= date_start:
+        #             break
+        #     hist = hist.iloc[i:]
         
         hist.drop("Time", axis=1, inplace=True)
         columns = list(hist.columns)
@@ -58,19 +74,11 @@ class DataParser():
         hist.set_index("Date", inplace=True, drop=True)
         return hist, hist_dict
     
-    @staticmethod
-    def bitfinex(data_file, date_start):
+    def bitfinex(self, data_file):
         hist = pd.read_csv(data_file, header=1)
         hist = hist[::-1]
         hist["Date"] = pd.to_datetime(hist.date.values)
-        
-        if date_start is not None:
-            date_start = pd.to_datetime(date_start)
-            for i, d in enumerate(hist.Date):
-                if d >= date_start:
-                    break
-            hist = hist.iloc[i:]
-        
+        hist = self._trim_by_date(hist)
         hist.set_index("Date", inplace=True, drop=False)
         hist["Id"] = list(range(hist.shape[0]))
         hist.drop(["unix", "symbol", "date"], axis=1, inplace=True)
@@ -173,7 +181,6 @@ def backtest(cfg):
     logger.info(sformat.format("expert updates", texp/ttotal*100))
     logger.info(sformat.format("broker updates", tbrok/ttotal*100))
     logger.info(sformat.format("data loadings", tdata/ttotal*100))
-
     return broker
     
     
@@ -184,4 +191,5 @@ if __name__ == "__main__":
     brok_results = backtest(PyConfig().test())
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
     plt.savefig("backtest.png")
+    print(brok_results.profits.sum())
     # plt.show()
