@@ -16,7 +16,7 @@ class Net(nn.Module):
         self.convs = nn.ModuleList() 
         n = (1, 4)
         for i in range(self.nl):
-            self.convs.append(nn.Conv2d(n[0], n[1], (self.nf, 4), padding="same"))
+            self.convs.append(nn.Conv2d(n[0], n[1], (self.nf, 3), padding="same"))
             n = (n[1], n[1]*2)
         self.conv_valid = nn.Conv2d(n[0], n[1], (self.nf, 4), padding="valid")
         self.pool = nn.MaxPool2d((1, 2), (1, 2))
@@ -30,7 +30,7 @@ class Net(nn.Module):
         x = F.relu(self.conv_valid(x))
         x = torch.flatten(x, 1)
         x = self.dropout(x)
-        x = F.tanh(self.fc(x))
+        x = self.fc(x)
         return x
     
 def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True):
@@ -41,8 +41,8 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True):
     model = Net(X_train.shape[2], X_train.shape[3]).to(device) #32-3, 16-2, 8-1
     # print(summary(model, (1, 6, 32)))
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
-    for epoch in range(30):  # loop over the dataset multiple times
+    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.1)
+    for epoch in range(10):  # loop over the dataset multiple times
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]

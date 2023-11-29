@@ -28,7 +28,7 @@ stops_processors = EasyDict(
         func=StopsFixed,
         params=EasyDict(
             tp=Param(None, [None]), 
-            sl=Param(4, [4])
+            sl=Param(4, [2, 4, 6])
             )
 ),
     stops_dynamic = EasyDict(
@@ -49,7 +49,7 @@ forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
 config = EasyDict(
     date_start=Param("2000-01-01", ["2000-01-01"]),
     date_end=Param("2024-01-01", ["2024-01-01"]),
-    trailing_stop_rate=Param(0.02, [0.02]),
+    trailing_stop_rate=Param(0.02, [0.01, 0.02, 0.04]),
     trailing_stop_type=Param(1, [1]),
     body_classifier=Param(body_classifiers["trend"], [body_classifiers[k] for k in ["trend"]]),
     stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_fixed"]]),
