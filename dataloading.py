@@ -49,10 +49,8 @@ def get_data(X, y, test_split=0.25):
     X_train = X_train[:, :, :-2, :]
     X_test = X_test[:, :, :-2, :]
     
-    # y_train = np.tanh(y_train)
-    # y_test = np.tanh(y_test)
-    y_train = np.clip(y_train, -5, 0)
-    y_test = np.clip(y_test, -5, 0)
+    y_train = np.expand_dims(y_train>0, 1)
+    y_test = np.expand_dims(y_test>0, 1)
         
     return X_train, X_test, y_train, y_test, profs_test.copy(), tf_test
 

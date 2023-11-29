@@ -181,6 +181,9 @@ def backtest(cfg):
     logger.info(sformat.format("expert updates", texp/ttotal*100))
     logger.info(sformat.format("broker updates", tbrok/ttotal*100))
     logger.info(sformat.format("data loadings", tdata/ttotal*100))
+    
+    import pickle
+    pickle.dump((cfg, broker), open(str(Path("backtests") / f"btest{0:003.0f}.pickle"), "wb"))
     return broker
     
     
@@ -192,4 +195,3 @@ if __name__ == "__main__":
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
     plt.savefig("backtest.png")
     print(brok_results.profits.sum())
-    # plt.show()

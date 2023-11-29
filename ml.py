@@ -9,10 +9,11 @@ from dataloading import CustomImageDataset
 device = "cuda"
 
 class Net(nn.Module):
-    def __init__(self, nf, nl):
+    def __init__(self, nf, nl, threshold=0):
         super().__init__()
         self.nf = nf
         self.nl = {8:1, 16:2, 32:3, 64:4, 128:5}.get(nl)
+        self.set_threshold(threshold)
         self.convs = nn.ModuleList() 
         n = (1, 4)
         for i in range(self.nl):
@@ -30,8 +31,14 @@ class Net(nn.Module):
         x = F.relu(self.conv_valid(x))
         x = torch.flatten(x, 1)
         x = self.dropout(x)
-        x = self.fc(x)
+        x = F.sigmoid(self.fc(x))
         return x
+    
+    def set_threshold(self, threshold):
+        self.threshold = nn.Parameter(torch.FloatTensor([threshold]), requires_grad=False)
+    
+    def forward_thresholded(self, x):
+        return (self.forward(x).squeeze() > self.threshold).detach().cpu().numpy()
     
 def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True):
     trainloader = torch.utils.data.DataLoader(CustomImageDataset(X_train, y_train), 
@@ -40,9 +47,9 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True):
     
     model = Net(X_train.shape[2], X_train.shape[3]).to(device) #32-3, 16-2, 8-1
     # print(summary(model, (1, 6, 32)))
-    criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.1)
-    for epoch in range(10):  # loop over the dataset multiple times
+    criterion = nn.BCELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    for epoch in range(20):  # loop over the dataset multiple times
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]
@@ -53,7 +60,7 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True):
 
             # forward + backward + optimize
             outputs = model(inputs.float().to(device))
-            loss = criterion(outputs[:, 0], labels.float().to(device))
+            loss = criterion(outputs, labels.float().to(device))
             loss.backward()
             optimizer.step()
 

@@ -44,8 +44,11 @@ class ExpertFormation(ExpertBase):
         
         self.device = "cuda"
         from ml import Net
-        self.model = Net(7, 32).to(self.device)
+        self.model = Net(7, 32)
         self.model.load_state_dict(torch.load("model.pth"))
+        self.model.set_threshold(0.6)
+        self.model.eval()
+        self.model.to(self.device)
         
     def reset_state(self):
         self.formation_found = False
@@ -83,8 +86,10 @@ class ExpertFormation(ExpertBase):
                                self.order_dir, 
                                self.stops_processor.cfg.sl,
                                self.cfg.trailing_stop_rate)
-            y = self.model(torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.device))[0]
-            if y < -0.45:
+            x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.device)
+            y = self.model.forward_thresholded(x)[0]
+            if not y:
+                print(self.model(x)[0].detach().cpu())
                 self.reset_state()
                 return
             
