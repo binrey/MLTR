@@ -61,4 +61,5 @@ config = EasyDict(
     ticker=Param("BTCUSD", bitfinex_list),
     data_type=Param("bitfinex", ["bitfinex"]),
     save_plots=Param(False, [False]),
+    run_model_device=Param(None, [None])
 )

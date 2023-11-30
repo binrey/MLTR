@@ -42,13 +42,13 @@ class ExpertFormation(ExpertBase):
         self.wait_length = cfg.wait_entry_point
         self.reset_state()
         
-        self.device = "mps"
-        from ml import Net
-        self.model = Net(7, 32)
-        self.model.load_state_dict(torch.load("model.pth"))
-        # self.model.set_threshold(0.6)
-        self.model.eval()
-        self.model.to(self.device)
+        if self.cfg.run_model_device is not None:
+            from ml import Net
+            self.model = Net(7, 32)
+            self.model.load_state_dict(torch.load("model.pth"))
+            # self.model.set_threshold(0.6)
+            self.model.eval()
+            self.model.to(self.cfg.run_model_device)
         
     def reset_state(self):
         self.formation_found = False
@@ -81,7 +81,7 @@ class ExpertFormation(ExpertBase):
                 self.reset_state()
                 return            
             
-        if self.order_dir != 0:
+        if self.cfg.run_model_device and self.order_dir != 0:
             x = build_features(h, 
                                self.order_dir, 
                                self.stops_processor.cfg.sl,
