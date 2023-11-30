@@ -28,7 +28,7 @@ stops_processors = EasyDict(
         func=StopsFixed,
         params=EasyDict(
             tp=Param(None, [None]), 
-            sl=Param(4, [4])
+            sl=Param(4, [1, 2, 3, 4])
             )
 ),
     stops_dynamic = EasyDict(
@@ -47,9 +47,9 @@ moex_list = ["SBER", "ROSN", "LKOH", "GMKN", "GAZP"]
 forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
 
 config = EasyDict(
-    date_start=Param("2000-01-01", ["2000-01-01"]),
-    date_end=Param("2024-01-01", ["2024-01-01"]),
-    trailing_stop_rate=Param(0.022, [0.022, 0.02, 0.18]),
+    date_start=Param("2021-01-01", ["2000-01-01"]),
+    date_end=Param("2024-01-01", ["2021-01-01"]),
+    trailing_stop_rate=Param(0.02, [0.01, 0.02, 0.03, 0.04]),
     trailing_stop_type=Param(1, [1]),
     body_classifier=Param(body_classifiers["trend"], [body_classifiers[k] for k in ["trend"]]),
     stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_fixed"]]),
@@ -58,7 +58,7 @@ config = EasyDict(
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
     period=Param("H1", ["H1"]),
-    ticker=Param("BTCUSD", ["BTCUSD"]),
+    ticker=Param("BTCUSD", bitfinex_list),
     data_type=Param("bitfinex", ["bitfinex"]),
     save_plots=Param(False, [False]),
 )

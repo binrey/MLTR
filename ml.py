@@ -6,7 +6,6 @@ import torch.nn.functional as F
 from torchinfo import summary
 from dataloading import CustomImageDataset
 
-device = "cuda"
 
 class Net(nn.Module):
     def __init__(self, nf, nl, threshold=0):
@@ -40,7 +39,8 @@ class Net(nn.Module):
     def forward_thresholded(self, x):
         return (self.forward(x).squeeze() > self.threshold).detach().cpu().numpy()
     
-def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True):
+
+def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True, device="cuda"):
     trainloader = torch.utils.data.DataLoader(CustomImageDataset(X_train, y_train), 
                                               batch_size=batch_size, 
                                               shuffle=True)
@@ -48,8 +48,8 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True):
     model = Net(X_train.shape[2], X_train.shape[3]).to(device) #32-3, 16-2, 8-1
     # print(summary(model, (1, 6, 32)))
     criterion = nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-    for epoch in range(20):  # loop over the dataset multiple times
+    optimizer = optim.Adam(model.parameters(), lr=0.00001)
+    for epoch in range(10):  # loop over the dataset multiple times
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]

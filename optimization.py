@@ -27,7 +27,6 @@ def backtest_process(args):
       pickle.dump((cfg, btest), open(str(Path("optimization") / f"btest{num:003.0f}.pickle"), "wb"))
 
 
-
 def pool_handler():
       ncpu = multiprocessing.cpu_count()
       logger.info(f"Number of cpu : {ncpu}")

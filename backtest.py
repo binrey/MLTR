@@ -55,15 +55,7 @@ class DataParser():
         hist.columns = map(lambda x:x[1:-1], hist.columns)
         hist.columns = map(str.capitalize, hist.columns)
         hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(hist.Date.values, hist.Time.values)])#, utc=True)
-        
-        self._trim_by_date(hist)
-        # if date_start is not None:
-        #     date_start = pd.to_datetime(date_start)
-        #     for i, d in enumerate(hist.Date):
-        #         if d >= date_start:
-        #             break
-        #     hist = hist.iloc[i:]
-        
+        hist = self._trim_by_date(hist)
         hist.drop("Time", axis=1, inplace=True)
         columns = list(hist.columns)
         columns[-2] = "Volume"
