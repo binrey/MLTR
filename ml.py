@@ -19,9 +19,9 @@ class Net(nn.Module):
             self.convs.append(nn.Conv2d(n[0], n[1], (self.nf, 3), padding="same"))
             n = (n[1], n[1]*2)
         self.conv_valid = nn.Conv2d(n[0], n[1], (self.nf, 4), padding="valid")
-        self.pool = nn.MaxPool2d((1, 2), (1, 2))
+        self.pool = nn.AvgPool2d((1, 2), (1, 2))
         self.fc = nn.Linear(n[1], 2)
-        self.dropout = nn.Dropout1d(0.8)
+        self.dropout = nn.Dropout1d(0.75)
         self.softmax = nn.Softmax()
 
     def forward(self, x):
@@ -30,7 +30,7 @@ class Net(nn.Module):
             x = self.pool(F.relu(x))
         x = F.relu(self.conv_valid(x))
         x = torch.flatten(x, 1)
-        # x = self.dropout(x)
+        x = self.dropout(x)
         x = self.softmax(self.fc(x))
         return x
     
@@ -53,7 +53,7 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True, device
     
     model = Net(X_train.shape[2], X_train.shape[3]).to(device) #32-3, 16-2, 8-1
     # print(summary(model, (1, 6, 32)))
-    optimizer = optim.Adam(model.parameters(), lr=0.00001, weight_decay=0.01)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.01)
     for epoch in range(10):  # loop over the dataset multiple times
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):

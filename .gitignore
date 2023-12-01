@@ -6,5 +6,8 @@ optimization/
 *.png
 *.pyc
 *.pickle
+*.pt
+*.pth
+*.jpg
 
 .DS_Store
