@@ -54,6 +54,8 @@ class DataParser():
         hist = pd.read_csv(data_file, sep="\t")
         hist.columns = map(lambda x:x[1:-1], hist.columns)
         hist.columns = map(str.capitalize, hist.columns)
+        if "Time" not in hist.columns:
+            hist["Time"] = ["00:00:00"]*hist.shape[0]
         hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(hist.Date.values, hist.Time.values)])#, utc=True)
         hist = self._trim_by_date(hist)
         hist.drop("Time", axis=1, inplace=True)
