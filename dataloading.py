@@ -50,8 +50,8 @@ def get_data(X, y, test_split=0.25):
     X_test = X_test[:, :, :-2, :]
     
     
-    y_train = np.expand_dims(y_train>0, 1).astype(np.int32)
-    y_test = np.expand_dims(y_test>0, 1).astype(np.int32)
+    y_train = np.expand_dims((np.tanh(y_train)+1)/2, 1).astype(np.float32)
+    y_test = np.expand_dims((np.tanh(y_test)+1)/2, 1).astype(np.float32)
     y_train = np.hstack([y_train, 1-y_train])
     y_test = np.hstack([y_test, 1-y_test])
         
