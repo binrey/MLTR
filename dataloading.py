@@ -27,6 +27,10 @@ def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=Non
     return x
 
 
+def sigmoid(x):
+  return 1 / (1 + np.exp(-x))
+
+
 def get_data(X, y, test_split=0.25):
     ids = np.arange(X.shape[0])
     # np.random.shuffle(ids)
@@ -49,9 +53,12 @@ def get_data(X, y, test_split=0.25):
     X_train = X_train[:, :, :-2, :]
     X_test = X_test[:, :, :-2, :]
     
-    
-    y_train = np.expand_dims((np.tanh(y_train)+1)/2, 1).astype(np.float32)
-    y_test = np.expand_dims((np.tanh(y_test)+1)/2, 1).astype(np.float32)
+    std_train, mean_train = y_train.std(), np.median(y_train)
+    y_train = y_train - mean_train
+    y_test  = y_test - mean_train
+
+    y_train = np.expand_dims(sigmoid(y_train), 1).astype(np.float32)
+    y_test = np.expand_dims(sigmoid(y_test), 1).astype(np.float32)
     y_train = np.hstack([y_train, 1-y_train])
     y_test = np.hstack([y_test, 1-y_test])
         
