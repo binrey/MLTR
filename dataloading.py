@@ -53,12 +53,15 @@ def get_data(X, y, test_split=0.25):
     X_train = X_train[:, :, :-2, :]
     X_test = X_test[:, :, :-2, :]
     
-    std_train, mean_train = y_train.std(), np.median(y_train)
-    y_train = y_train - mean_train
-    y_test  = y_test - mean_train
-
-    y_train = np.expand_dims(sigmoid(y_train), 1).astype(np.float32)
-    y_test = np.expand_dims(sigmoid(y_test), 1).astype(np.float32)
+    # std_train, mean_train = y_train.std(), np.median(y_train)
+    # y_train = y_train - mean_train
+    # y_test  = y_test - mean_train
+    # y_train = np.expand_dims(sigmoid(y_train), 1).astype(np.float32)
+    # y_test = np.expand_dims(sigmoid(y_test), 1).astype(np.float32)
+    
+    y_train = np.expand_dims(y_train>0, 1).astype(np.int32)
+    y_test = np.expand_dims(y_test>0, 1).astype(np.int32)
+    
     y_train = np.hstack([y_train, 1-y_train])
     y_test = np.hstack([y_test, 1-y_test])
         
