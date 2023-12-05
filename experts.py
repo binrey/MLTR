@@ -315,3 +315,28 @@ class Config(EasyDict):
             else:
                 out += f"{k}: {v}\n"
         return out
+    
+    
+if __name__ == "__main__":
+    import torch
+    from torchinfo import summary
+    from dataloading import MovingWindow, DataParser
+    
+    cfg = PyConfig().test()
+    expert = ExpertFormation(cfg)
+    dp = DataParser(cfg)
+    hist_pd, hist = DataParser(cfg).load()
+    mw = MovingWindow(hist, cfg.hist_buffer_size)
+    h, _ = mw(100)
+    x = build_features(h, 1, 
+                       cfg.stops_processor.func.cfg.sl,
+                       cfg.trailing_stop_rate)
+    # x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to("cuda")
+    x = torch.tensor(np.zeros((7, 64))).unsqueeze(0).unsqueeze(0).double().to("cuda")
+    m = expert.model.double()
+    m.eval()
+    with torch.no_grad():
+        for _ in range(10):
+            torch.random.seed = 0
+            print(m(x).sum())
+    # print(summary(m, (10, 1, 7, 32)))

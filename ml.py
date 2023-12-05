@@ -13,7 +13,7 @@ class Net(nn.Module):
         self.nf = nf
         self.nl = {8:1, 16:2, 32:3, 64:4, 128:5}.get(nl)
         self.set_threshold(threshold)
-        self.convs = nn.ModuleList() 
+        self.convs = nn.ModuleList()
         n = (1, 4)
         for i in range(self.nl):
             self.convs.append(nn.Conv2d(n[0], n[1], (self.nf, 3), padding="same"))
@@ -23,22 +23,26 @@ class Net(nn.Module):
         self.fc = nn.Linear(n[1], 2)
         self.dropout = nn.Dropout1d(0.75)
         self.softmax = nn.Softmax()
+        # self.c1 = nn.Conv2d(1, 4,  (3, 3), padding=1, padding_mode="zeros")
+        # self.c2 = nn.Conv2d(4, 8,  (3, 3), padding=1, padding_mode="zeros")
+        # self.c3 = nn.Conv2d(8, 16, (3, 3), padding=1, padding_mode="zeros")
+        # self.convs = [self.c1, self.c2, self.c3]
 
     def forward(self, x):
-        for i in range(self.nl):
-            x = self.convs[i](x)
-            x = self.pool(F.relu(x))
+        for conv in self.convs: 
+            x = self.pool(F.relu(conv(x)))
         x = F.relu(self.conv_valid(x))
         x = torch.flatten(x, 1)
-        x = self.dropout(x)
+        # x = self.dropout(x)
         x = self.softmax(self.fc(x))
         return x
+        # return self.c3(self.c2(self.c1(x)))
     
     def set_threshold(self, threshold):
         self.threshold = nn.Parameter(torch.FloatTensor([threshold]), requires_grad=False)
     
     def forward_thresholded(self, x):
-        return (self.forward(x).squeeze() > self.threshold).detach().cpu().numpy()
+        return (self.forward(x).squeeze() > self.threshold).cpu().numpy()
     
 
 def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True, device="cuda"):
@@ -81,5 +85,37 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True, device
     
     
 if __name__ == "__main__":
-    model = Net(7, 32).to("cuda")
-    print(summary(model, (10, 1, 7, 32)))
+    import numpy as np
+    device = "cpu"
+    # model = Net(7, 32).to(device).double()
+    # model.eval()
+    # # print(summary(model, (10, 1, 7, 32)))
+    # x = torch.tensor(np.zeros((1, 1, 7, 32))).double().to(device)
+    # model(x)
+    # with torch.no_grad():
+    #     for _ in range(10):
+    #         print(model(x))
+            
+            
+            
+    class Net(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.c1 = nn.Conv2d(1, 4,  (3, 3), padding=1, padding_mode="zeros")
+            self.c2 = nn.Conv2d(4, 8,  (3, 3), padding=1, padding_mode="zeros")
+            self.c3 = nn.Conv2d(8, 16,  (3, 3), padding=1, padding_mode="zeros")
+            self.c4 = nn.Conv2d(16, 32,  (3, 3), padding=1, padding_mode="zeros")
+            self.convs = [self.c1, self.c2, self.c3, self.c4]
+
+        def forward(self, x):
+            for conv in self.convs: 
+                x = conv(x)
+            return x
+
+    model = Net().to(device)
+    # print(summary(model, (10, 1, 32, 32)))
+    x = torch.tensor(np.zeros((1, 1, 32, 32))).float().to(device)
+    model(x)
+    with torch.no_grad():
+        for _ in range(10):
+            print(model(x).cpu().sum())
