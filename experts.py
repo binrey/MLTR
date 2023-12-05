@@ -44,7 +44,7 @@ class ExpertFormation(ExpertBase):
         
         if self.cfg.run_model_device is not None:
             from ml import Net
-            self.model = Net(7, 32)
+            self.model = Net(7, 64)
             self.model.load_state_dict(torch.load("model.pth"))
             # self.model.set_threshold(0.6)
             self.model.eval()
@@ -86,12 +86,13 @@ class ExpertFormation(ExpertBase):
                                self.order_dir, 
                                self.stops_processor.cfg.sl,
                                self.cfg.trailing_stop_rate)
-            x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.device)
+            x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.cfg.run_model_device)
             y = self.model.forward_thresholded(x)[0]
-            print(self.model(x)[0].detach().cpu())
             if not y:
                 self.reset_state()
+                print(y)
                 return
+            print("OK")
             
         if self.order_dir != 0:
             tp, sl = self.stops_processor(self, h)
