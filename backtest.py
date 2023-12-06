@@ -82,7 +82,13 @@ if __name__ == "__main__":
     import sys
     logger.remove()
     logger.add(sys.stderr, level="INFO")
-    brok_results = backtest(PyConfig().test())
+    cfg = PyConfig().test()
+    brok_results = backtest(cfg)
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
+    print(brok_results.profits.sum())
+    cfg.run_model_device = None
+    brok_results = backtest(cfg)
+    plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum(), linewidth=2, alpha=0.6)
+    
     plt.savefig("backtest.png")
     print(brok_results.profits.sum())

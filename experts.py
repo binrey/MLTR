@@ -92,7 +92,6 @@ class ExpertFormation(ExpertBase):
                 self.reset_state()
                 print(y)
                 return
-            print("OK")
             
         if self.order_dir != 0:
             tp, sl = self.stops_processor(self, h)

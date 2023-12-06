@@ -13,27 +13,24 @@ class Net(nn.Module):
         self.nf = nf
         self.nl = {8:1, 16:2, 32:3, 64:4, 128:5}.get(nl)
         self.set_threshold(threshold)
-        self.convs = nn.ModuleList()
+        self.f = nn.Sequential()
         n = (1, 4)
         for i in range(self.nl):
-            self.convs.append(nn.Conv2d(n[0], n[1], (self.nf, 3), padding="same"))
+            self.f.append(nn.Conv2d(n[0], n[1], (self.nf, 4), padding="same"))
+            self.f.append(nn.BatchNorm2d(n[1]))
+            self.f.append(nn.ReLU())
+            self.f.append(nn.AvgPool2d((1, 2), (1, 2)))
             n = (n[1], n[1]*2)
         self.conv_valid = nn.Conv2d(n[0], n[1], (self.nf, 4), padding="valid")
-        self.pool = nn.AvgPool2d((1, 2), (1, 2))
         self.fc = nn.Linear(n[1], 2)
-        self.dropout = nn.Dropout1d(0.75)
+        self.dropout = nn.Dropout1d(0.9)
         self.softmax = nn.Softmax()
-        # self.c1 = nn.Conv2d(1, 4,  (3, 3), padding=1, padding_mode="zeros")
-        # self.c2 = nn.Conv2d(4, 8,  (3, 3), padding=1, padding_mode="zeros")
-        # self.c3 = nn.Conv2d(8, 16, (3, 3), padding=1, padding_mode="zeros")
-        # self.convs = [self.c1, self.c2, self.c3]
 
     def forward(self, x):
-        for conv in self.convs: 
-            x = self.pool(F.relu(conv(x)))
+        x = self.f(x)
         x = F.relu(self.conv_valid(x))
         x = torch.flatten(x, 1)
-        # x = self.dropout(x)
+        x = self.dropout(x)
         x = self.softmax(self.fc(x))
         return x
         # return self.c3(self.c2(self.c1(x)))
@@ -58,7 +55,7 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True, device
     model = Net(X_train.shape[2], X_train.shape[3]).to(device) #32-3, 16-2, 8-1
     # print(summary(model, (1, 6, 32)))
     optimizer = optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.01)
-    for epoch in range(10):  # loop over the dataset multiple times
+    for epoch in range(5):  # loop over the dataset multiple times
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]
@@ -86,36 +83,13 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True, device
     
 if __name__ == "__main__":
     import numpy as np
+    torch.manual_seed(0)
     device = "cpu"
-    # model = Net(7, 32).to(device).double()
-    # model.eval()
-    # # print(summary(model, (10, 1, 7, 32)))
-    # x = torch.tensor(np.zeros((1, 1, 7, 32))).double().to(device)
-    # model(x)
-    # with torch.no_grad():
-    #     for _ in range(10):
-    #         print(model(x))
-            
-            
-            
-    class Net(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.c1 = nn.Conv2d(1, 4,  (3, 3), padding=1, padding_mode="zeros")
-            self.c2 = nn.Conv2d(4, 8,  (3, 3), padding=1, padding_mode="zeros")
-            self.c3 = nn.Conv2d(8, 16,  (3, 3), padding=1, padding_mode="zeros")
-            self.c4 = nn.Conv2d(16, 32,  (3, 3), padding=1, padding_mode="zeros")
-            self.convs = [self.c1, self.c2, self.c3, self.c4]
-
-        def forward(self, x):
-            for conv in self.convs: 
-                x = conv(x)
-            return x
-
-    model = Net().to(device)
-    # print(summary(model, (10, 1, 32, 32)))
-    x = torch.tensor(np.zeros((1, 1, 32, 32))).float().to(device)
-    model(x)
+    model = Net(7, 64)
+    model.eval()
+    print(summary(model, (10, 1, 7, 64)))
+    model.to(device)
+    x = torch.tensor(np.zeros((1, 1, 7, 64))).float().to(device)
     with torch.no_grad():
         for _ in range(10):
-            print(model(x).cpu().sum())
+            print(model(x))
