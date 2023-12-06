@@ -42,20 +42,20 @@ class Net(nn.Module):
         return (self.forward(x).squeeze() > self.threshold).cpu().numpy()
     
 
-def train(X_train, y_train, X_test, y_test, batch_size=1, calc_test=True, device="cuda"):
+def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=True, device="cuda"):
     # class_sample_count = [10, 1, 20, 3, 4] # dataset has 10 class-1 samples, 1 class-2 samples, etc.
     # weights = 1 / torch.Tensor(class_sample_count)
     # weights = weights.double()
     # sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, batch_size)
     trainloader = torch.utils.data.DataLoader(CustomImageDataset(X_train, y_train), 
                                               batch_size=batch_size, 
-                                              shuffle=True,
+                                              shuffle=True
                                               )
     
     model = Net(X_train.shape[2], X_train.shape[3]).to(device) #32-3, 16-2, 8-1
     # print(summary(model, (1, 6, 32)))
     optimizer = optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.01)
-    for epoch in range(5):  # loop over the dataset multiple times
+    for epoch in range(epochs):  # loop over the dataset multiple times
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]
