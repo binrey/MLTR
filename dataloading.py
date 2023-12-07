@@ -48,14 +48,15 @@ def get_data(X, y, test_split=0.25):
             periods_test += periods[selected_days].tolist()
             ids_test += ii.tolist()
             odates_testset.add(d)
+    periods_test = np.array(periods_test)
+    ids_test = np.array(ids_test)
     ids_train = [ix for ix in ids if ix not in ids_test]
-    # ids_test = [ids_test[i] for i in range(len(ids_test)) if periods_test[i] == 2]
+    ids_test = ids_test[periods_test == 2]
+    periods_test = periods_test[periods_test==2]
     np.random.shuffle(ids_train) 
     np.random.shuffle(ids_test) 
         
-    ids_test, ids_train = ids[:test_size], ids[test_size:]
     X_train, X_test, y_train, y_test, profs_train, profs_test = X[ids_train], X[ids_test], y[ids_train], y[ids_test], y[ids_train].copy(), y[ids_test].copy()
-    tf_test = X_test[:, 0, -1, 0]
     X_train = X_train[:, :, :-2, :]
     X_test = X_test[:, :, :-2, :]
     
@@ -65,8 +66,7 @@ def get_data(X, y, test_split=0.25):
     y_train = np.hstack([y_train, 1-y_train])
     y_test = np.hstack([y_test, 1-y_test])
         
-    return X_train, X_test, y_train, y_test, profs_train, profs_test, tf_test
-
+    return X_train, X_test, y_train, y_test, profs_train, profs_test, periods_test
 class CustomImageDataset(Dataset):
     def __init__(self, X, y):
         self.img_labels = y

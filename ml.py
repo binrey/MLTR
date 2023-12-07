@@ -23,7 +23,7 @@ class Net(nn.Module):
             n = (n[1], n[1]*2)
         self.conv_valid = nn.Conv2d(n[0], n[1], (self.nf, 4), padding="valid")
         self.fc = nn.Linear(n[1], 2)
-        self.dropout = nn.Dropout1d(0.9)
+        self.dropout = nn.Dropout1d(0.5)
         self.softmax = nn.Softmax()
 
     def forward(self, x):
@@ -43,10 +43,6 @@ class Net(nn.Module):
     
 
 def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=True, device="cuda"):
-    # class_sample_count = [10, 1, 20, 3, 4] # dataset has 10 class-1 samples, 1 class-2 samples, etc.
-    # weights = 1 / torch.Tensor(class_sample_count)
-    # weights = weights.double()
-    # sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, batch_size)
     trainloader = torch.utils.data.DataLoader(CustomImageDataset(X_train, y_train), 
                                               batch_size=batch_size, 
                                               shuffle=True
