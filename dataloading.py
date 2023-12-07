@@ -38,29 +38,26 @@ def get_data(X, y, test_split=0.25):
     ids = np.arange(X.shape[0])
     # np.random.shuffle(ids)
     test_size = int(X.shape[0]*test_split)
-    ids_test, odates_testset, odates = [], set(), X[:, 0, -2, 0]
+    ids_test, periods_test, odates_testset, odates, periods = [], [], set(), X[:, 0, -2, 0], X[:, 0, -1, 0]
     while len(ids_test) < test_size:
         ix = np.random.randint(0, X.shape[0])
         d = odates[ix]
         if d not in odates_testset:
-            ii = ids[odates == d]
+            selected_days = odates == d
+            ii = ids[selected_days]
+            periods_test += periods[selected_days].tolist()
             ids_test += ii.tolist()
             odates_testset.add(d)
-    ids_train = [ix for ix in ids if ix not in ids_test]   
+    ids_train = [ix for ix in ids if ix not in ids_test]
+    # ids_test = [ids_test[i] for i in range(len(ids_test)) if periods_test[i] == 2]
     np.random.shuffle(ids_train) 
     np.random.shuffle(ids_test) 
         
-    # ids_test, ids_train = ids[:test_size], ids[test_size:]
+    ids_test, ids_train = ids[:test_size], ids[test_size:]
     X_train, X_test, y_train, y_test, profs_train, profs_test = X[ids_train], X[ids_test], y[ids_train], y[ids_test], y[ids_train].copy(), y[ids_test].copy()
     tf_test = X_test[:, 0, -1, 0]
     X_train = X_train[:, :, :-2, :]
     X_test = X_test[:, :, :-2, :]
-    
-    # std_train, mean_train = y_train.std(), np.median(y_train)
-    # y_train = y_train - mean_train
-    # y_test  = y_test - mean_train
-    # y_train = np.expand_dims(sigmoid(y_train), 1).astype(np.float32)
-    # y_test = np.expand_dims(sigmoid(y_test), 1).astype(np.float32)
     
     y_train = np.expand_dims(y_train>0, 1).astype(np.int32)
     y_test = np.expand_dims(y_test>0, 1).astype(np.int32)
