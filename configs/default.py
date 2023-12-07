@@ -28,7 +28,7 @@ stops_processors = EasyDict(
         func=StopsFixed,
         params=EasyDict(
             tp=Param(None, [None]), 
-            sl=Param(4, [1, 2, 4])
+            sl=Param(4, [1, 2, 4, 6])
             )
 ),
     stops_dynamic = EasyDict(
@@ -57,7 +57,7 @@ config = EasyDict(
     hist_buffer_size=Param(66, [34]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("H1", ["H1", "M15"]),
+    period=Param("H1", ["M15"]),
     ticker=Param("ETHUSDT", bitfinex_list),
     data_type=Param("metatrader", ["metatrader"]),
     save_plots=Param(False, [False]),
