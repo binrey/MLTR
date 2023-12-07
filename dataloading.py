@@ -51,8 +51,8 @@ def get_data(X, y, test_split=0.25):
     periods_test = np.array(periods_test)
     ids_test = np.array(ids_test)
     ids_train = [ix for ix in ids if ix not in ids_test]
-    ids_test = ids_test[periods_test == 1]
-    periods_test = periods_test[periods_test == 1]
+    ids_test = ids_test[periods_test == 2]
+    periods_test = periods_test[periods_test == 2]
     np.random.shuffle(ids_train) 
     np.random.shuffle(ids_test) 
         
