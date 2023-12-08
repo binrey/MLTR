@@ -24,7 +24,7 @@ class Net(nn.Module):
         self.conv_valid = nn.Conv2d(n[0], n[1], (self.nf, 4), padding="valid")
         self.fc = nn.Linear(n[1], 2)
         self.dropout = nn.Dropout1d(0.5)
-        self.softmax = nn.Softmax()
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         x = self.f(x)
