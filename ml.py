@@ -17,13 +17,13 @@ class Net(nn.Module):
         n = (1, 4)
         for i in range(self.nl):
             self.f.append(nn.Conv2d(n[0], n[1], (self.nf, 4), padding="same"))
-            # self.f.append(nn.BatchNorm2d(n[1]))
+            self.f.append(nn.BatchNorm2d(n[1]))
             self.f.append(nn.ReLU())
-            self.f.append(nn.AvgPool2d((1, 2), (1, 2)))
+            self.f.append(nn.MaxPool2d((1, 2), (1, 2)))
             n = (n[1], n[1]*2)
         self.conv_valid = nn.Conv2d(n[0], n[1], (self.nf, 4), padding="valid")
         self.fc = nn.Linear(n[1], 2)
-        self.dropout = nn.Dropout1d(0.5)
+        self.dropout = nn.Dropout1d(0.75)
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
