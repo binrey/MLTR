@@ -90,7 +90,6 @@ class ExpertFormation(ExpertBase):
             y = self.model.forward_thresholded(x)[0]
             if not y:
                 self.reset_state()
-                print(y)
                 return
             
         if self.order_dir != 0:

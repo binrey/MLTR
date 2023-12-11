@@ -4,6 +4,8 @@ from torch.utils.data import Dataset
 from easydict import EasyDict
 from pathlib import Path
 from time import perf_counter
+from loguru import logger
+from tqdm import tqdm
 
 
 def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=None):
@@ -23,7 +25,7 @@ def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=Non
     x = np.vstack([x, np.ones(x.shape[1])*trailing_stop_rate/0.04+1])
     if open_date is not None:
         odate = pd.to_datetime(open_date)
-        odate = odate.year*10000 + odate.month*100 + odate.day        
+        odate = odate.year*10000 + odate.month*100 + odate.day       
         x = np.vstack([x, np.ones(x.shape[1])*odate])
     if timeframe is not None:
         x = np.vstack([x, np.ones(x.shape[1])*timeframe])
@@ -34,20 +36,27 @@ def sigmoid(x):
   return 1 / (1 + np.exp(-x))
 
 
-def get_data(X, y, test_split=0.25):
+def get_data(X, y, test_split=0.25, n_split=0):
     ids = np.arange(X.shape[0])
     # np.random.shuffle(ids)
-    test_size = int(X.shape[0]*test_split)
+    
     ids_test, periods_test, odates_testset, odates, periods = [], [], set(), X[:, 0, -2, 0], X[:, 0, -1, 0]
-    while len(ids_test) < test_size:
-        ix = np.random.randint(0, X.shape[0])
-        d = odates[ix]
+    odates_set = sorted(list(set(odates.astype(int))))
+    dates_count = len(odates_set)
+    test_size = int(dates_count*test_split)
+    if test_size*(n_split+1) > dates_count:
+        return None
+    di0, di1 = test_size*n_split, test_size*(n_split+1) - 1
+    name = f"test dates: {odates_set[di0]}:{odates_set[di1]}"
+    for di in tqdm(range(di0, di1), name):
+        d = odates_set[di]
         if d not in odates_testset:
             selected_days = odates == d
             ii = ids[selected_days]
             periods_test += periods[selected_days].tolist()
             ids_test += ii.tolist()
             odates_testset.add(d)
+        di += 1
     periods_test = np.array(periods_test)
     ids_test = np.array(ids_test)
     ids_train = [ix for ix in ids if ix not in ids_test]
@@ -66,7 +75,7 @@ def get_data(X, y, test_split=0.25):
     y_train = np.hstack([y_train, 1-y_train])
     y_test = np.hstack([y_test, 1-y_test])
         
-    return X_train, X_test, y_train, y_test, profs_train, profs_test, periods_test
+    return X_train, X_test, y_train, y_test, profs_train, profs_test, periods_test, (str(odates_set[di0]), str(odates_set[di1]))
 class CustomImageDataset(Dataset):
     def __init__(self, X, y):
         self.img_labels = y
