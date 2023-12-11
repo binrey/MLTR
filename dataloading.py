@@ -6,6 +6,7 @@ from pathlib import Path
 from time import perf_counter
 from loguru import logger
 from tqdm import tqdm
+import pickle
 
 
 def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=None):
@@ -36,7 +37,7 @@ def sigmoid(x):
   return 1 / (1 + np.exp(-x))
 
 
-def get_data(X, y, test_split=0.25, n_split=0):
+def get_data(X, y, test_split=0.25, n1_split=0, n2_split=1):
     ids = np.arange(X.shape[0])
     # np.random.shuffle(ids)
     
@@ -44,9 +45,9 @@ def get_data(X, y, test_split=0.25, n_split=0):
     odates_set = sorted(list(set(odates.astype(int))))
     dates_count = len(odates_set)
     test_size = int(dates_count*test_split)
-    if test_size*(n_split+1) > dates_count:
+    if test_size*n2_split > dates_count:
         return None
-    di0, di1 = test_size*n_split, test_size*(n_split+1) - 1
+    di0, di1 = test_size*n1_split, test_size*(n2_split) - 1
     name = f"test dates: {odates_set[di0]}:{odates_set[di1]}"
     for di in tqdm(range(di0, di1), name):
         d = odates_set[di]
@@ -162,6 +163,39 @@ class DataParser():
         hist["Id"] = list(range(hist.shape[0]))
         return hist
         
+
+def collect_train_data(dir, fsize=64):
+    cfgs, btests = [], []
+    for p in sorted(Path(dir).glob("*.pickle")):
+        cfg, btest = pickle.load(open(p, "rb"))
+        cfgs.append(cfg)
+        btests.append(btest)
+    print(len(btests))
+
+    tfdict = {"M5":0, "M15":1, "H1":2}
+    X, y, poslist = [], [], []
+    for btest in tqdm(btests, "Load pickles"):
+        # print(btest.cfg.ticker, end=" ")
+        hist_pd, hist = DataParser(btest.cfg).load()
+        mw = MovingWindow(hist, fsize+2)
+        # print(len(btest.positions))
+        for pos in btest.positions[4:]:
+            f, _ = mw(pos.open_indx)
+            x = build_features(f, 
+                            pos.dir, 
+                            btest.cfg.stops_processor.func.cfg.sl, 
+                            btest.cfg.trailing_stop_rate,
+                            pos.open_date, 
+                            tfdict[btest.cfg.period])
+            X.append([x])
+            y.append(pos.profit)
+            poslist.append(pos)
+            
+    X, y = np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)
+    print(X.shape, y.shape)
+    print(f"{X[0, 0, -2, 0]:8.0f} -> {X[-1, 0, -2, 0]:8.0f}")
+    return X, y
+
 
 class MovingWindow():
     def __init__(self, hist, size):

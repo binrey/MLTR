@@ -57,7 +57,7 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             labels = labels.to(device)
-            criterion = nn.CrossEntropyLoss(weight=torch.tensor(labels.sum(0)[[1, 0]]))
+            criterion = nn.CrossEntropyLoss(weight=labels.sum(0)[[1, 0]])
             # zero the parameter gradients
             optimizer.zero_grad()
 
