@@ -22,8 +22,8 @@ def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=Non
         x = np.vstack([2-fc, 2-fo, 2-fl, 2-fh])
     x = x*100 - 100
     x = np.vstack([x, fv])
-    x = np.vstack([x, np.ones(x.shape[1])*sl/6+1])
-    x = np.vstack([x, np.ones(x.shape[1])*trailing_stop_rate/0.04+1])
+    x = np.vstack([x, np.ones(x.shape[1])*sl])
+    x = np.vstack([x, np.ones(x.shape[1])*trailing_stop_rate])
     if open_date is not None:
         odate = pd.to_datetime(open_date)
         odate = odate.year*10000 + odate.month*100 + odate.day       
@@ -191,7 +191,7 @@ def collect_train_data(dir, fsize=64):
             y.append(pos.profit)
             poslist.append(pos)
             
-    X, y = np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)
+    X, y = np.array(X), np.array(y, dtype=np.float32)
     print(X.shape, y.shape)
     print(f"{X[0, 0, -2, 0]:8.0f} -> {X[-1, 0, -2, 0]:8.0f}")
     return X, y
