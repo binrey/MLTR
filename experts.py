@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from time import perf_counter
-
+from copy import deepcopy
 import numpy as np
 import yaml
 from easydict import EasyDict
@@ -44,7 +44,7 @@ class ExpertFormation(ExpertBase):
         
         if self.cfg.run_model_device is not None:
             from ml import Net
-            self.model = Net(5, 32)
+            self.model = Net(5, 64)
             self.model.load_state_dict(torch.load("model.pth"))
             # self.model.set_threshold(0.6)
             self.model.eval()
@@ -271,14 +271,15 @@ class StopsDynamic(ExtensionBase):
 class PyConfig():
     def test(self):
         from configs.default import config
-        for k, v in config.items():
+        cfg = deepcopy(config)
+        for k, v in cfg.items():
             v = v.test
             if type(v) is EasyDict and "func" in v.keys():
                 params = EasyDict({pk: pv.test for pk, pv in v.params.items()})
-                config[k].func = v.func(params)
+                cfg[k].func = v.func(params)
             else:
-                config[k] = v
-        return config
+                cfg[k] = v
+        return cfg
 
     def optim(self):
         from configs.default import config
