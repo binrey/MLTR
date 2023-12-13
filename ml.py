@@ -17,7 +17,7 @@ class Net(nn.Module):
         n = (1, 4)
         for i in range(self.nl):
             self.f.append(nn.Conv2d(n[0], n[1], (self.nf, 3), padding="same"))
-            self.f.append(nn.BatchNorm2d(n[1]))
+            # self.f.append(nn.BatchNorm2d(n[1]))
             self.f.append(nn.ReLU())
             self.f.append(nn.MaxPool2d((1, 2), (1, 2)))
             n = (n[1], n[1]*2)
@@ -53,7 +53,7 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
     
     model = Net(X_train.shape[2]-2, X_train.shape[3]).to(device) #32-3, 16-2, 8-1
     # print(summary(model, (1, 6, 32)))
-    optimizer = optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.1)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)
     for epoch in range(epochs):  # loop over the dataset multiple times
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
