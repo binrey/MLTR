@@ -20,10 +20,10 @@ def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=Non
         x = np.vstack([fc, fo, fl, fh])
     else:
         x = np.vstack([2-fc, 2-fo, 2-fl, 2-fh])
-    x = x*100 - 100
-    x = np.vstack([x, fv])
+    x = x*127
+    # x = np.vstack([x, fv])
     x = np.vstack([x, np.ones(x.shape[1])*sl])
-    x = np.vstack([x, np.ones(x.shape[1])*trailing_stop_rate])
+    x = np.vstack([x, np.ones(x.shape[1])*trailing_stop_rate*1000])
     if open_date is not None:
         odate = pd.to_datetime(open_date)
         odate = odate.year*10000 + odate.month*100 + odate.day       
@@ -67,8 +67,8 @@ def get_data(X, y, test_split=0.25, n1_split=0, n2_split=1):
     np.random.shuffle(ids_test) 
         
     X_train, X_test, y_train, y_test, profs_train, profs_test = X[ids_train], X[ids_test], y[ids_train], y[ids_test], y[ids_train].copy(), y[ids_test].copy()
-    X_train = X_train[:, :, :-2, :]
-    X_test = X_test[:, :, :-2, :]
+    X_train = X_train[:, :, :-2, :].astype(np.uint8)
+    X_test = X_test[:, :, :-2, :].astype(np.uint8)
     
     y_train = np.expand_dims(y_train>0, 1).astype(np.int32)
     y_test = np.expand_dims(y_test>0, 1).astype(np.int32)

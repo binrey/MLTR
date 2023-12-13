@@ -14,7 +14,7 @@ logger.add(sys.stderr, level="INFO")
 
 
 if __name__ == "__main__":
-    test_split_size = 0.2
+    test_split_size = 0.25
     device = "mps"
     cfg = PyConfig().test()
     cfg.run_model_device = device
@@ -28,12 +28,11 @@ if __name__ == "__main__":
         X_train = X_train.float().to(device)
         p_train = model(X_train).detach().cpu().numpy().squeeze()[:, 0]    
         profsum_best, threshold = -999999, np.percentile(p_train, 10)
-        # for th in np.arange(0., 0.9, 0.05):
-        #     w_profs_train = (p_train > th).astype(np.float32)
-        #     profsum = (profs_train*w_profs_train).sum()
-        #     if profsum > profsum_best:
-        #         profsum_best = profsum
-        #         threshold = th
+        for th in np.arange(0., 0.9, 0.025):
+            profsum = f1_score(y_train[:, 0], p_train>th)
+            if profsum > profsum_best:
+                profsum_best = profsum
+                threshold = th
         model.set_threshold(threshold)
         torch.save(model.state_dict(), "model.pth")
         cfg.date_start=f"{test_dates[0][:4]}-{test_dates[0][4:6]}-{test_dates[0][6:]}"

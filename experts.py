@@ -44,7 +44,7 @@ class ExpertFormation(ExpertBase):
         
         if self.cfg.run_model_device is not None:
             from ml import Net
-            self.model = Net(5, 64)
+            self.model = Net(4, 64)
             self.model.load_state_dict(torch.load("model.pth"))
             # self.model.set_threshold(0.6)
             self.model.eval()
