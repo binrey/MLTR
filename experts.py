@@ -283,7 +283,8 @@ class PyConfig():
 
     def optim(self):
         from configs.default import config
-        for k, vlist in config.items():
+        cfg = deepcopy(config)
+        for k, vlist in cfg.items():
             vlist_new = []
             for v in vlist.optim:
                 if type(v) is EasyDict and "func" in v.keys():
@@ -293,8 +294,8 @@ class PyConfig():
                     vlist_new += [EasyDict(func=v.func(params)) for params in params_list]
                 else:
                     vlist_new.append(v)
-            config[k] = vlist_new
-        return config
+            cfg[k] = vlist_new
+        return cfg
     
     @staticmethod
     def unroll_params(cfg):
