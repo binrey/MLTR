@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchinfo import summary
 from dataloading import CustomImageDataset
+from sklearn.metrics import roc_auc_score
 
 
 class Net(nn.Module):
@@ -32,7 +33,7 @@ class Net(nn.Module):
         x = self.f(x[:, :, :-2, :])
         x = F.relu(self.conv_valid(x))
         x = torch.flatten(x, 1)
-        x = self.dropout(x)
+        # x = self.dropout(x)
         # x = torch.concat([x, p], 1)
         x = self.softmax(self.fc(x))
         return x
@@ -52,30 +53,36 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
                                               )
     
     model = Net(X_train.shape[2]-2, X_train.shape[3]).to(device) #32-3, 16-2, 8-1
-    # print(summary(model, (1, 6, 32)))
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    if calc_test:
+        y_test_tensor = torch.tensor(y_test).float().to(device)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.CrossEntropyLoss(weight=torch.tensor(y_train).float().to(device).sum(0)[[1, 0]])
     for epoch in range(epochs):  # loop over the dataset multiple times
-        running_loss = 0.0
+        running_loss = 0
+        running_roc_train = 0
+        
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             labels = labels.to(device)
-            criterion = nn.CrossEntropyLoss(weight=labels.sum(0)[[1, 0]])
+            outputs = model(inputs.float().to(device))
+            roc_train = 0
+            if calc_test:
+                roc_train = roc_auc_score(labels[:, 0].cpu().numpy(), outputs[:, 0].cpu().detach().numpy())
             # zero the parameter gradients
             optimizer.zero_grad()
-
             # forward + backward + optimize
-            outputs = model(inputs.float().to(device))
             loss = criterion(outputs, labels.float())
             loss.backward()
             optimizer.step()
-
             # print statistics
             running_loss += loss.item()
+            running_roc_train += roc_train
         if calc_test:
-            loss_test = criterion(model(torch.tensor(X_test).float().to(device)), 
-                                        torch.tensor(y_test).float().to(device))
-            print(f"[{epoch + 1:03d}, {i + 1:5d}] loss train: {running_loss / (i + 1):.4f} | test: {loss_test / (i + 1):.4f}")
+            test_out = model(X_test)
+            roc_test = roc_auc_score(y_test[:, 0], test_out[:, 0].cpu().detach().numpy())
+            loss_test = criterion(y_test_tensor, test_out)
+            print(f"{epoch + 1:03d} loss train: {running_loss/(i+1):.4f} | test: {loss_test:.4f}   ROC train: {running_roc_train/(i+1):.4f} | test: {roc_test:.4f}")
         running_loss = 0.0
     return model
     
