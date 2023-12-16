@@ -70,11 +70,11 @@ def get_data(X, y, test_split=0.25, n1_split=0, n2_split=1):
     X_train = X_train[:, :, :-2, :].astype(np.uint8)
     X_test = X_test[:, :, :-2, :].astype(np.uint8)
     
-    y_train = np.expand_dims(y_train>0, 1).astype(np.int32)
-    y_test = np.expand_dims(y_test>0, 1).astype(np.int32)
+    y_train = np.expand_dims(y_train, 1)#.astype(np.int32)
+    y_test = np.expand_dims(y_test, 1)#.astype(np.int32)
     
-    y_train = np.hstack([y_train, 1-y_train])
-    y_test = np.hstack([y_test, 1-y_test])
+    # y_train = np.hstack([y_train, 1-y_train])
+    # y_test = np.hstack([y_test, 1-y_test])
         
     return X_train, X_test, y_train, y_test, profs_train, profs_test, periods_test, (str(odates_set[di0]), str(odates_set[di1]))
 class CustomImageDataset(Dataset):

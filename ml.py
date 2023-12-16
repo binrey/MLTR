@@ -55,8 +55,8 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
     model = Net(X_train.shape[2]-2, X_train.shape[3]).to(device) #32-3, 16-2, 8-1
     if calc_test:
         y_test_tensor = torch.tensor(y_test).float().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-    criterion = nn.CrossEntropyLoss(weight=torch.tensor(y_train).float().to(device).sum(0)[[1, 0]])
+    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.1)
+    criterion = nn.MSELoss()#weight=torch.tensor(y_train).float().to(device).sum(0)[[1, 0]])
     for epoch in range(epochs):  # loop over the dataset multiple times
         running_loss = 0
         running_roc_train = 0
@@ -65,14 +65,15 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             labels = labels.to(device)
+            
             outputs = model(inputs.float().to(device))
             roc_train = 0
             if calc_test:
-                roc_train = roc_auc_score(labels[:, 0].cpu().numpy(), outputs[:, 0].cpu().detach().numpy())
+                roc_train = roc_auc_score(labels[:, 0].cpu().numpy()>0, outputs[:, 0].cpu().detach().numpy())
             # zero the parameter gradients
             optimizer.zero_grad()
             # forward + backward + optimize
-            loss = criterion(outputs, labels.float())
+            loss = -((outputs[:, :1]*labels).sum() - labels.sum()*outputs[:, :1].mean())
             loss.backward()
             optimizer.step()
             # print statistics
@@ -80,8 +81,8 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
             running_roc_train += roc_train
         if calc_test:
             test_out = model(X_test)
-            roc_test = roc_auc_score(y_test[:, 0], test_out[:, 0].cpu().detach().numpy())
-            loss_test = criterion(y_test_tensor, test_out)
+            roc_test = roc_auc_score(y_test[:, 0]>0, test_out[:, 0].cpu().detach().numpy())
+            loss_test = -((test_out[:, :1]*y_test_tensor).sum() - y_test_tensor.sum()*test_out[:, :1].mean())
             print(f"{epoch + 1:03d} loss train: {running_loss/(i+1):.4f} | test: {loss_test:.4f}   ROC train: {running_roc_train/(i+1):.4f} | test: {roc_test:.4f}")
         running_loss = 0.0
     return model

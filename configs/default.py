@@ -28,7 +28,7 @@ stops_processors = EasyDict(
         func=StopsFixed,
         params=EasyDict(
             tp=Param(None, [None]), 
-            sl=Param(2, [1, 2, 3])
+            sl=Param(2, [2])
             )
 ),
     stops_dynamic = EasyDict(
@@ -41,7 +41,7 @@ stops_processors = EasyDict(
 )
 # ----------------------------------------------------------------
 # Configuration
-bitfinex_list = ["BTCUSD", "ETHUSD", "TRXUSD", "XRPUSD"]
+bitfinex_list = ["ETHUSD"]#, "BTCUSD", "TRXUSD", "XRPUSD"]
 yahoo_list = ["MSFT", "AMZN", "AAPL", "GOOG", "NFLX", "TSLA"]
 moex_list = ["SBER", "ROSN", "LKOH", "GMKN", "GAZP"]
 forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
@@ -58,7 +58,7 @@ config = EasyDict(
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
     period=Param("H1", ["H1"]),
-    ticker=Param("BTCUSDT", bitfinex_list),
+    ticker=Param("ETHUSDT", bitfinex_list),
     data_type=Param("metatrader", ["metatrader"]),
     save_plots=Param(False, [False]),
     run_model_device=Param("cuda", [None])
