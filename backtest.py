@@ -85,27 +85,27 @@ if __name__ == "__main__":
     plt.subplots(figsize=(20, 10))
     cfg = PyConfig().test()
     
-    cfg.date_start="2000-01-01"
-    cfg.date_end="2021-01-01"
-    cfg.run_model_device = "cuda"
-    brok_results = backtest(cfg)
-    plt.subplot(1, 2, 1)
-    plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
-    print(brok_results.profits.sum())
-    cfg.run_model_device = None
-    brok_results = backtest(cfg)
-    plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum(), linewidth=2, alpha=0.6)
-    print(brok_results.profits.sum())
+    # cfg.date_start="2000-01-01"
+    # cfg.date_end="2021-01-01"
+    # cfg.run_model_device = "cuda"
+    # brok_results = backtest(cfg)
+    # plt.subplot(1, 2, 1)
+    # plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
+    # print(brok_results.profits.sum())
+    # cfg.run_model_device = None
+    # brok_results = backtest(cfg)
+    # plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum(), linewidth=2, alpha=0.6)
+    # print(brok_results.profits.sum())
     
     
  
-    cfg.date_start="2021-01-01"
-    cfg.date_end="2024-01-01"
-    cfg.run_model_device = "cuda"
-    brok_results = backtest(cfg)
-    plt.subplot(1, 2, 2)
-    plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
-    print(brok_results.profits.sum())
+    # cfg.date_start="2021-01-01"
+    # cfg.date_end="2024-01-01"
+    # cfg.run_model_device = "cuda"
+    # brok_results = backtest(cfg)
+    # plt.subplot(1, 2, 2)
+    # plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
+    # print(brok_results.profits.sum())
     cfg.run_model_device = None
     brok_results = backtest(cfg)
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum(), linewidth=2, alpha=0.6)
