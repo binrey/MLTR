@@ -196,6 +196,49 @@ def collect_train_data(dir, fsize=64):
     print(f"{X[0, 0, -2, 0]:8.0f} -> {X[-1, 0, -2, 0]:8.0f}")
     return X, y
 
+def collect_train_data2(dir, fsize=64):
+    cfgs, btests = [], []
+    for p in sorted(Path(dir).glob("*.pickle")):
+        cfg, btest = pickle.load(open(p, "rb"))
+        cfgs.append(cfg)
+        btests.append(btest)
+    print(len(btests))
+
+    tfdict = {"M5":0, "M15":1, "H1":2}
+    X, y, poslist = [], [], []
+    posdict = {}
+    for btest in tqdm(btests, "Load pickles"):
+        for pos in btest.positions[4:]:
+            k = pos.open_date
+            sl, profit, dir = btest.cfg.stops_processor.func.cfg.sl, pos.profit, pos.dir
+            if k in posdict.keys():
+                posdict[k][0].append(sl)
+                posdict[k][1].append(profit)
+                posdict[k][2].append(dir)
+            else:
+                posdict[k] = [[sl], [profit], [dir]]
+    
+
+    btest = btests[0]
+    hist_pd, hist = DataParser(btests.cfg).load()
+    mw = MovingWindow(hist, fsize+2)
+    for open_date, pos in posdict.items():
+        if len(pos[0]) == 3 and len(set(pos[2])) == 1:
+            f, _ = mw(pos.open_indx)
+            x = build_features(f, 
+                            pos[2][0],
+                            0, 
+                            btest.cfg.trailing_stop_rate,
+                            open_date, 
+                            tfdict[btest.cfg.period])
+            X.append([x])
+            y.append(pos.profit)
+            poslist.append(pos)
+    
+    X, y = np.array(X), np.array(y, dtype=np.float32)
+    print(X.shape, y.shape)
+    print(f"{X[0, 0, -2, 0]:8.0f} -> {X[-1, 0, -2, 0]:8.0f}")
+    return X, y
 
 class MovingWindow():
     def __init__(self, hist, size):
@@ -224,3 +267,7 @@ class MovingWindow():
         self.data.Volume[:-1] = self.hist.Volume[t-self.size+1:t]
         self.data.Volume[-1] = 0      
         return self.data, perf_counter() - t0
+    
+    
+if __name__ == "__main__":
+    collect_train_data2("./optimization")
