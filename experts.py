@@ -85,18 +85,17 @@ class ExpertFormation(ExpertBase):
         if h.Date[-1] in self.cfg.no_trading_days:
             self.reset_state()
             
+        y = None
         if self.cfg.run_model_device and self.order_dir != 0:
             x = build_features(h, 
                                self.order_dir, 
                                self.stops_processor.cfg.sl,
                                self.cfg.trailing_stop_rate)
             x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.cfg.run_model_device)
-            y = self.model.forward_thresholded(x)[0]
-            if not y:
-                self.reset_state()
+            y = self.model.forward_thresholded(x).item() + 1
             
         if self.order_dir != 0:
-            tp, sl = self.stops_processor(self, h)
+            tp, sl = self.stops_processor(self, h, y)
             self.orders = [Order(self.order_dir, Order.TYPE.MARKET, h.Id[-1], h.Id[-1])]
             if tp:
                 self.orders.append(Order(tp, Order.TYPE.LIMIT, h.Id[-1], h.Id[-1]))
@@ -247,9 +246,13 @@ class StopsFixed(ExtensionBase):
         self.cfg = cfg
         super(StopsFixed, self).__init__(cfg, name="stops_fix")
         
-    def __call__(self, common, h):
+    def __call__(self, common, h, sl_custom=None):
         tp = -common.order_dir*h.Open[-1]*(1+common.order_dir*self.cfg.tp/100) if self.cfg.tp is not None else self.cfg.tp
-        sl = -common.order_dir*h.Open[-1]*(1-common.order_dir*self.cfg.sl/100) if self.cfg.sl is not None else self.cfg.sl
+        sl = self.cfg.sl
+        if sl_custom is not None:
+            sl = sl_custom
+        if sl is not None:
+            sl = -common.order_dir*h.Open[-1]*(1-common.order_dir*self.cfg.sl/100)
         return tp, sl
     
 

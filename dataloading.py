@@ -22,8 +22,8 @@ def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=Non
         x = np.vstack([2-fc, 2-fo, 2-fl, 2-fh])
     x = x*127
     # x = np.vstack([x, fv])
-    x = np.vstack([x, np.ones(x.shape[1])*sl])
-    x = np.vstack([x, np.ones(x.shape[1])*trailing_stop_rate*1000])
+    # x = np.vstack([x, np.ones(x.shape[1])*sl])
+    # x = np.vstack([x, np.ones(x.shape[1])*trailing_stop_rate*1000])
     if open_date is not None:
         odate = pd.to_datetime(open_date)
         odate = odate.year*10000 + odate.month*100 + odate.day       
@@ -70,13 +70,11 @@ def get_data(X, y, test_split=0.25, n1_split=0, n2_split=1):
     X_train = X_train[:, :, :-2, :].astype(np.uint8)
     X_test = X_test[:, :, :-2, :].astype(np.uint8)
     
-    y_train = np.expand_dims(y_train>0, 1).astype(np.int32)
-    y_test = np.expand_dims(y_test>0, 1).astype(np.int32)
+    y_train = np.eye(3)[np.argmax(y_train, 1).reshape(-1)].astype(np.float32)
+    y_test = np.eye(3)[np.argmax(y_test, 1).reshape(-1)].astype(np.float32)
     
-    y_train = np.hstack([y_train, 1-y_train])
-    y_test = np.hstack([y_test, 1-y_test])
-        
     return X_train, X_test, y_train, y_test, profs_train, profs_test, periods_test, (str(odates_set[di0]), str(odates_set[di1]))
+
 class CustomImageDataset(Dataset):
     def __init__(self, X, y):
         self.img_labels = y
@@ -173,7 +171,7 @@ def collect_train_data(dir, fsize=64):
     print(len(btests))
 
     tfdict = {"M5":0, "M15":1, "H1":2}
-    X, y, poslist = [], [], []
+    X, y = [], []
     for btest in tqdm(btests, "Load pickles"):
         # print(btest.cfg.ticker, end=" ")
         hist_pd, hist = DataParser(btest.cfg).load()
@@ -189,7 +187,6 @@ def collect_train_data(dir, fsize=64):
                             tfdict[btest.cfg.period])
             X.append([x])
             y.append(pos.profit)
-            poslist.append(pos)
             
     X, y = np.array(X), np.array(y, dtype=np.float32)
     print(X.shape, y.shape)
@@ -205,35 +202,35 @@ def collect_train_data2(dir, fsize=64):
     print(len(btests))
 
     tfdict = {"M5":0, "M15":1, "H1":2}
-    X, y, poslist = [], [], []
+    X, y = [], []
     posdict = {}
     for btest in tqdm(btests, "Load pickles"):
         for pos in btest.positions[4:]:
             k = pos.open_date
-            sl, profit, dir = btest.cfg.stops_processor.func.cfg.sl, pos.profit, pos.dir
+            sl, profit, dir, pos_id = btest.cfg.stops_processor.func.cfg.sl, pos.profit, pos.dir, pos.open_indx
             if k in posdict.keys():
-                posdict[k][0].append(sl)
-                posdict[k][1].append(profit)
-                posdict[k][2].append(dir)
+                posdict[k]["sl"].append(sl)
+                posdict[k]["prof"].append(profit)
+                posdict[k]["dir"].append(dir)
+                posdict[k]["id"].append(pos_id)
             else:
-                posdict[k] = [[sl], [profit], [dir]]
+                posdict[k] = {"sl":[sl], "prof":[profit], "dir":[dir], "id":[pos_id]}
     
 
     btest = btests[0]
-    hist_pd, hist = DataParser(btests.cfg).load()
+    hist_pd, hist = DataParser(btest.cfg).load()
     mw = MovingWindow(hist, fsize+2)
     for open_date, pos in posdict.items():
-        if len(pos[0]) == 3 and len(set(pos[2])) == 1:
-            f, _ = mw(pos.open_indx)
+        if len(set(pos["sl"])) == 3 and len(set(pos["dir"])) == 1:
+            f, _ = mw(pos["id"][0])
             x = build_features(f, 
-                            pos[2][0],
+                            pos["dir"][0],
                             0, 
                             btest.cfg.trailing_stop_rate,
                             open_date, 
                             tfdict[btest.cfg.period])
             X.append([x])
-            y.append(pos.profit)
-            poslist.append(pos)
+            y.append(pos["prof"])
     
     X, y = np.array(X), np.array(y, dtype=np.float32)
     print(X.shape, y.shape)
@@ -270,4 +267,5 @@ class MovingWindow():
     
     
 if __name__ == "__main__":
-    collect_train_data2("./optimization")
+    X, y = collect_train_data2("./optimization")
+    get_data(X, y)

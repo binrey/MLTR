@@ -106,7 +106,7 @@ if __name__ == "__main__":
     # plt.subplot(1, 2, 2)
     # plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
     # print(brok_results.profits.sum())
-    cfg.run_model_device = None
+    # cfg.run_model_device = None
     brok_results = backtest(cfg)
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum(), linewidth=2, alpha=0.6)
     print(brok_results.profits.sum())
