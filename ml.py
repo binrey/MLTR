@@ -25,7 +25,7 @@ class Net(nn.Module):
         self.conv_valid = nn.Conv2d(n[0], n[1], (self.nf, 4), padding="valid")
         self.fc_scale = nn.Linear(2, 2)
         self.fc = nn.Linear(n[1], 3)
-        self.dropout = nn.Dropout1d(0.75)
+        self.dropout = nn.Dropout1d(0.5)
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
@@ -42,11 +42,11 @@ class Net(nn.Module):
     def set_threshold(self, threshold):
         self.threshold = nn.Parameter(torch.FloatTensor([threshold]), requires_grad=False)
     
-    def forward_thresholded(self, x):
-        return (self.forward(x).squeeze().argmax()).cpu().numpy()
+    def predict(self, x):
+        return (self.forward(x).argmax(1)).cpu().numpy()
     
 
-def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=True, device="cuda"):
+def train(X_train, y_train, X_test, y_test, profs_train, batch_size=1, epochs=4, calc_test=True, device="cuda"):
     trainloader = torch.utils.data.DataLoader(CustomImageDataset(X_train, y_train), 
                                               batch_size=batch_size, 
                                               shuffle=True

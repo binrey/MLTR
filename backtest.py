@@ -65,13 +65,13 @@ def backtest(cfg):
             exp.reset_state()
     
     ttotal = perf_counter() - t0
-    logger.info("-"*40)
-    sformat = "{:>40}: {:>3.0f} %"
-    logger.info("{:>40}: {:.1f} sec".format("total backtest", ttotal))
+    sformat = "{:>30}: {:>3.0f} %"
+    logger.info("{:>30}: {:.1f} sec".format("total backtest", ttotal))
     logger.info(sformat.format("expert updates", texp/ttotal*100))
     logger.info(sformat.format("broker updates", tbrok/ttotal*100))
     logger.info(sformat.format("data loadings", tdata/ttotal*100))
-    
+    logger.info("-"*30)
+    logger.info(sformat.format("FINAL PROFIT", broker.profits.sum()))    
     import pickle
     pickle.dump((cfg, broker), open(str(Path("backtests") / f"btest{0:003.0f}.pickle"), "wb"))
     return broker
@@ -79,10 +79,10 @@ def backtest(cfg):
     
 if __name__ == "__main__":
     import sys
-    logger.remove()
-    logger.add(sys.stderr, level="INFO")
+    # logger.remove()
+    # logger.add(sys.stderr, level="INFO")
     
-    plt.subplots(figsize=(20, 10))
+
     cfg = PyConfig().test()
     
     # cfg.date_start="2000-01-01"
@@ -108,6 +108,7 @@ if __name__ == "__main__":
     # print(brok_results.profits.sum())
     # cfg.run_model_device = None
     brok_results = backtest(cfg)
+    plt.subplots(figsize=(20, 10))
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum(), linewidth=2, alpha=0.6)
     print(brok_results.profits.sum())
     

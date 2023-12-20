@@ -92,7 +92,7 @@ class ExpertFormation(ExpertBase):
                                self.stops_processor.cfg.sl,
                                self.cfg.trailing_stop_rate)
             x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.cfg.run_model_device)
-            y = self.model.forward_thresholded(x).item() + 1
+            y = self.model.predict(x).item() + 1
             
         if self.order_dir != 0:
             tp, sl = self.stops_processor(self, h, y)
@@ -252,7 +252,7 @@ class StopsFixed(ExtensionBase):
         if sl_custom is not None:
             sl = sl_custom
         if sl is not None:
-            sl = -common.order_dir*h.Open[-1]*(1-common.order_dir*self.cfg.sl/100)
+            sl = -common.order_dir*h.Open[-1]*(1-common.order_dir*sl/100)
         return tp, sl
     
 

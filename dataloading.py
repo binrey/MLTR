@@ -237,6 +237,7 @@ def collect_train_data2(dir, fsize=64):
     print(f"{X[0, 0, -2, 0]:8.0f} -> {X[-1, 0, -2, 0]:8.0f}")
     return X, y
 
+
 class MovingWindow():
     def __init__(self, hist, size):
         self.hist = hist
