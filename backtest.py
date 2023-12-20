@@ -79,8 +79,8 @@ def backtest(cfg):
     
 if __name__ == "__main__":
     import sys
-    # logger.remove()
-    # logger.add(sys.stderr, level="INFO")
+    logger.remove()
+    logger.add(sys.stderr, level="INFO")
     
 
     cfg = PyConfig().test()
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     # plt.subplot(1, 2, 2)
     # plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
     # print(brok_results.profits.sum())
-    # cfg.run_model_device = None
+    cfg.run_model_device = None
     brok_results = backtest(cfg)
     plt.subplots(figsize=(20, 10))
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum(), linewidth=2, alpha=0.6)

@@ -46,17 +46,18 @@ class Net(nn.Module):
         return (self.forward(x).argmax(1)).cpu().numpy()
     
 
-def train(X_train, y_train, X_test, y_test, profs_train, batch_size=1, epochs=4, calc_test=True, device="cuda"):
+def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=True, device="cuda"):
+    
     trainloader = torch.utils.data.DataLoader(CustomImageDataset(X_train, y_train), 
                                               batch_size=batch_size, 
                                               shuffle=True
                                               )
-    
+    # costs = torch.FloatTensor([[1, 1/2, 1/3]]*y_train.shape[0]).to(device)
     model = Net(X_train.shape[2], X_train.shape[3]).to(device) #32-3, 16-2, 8-1
     if calc_test:
         y_test_tensor = torch.tensor(y_test).float().to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    criterion = nn.CrossEntropyLoss(weight=100/torch.tensor(y_train).float().to(device).sum(0))
+    # criterion = nn.CrossEntropyLoss(weight=100/torch.tensor(y_train).float().to(device).sum(0))
     for epoch in range(epochs):  # loop over the dataset multiple times
         running_loss = 0
         running_roc_train = 0
@@ -67,22 +68,25 @@ def train(X_train, y_train, X_test, y_test, profs_train, batch_size=1, epochs=4,
             labels = labels.to(device)
             outputs = model(inputs.float().to(device))
             roc_train = 0
-            if calc_test:
-                roc_train = roc_auc_score(labels[:, 0].cpu().numpy(), outputs[:, 0].cpu().detach().numpy())
+            # if calc_test:
+            #     roc_train = roc_auc_score(labels[:, 0].cpu().numpy(), outputs[:, 0].cpu().detach().numpy())
             # zero the parameter gradients
             optimizer.zero_grad()
             # forward + backward + optimize
-            loss = criterion(outputs, labels.float())
+            loss = -(outputs*labels).sum()
             loss.backward()
             optimizer.step()
             # print statistics
             running_loss += loss.item()
             running_roc_train += roc_train
-        if calc_test:
-            test_out = model(X_test)
-            roc_test = roc_auc_score(y_test[:, 0], test_out[:, 0].cpu().detach().numpy())
-            loss_test = criterion(y_test_tensor, test_out)
-            print(f"{epoch + 1:03d} loss train: {running_loss/(i+1):.4f} | test: {loss_test:.4f}   ROC train: {running_roc_train/(i+1):.4f} | test: {roc_test:.4f}")
+            
+        loss_test = -(model(X_test).cpu().detach().numpy()*y_test).sum()
+        print(f"{epoch + 1:03d} loss train: {running_loss/(i+1):.4f} | test: {loss_test:.4f}")
+        # if calc_test:
+        #     test_out = model(X_test)
+        #     roc_test = roc_auc_score(y_test[:, 0], test_out[:, 0].cpu().detach().numpy())
+        #     loss_test = criterion(y_test_tensor, test_out)
+        #     print(f"{epoch + 1:03d} loss train: {running_loss/(i+1):.4f} | test: {loss_test:.4f}   ROC train: {running_roc_train/(i+1):.4f} | test: {roc_test:.4f}")
         running_loss = 0.0
     return model
     
@@ -97,3 +101,45 @@ if __name__ == "__main__":
     model.to(device)
     x = torch.tensor(np.zeros((10, 1, 4, 64))).float().to(device)
     print(model(x))
+    
+    
+    def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=True, device="cuda"):
+        trainloader = torch.utils.data.DataLoader(CustomImageDataset(X_train, y_train), 
+                                                batch_size=batch_size, 
+                                                shuffle=True
+                                                )
+        
+        model = Net(X_train.shape[2]-2, X_train.shape[3]).to(device) #32-3, 16-2, 8-1
+        if calc_test:
+            y_test_tensor = torch.tensor(y_test).float().to(device)
+        optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.1)
+        criterion = nn.MSELoss()#weight=torch.tensor(y_train).float().to(device).sum(0)[[1, 0]])
+        for epoch in range(epochs):  # loop over the dataset multiple times
+            running_loss = 0
+            running_roc_train = 0
+            
+            for i, data in enumerate(trainloader, 0):
+                # get the inputs; data is a list of [inputs, labels]
+                inputs, labels = data
+                labels = labels.to(device)
+                
+                outputs = model(inputs.float().to(device))
+                roc_train = 0
+                if calc_test:
+                    roc_train = roc_auc_score(labels[:, 0].cpu().numpy()>0, outputs[:, 0].cpu().detach().numpy())
+                # zero the parameter gradients
+                optimizer.zero_grad()
+                # forward + backward + optimize
+                loss = -((outputs[:, :1]*labels).sum() - labels.sum()*outputs[:, :1].mean())
+                loss.backward()
+                optimizer.step()
+                # print statistics
+                running_loss += loss.item()
+                running_roc_train += roc_train
+            if calc_test:
+                test_out = model(X_test)
+                roc_test = roc_auc_score(y_test[:, 0]>0, test_out[:, 0].cpu().detach().numpy())
+                loss_test = -((test_out[:, :1]*y_test_tensor).sum() - y_test_tensor.sum()*test_out[:, :1].mean())
+                print(f"{epoch + 1:03d} loss train: {running_loss/(i+1):.4f} | test: {loss_test:.4f}   ROC train: {running_roc_train/(i+1):.4f} | test: {roc_test:.4f}")
+            running_loss = 0.0
+        return model
