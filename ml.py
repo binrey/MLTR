@@ -47,7 +47,8 @@ class Net(nn.Module):
     
 
 def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=True, device="cuda"):
-    
+    y_train /= y_train.sum(0)
+    y_test /= y_test.sum(0)
     trainloader = torch.utils.data.DataLoader(CustomImageDataset(X_train, y_train), 
                                               batch_size=batch_size, 
                                               shuffle=True
@@ -67,20 +68,20 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
             inputs, labels = data
             labels = labels.to(device)
             outputs = model(inputs.float().to(device))
-            roc_train = 0
+            # roc_train = 0
             # if calc_test:
             #     roc_train = roc_auc_score(labels[:, 0].cpu().numpy(), outputs[:, 0].cpu().detach().numpy())
             # zero the parameter gradients
             optimizer.zero_grad()
             # forward + backward + optimize
-            loss = -(outputs*labels).sum()
+            loss = -((outputs*labels)).sum() - outputs.std(0).mean()*3
             loss.backward()
             optimizer.step()
             # print statistics
             running_loss += loss.item()
-            running_roc_train += roc_train
+            # running_roc_train += roc_train
             
-        loss_test = -(model(X_test).cpu().detach().numpy()*y_test).sum()
+        loss_test = -(model(X_test).cpu().detach().numpy()*y_test**2).sum()
         print(f"{epoch + 1:03d} loss train: {running_loss/(i+1):.4f} | test: {loss_test:.4f}")
         # if calc_test:
         #     test_out = model(X_test)
