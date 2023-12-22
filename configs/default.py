@@ -28,7 +28,7 @@ stops_processors = EasyDict(
         func=StopsFixed,
         params=EasyDict(
             tp=Param(None, [None]), 
-            sl=Param(2, [1, 2, 3])
+            sl=Param(2, [0.5, 1, 2, 4, 8])
             )
 ),
     stops_dynamic = EasyDict(
@@ -55,11 +55,11 @@ config = EasyDict(
     body_classifier=Param(body_classifiers["trend"], [body_classifiers[k] for k in ["trend"]]),
     stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_fixed"]]),
     wait_entry_point=Param(9999, [9999]),
-    hist_buffer_size=Param(66, [32]),
+    hist_buffer_size=Param(34, [32]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
     period=Param("H1", ["H1"]),
-    ticker=Param("BTCUSDT", ["BTCUSDT"]),
+    ticker=Param("BTCUSDT", ["ETHUSDT"]),
     data_type=Param("metatrader", ["metatrader"]),
     save_plots=Param(False, [False]),
     run_model_device=Param("cuda", [None])

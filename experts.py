@@ -92,7 +92,7 @@ class ExpertFormation(ExpertBase):
                                self.stops_processor.cfg.sl,
                                self.cfg.trailing_stop_rate)
             x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.cfg.run_model_device)
-            y = self.model.predict(x).item() + 1
+            y = [0.5, 1, 2, 4, 8][self.model.predict(x).item()]
             
         if self.order_dir != 0:
             tp, sl = self.stops_processor(self, h, y)

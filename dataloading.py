@@ -193,7 +193,7 @@ def collect_train_data(dir, fsize=64):
     print(f"{X[0, 0, -2, 0]:8.0f} -> {X[-1, 0, -2, 0]:8.0f}")
     return X, y
 
-def collect_train_data2(dir, fsize=64):
+def collect_train_data2(dir, fsize=64, nparams=4):
     cfgs, btests = [], []
     for p in sorted(Path(dir).glob("*.pickle")):
         cfg, btest = pickle.load(open(p, "rb"))
@@ -221,7 +221,7 @@ def collect_train_data2(dir, fsize=64):
     hist_pd, hist = DataParser(btest.cfg).load()
     mw = MovingWindow(hist, fsize+2)
     for open_date, pos in posdict.items():
-        if len(set(pos["sl"])) == 3 and len(set(pos["dir"])) == 1:
+        if len(set(pos["sl"])) == nparams and len(set(pos["dir"])) == 1:
             f, _ = mw(pos["id"][0])
             x = build_features(f, 
                             pos["dir"][0],
