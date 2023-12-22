@@ -23,9 +23,9 @@ class Net(nn.Module):
             self.f.append(nn.ReLU())
             self.f.append(nn.MaxPool2d((1, 2), (1, 2)))
             n = (n[1], n[1]*2)
-        self.conv_valid = nn.Conv2d(n[0], 5, (self.nf, 4), padding="valid")
+        self.conv_valid = nn.Conv2d(n[0], 4, (self.nf, 4), padding="valid")
         self.fc_scale = nn.Linear(2, 2)
-        self.fc = nn.Linear(n[1], 5)
+        self.fc = nn.Linear(n[1], 4)
         self.dropout = nn.Dropout2d(0.5)
         self.softmax = nn.Softmax(dim=1)
 
@@ -48,17 +48,14 @@ class Net(nn.Module):
     
 
 def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=True, device="cuda"):
-    # y_train /= y_train.sum(0)/100
     trainloader = torch.utils.data.DataLoader(CustomImageDataset(X_train, y_train), 
                                               batch_size=batch_size, 
                                               shuffle=True
                                               )
-    # costs = torch.FloatTensor([[1, 1/2, 1/3]]*y_train.shape[0]).to(device)
     model = Net(X_train.shape[2], X_train.shape[3]).to(device) #32-3, 16-2, 8-1
     if calc_test:
-        # y_test /= y_test.sum(0)/100
         y_test_tensor = torch.tensor(y_test).float().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)
     criterion = nn.MSELoss()#weight=100/torch.tensor(y_train).float().to(device).sum(0))
     loss_hist = np.zeros((epochs, 2))
     for epoch in range(epochs):  # loop over the dataset multiple times
@@ -93,8 +90,8 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
         #     print(f"{epoch + 1:03d} loss train: {running_loss/(i+1):.4f} | test: {loss_test:.4f}   ROC train: {running_roc_train/(i+1):.4f} | test: {roc_test:.4f}")
         loss_hist[epoch] = np.array([running_loss/(i+1), loss_test])
         running_loss = 0.0
-        if loss_hist[epoch, 0] <= loss_hist[epoch, 1]:
-            break        
+        # if loss_hist[epoch, 0] <= loss_hist[epoch, 1]:
+        #     break        
     return model, loss_hist[:epoch+1]
     
     
