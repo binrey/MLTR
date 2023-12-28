@@ -107,14 +107,14 @@ class DataParser():
     
     def _trim_by_date(self, hist):
         if self.cfg.date_start is not None:
-            date_start = pd.to_datetime(self.cfg.date_start)
+            date_start = pd.to_datetime(self.cfg.date_start, utc=True)
             for i, d in enumerate(hist.Date):
                 if d >= date_start:
                     break
             hist = hist.iloc[i:]   
             
         if self.cfg.date_end is not None:
-            date_end = pd.to_datetime(self.cfg.date_end)
+            date_end = pd.to_datetime(self.cfg.date_end, utc=True)
             for i, d in enumerate(hist.Date):
                 if d >= date_end:
                     break
@@ -153,13 +153,17 @@ class DataParser():
         hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
         return hist, hist_dict
     
-    @staticmethod
-    def yahoo(data_file):
+    def yahoo(self, data_file):
         hist = pd.read_csv(data_file)
         hist["Date"] = pd.to_datetime(hist.Date, utc=True)
-        hist.set_index("Date", inplace=True, drop=True)
+        hist = self._trim_by_date(hist)
+        hist.set_index("Date", inplace=True, drop=False)
         hist["Id"] = list(range(hist.shape[0]))
-        return hist
+        hist.drop(["Dividends", "Stock Splits"], axis=1, inplace=True)
+        hist.columns = map(str.capitalize, hist.columns)
+        hist["Volume"] = hist.iloc[:, -3]
+        hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
+        return hist, hist_dict
         
 
 def collect_train_data(dir, fsize=64):

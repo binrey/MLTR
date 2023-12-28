@@ -47,7 +47,7 @@ moex_list = ["SBER", "ROSN", "LKOH", "GMKN", "GAZP"]
 forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
 
 config = EasyDict(
-    date_start=Param("2000-01-01", ["2000-01-01"]),
+    date_start=Param("2010-01-01", ["2000-01-01"]),
     date_end=Param("2024-01-01", ["2023-06-01"]),
     no_trading_days=Param(set(), [set()]),
     trailing_stop_rate=Param(0.01, [0.01]),
@@ -58,9 +58,9 @@ config = EasyDict(
     hist_buffer_size=Param(34, [32]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("H1", ["H1"]),
-    ticker=Param("BTCUSDT", ["ETHUSDT"]),
-    data_type=Param("metatrader", ["metatrader"]),
+    period=Param("D", ["H1"]),
+    ticker=Param("TSLA", ["ETHUSDT"]),
+    data_type=Param("yahoo", ["yahoo"]),
     save_plots=Param(False, [False]),
     run_model_device=Param("cuda", [None])
 )
