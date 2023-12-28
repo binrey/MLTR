@@ -11,9 +11,9 @@ import pickle
 
 def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=None):
     fo = f.Open[:-2]/f.Open[-2]
-    fc = f.Close[:-2]/f.Open[:-2]
-    fh = f.High[:-2]/f.Open[:-2]
-    fl = f.Low[:-2]/f.Open[:-2]
+    fc = f.Close[:-2]/f.Open[-2]
+    fh = f.High[:-2]/f.Open[-2]
+    fl = f.Low[:-2]/f.Open[-2]
     fv = f.Volume[:-2]/f.Volume[-2] if f.Volume[-2] != 0 else np.ones_like(f.Volume[:-2])
 
     if dir > 0:
@@ -30,7 +30,7 @@ def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=Non
         x = np.vstack([x, np.ones(x.shape[1])*odate])
     if timeframe is not None:
         x = np.vstack([x, np.ones(x.shape[1])*timeframe])
-    return x
+    return x.astype(np.uint8)
 
 
 def sigmoid(x):
@@ -67,8 +67,8 @@ def get_data(X, y, test_period=0, test_split=0.25, n1_split=0, n2_split=1):
     np.random.shuffle(ids_test) 
         
     X_train, X_test, y_train, y_test, profs_train, profs_test = X[ids_train], X[ids_test], y[ids_train], y[ids_test], y[ids_train].copy(), y[ids_test].copy()
-    X_train = X_train[:, :, :-2, :].astype(np.uint8)
-    X_test = X_test[:, :, :-2, :].astype(np.uint8)
+    X_train = X_train[:, :, :-2, :]
+    X_test = X_test[:, :, :-2, :]
     
     # y_train = np.eye(3)[np.argmax(y_train, 1).reshape(-1)].astype(np.float32)
     # y_test = np.eye(3)[np.argmax(y_test, 1).reshape(-1)].astype(np.float32)
