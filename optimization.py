@@ -20,11 +20,17 @@ def backtest_process(args):
       logger.debug(args)
       num, cfg = args
       logger.info(f"start backtest {num}")
-      btest = backtest(cfg)
-      btest_res = btest.profits.sum()
-      # opt_summary["btest"].append(btest_res)
-      logger.info(f"back test {num}: {btest_res}")
-      pickle.dump((cfg, btest), open(str(Path("optimization") / f"btest{num:003.0f}.pickle"), "wb"))
+      locnum = 0
+      while True:
+            btest = backtest(cfg)
+            if len(btest.positions) == 0:
+                  break
+            cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
+            locnum += 1
+            # btest = backtest(cfg)
+            btest_res = btest.profits.sum()
+            logger.info(f"back test {num}: {btest_res}")
+            pickle.dump((cfg, btest), open(str(Path("optimization") / f"btest.{num+locnum/100:05.2f}.pickle"), "wb"))
 
 
 def pool_handler():

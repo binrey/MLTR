@@ -51,6 +51,7 @@ class ExpertFormation(ExpertBase):
             self.model.to(self.cfg.run_model_device)
         
     def reset_state(self):
+        self.order_dir = 0
         self.formation_found = False
         self.wait_entry_point = 0
         self.lprice = None
@@ -80,6 +81,9 @@ class ExpertFormation(ExpertBase):
             if self.cprice and h.Open[-1] > self.cprice:
                 self.reset_state()
                 return            
+        
+        if h.Date[-1] in self.cfg.no_trading_days:
+            self.reset_state()
             
         if self.cfg.run_model_device and self.order_dir != 0:
             x = build_features(h, 
@@ -90,7 +94,6 @@ class ExpertFormation(ExpertBase):
             y = self.model.forward_thresholded(x)[0]
             if not y:
                 self.reset_state()
-                self.order_dir = 0
             
         if self.order_dir != 0:
             tp, sl = self.stops_processor(self, h)
