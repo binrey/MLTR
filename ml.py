@@ -34,7 +34,7 @@ class Net(nn.Module):
         x = F.relu(self.conv_valid(x))
         x = torch.flatten(x, 1)
         # x = self.dropout(x)
-        x = x + p
+        # x = x + p
         x = self.softmax(self.fc(x))
         return x
         # return self.c3(self.c2(self.c1(x)))

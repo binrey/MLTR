@@ -10,10 +10,10 @@ import pickle
 
 
 def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=None):
-    fo = f.Open[:-2]/f.Open[-2]
-    fc = f.Close[:-2]/f.Open[-2]
-    fh = f.High[:-2]/f.Open[-2]
-    fl = f.Low[:-2]/f.Open[-2]
+    fo = f.Open/f.Open[-1]
+    fc = f.Close/f.Open[-1]
+    fh = f.High/f.Open[-1]
+    fl = f.Low/f.Open[-1]
     fv = f.Volume[:-2]/f.Volume[-2] if f.Volume[-2] != 0 else np.ones_like(f.Volume[:-2])
 
     if dir > 0:
@@ -61,8 +61,8 @@ def get_data(X, y, test_split=0.25, n1_split=0, n2_split=1):
     periods_test = np.array(periods_test)
     ids_test = np.array(ids_test)
     ids_train = [ix for ix in ids if ix not in ids_test]
-    ids_test = ids_test[periods_test == 2]
-    periods_test = periods_test[periods_test == 2]
+    ids_test = ids_test[periods_test == 1]
+    periods_test = periods_test[periods_test == 1]
     np.random.shuffle(ids_train) 
     np.random.shuffle(ids_test) 
         
@@ -177,9 +177,9 @@ def collect_train_data(dir, fsize=64):
     for btest in tqdm(btests, "Load pickles"):
         # print(btest.cfg.ticker, end=" ")
         hist_pd, hist = DataParser(btest.cfg).load()
-        mw = MovingWindow(hist, fsize+2)
+        mw = MovingWindow(hist, fsize)
         # print(len(btest.positions))
-        for pos in btest.positions[4:]:
+        for pos in btest.positions[:]:
             f, _ = mw(pos.open_indx)
             x = build_features(f, 
                             pos.dir, 
