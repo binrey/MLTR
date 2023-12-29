@@ -11,9 +11,9 @@ import pickle
 
 def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=None):
     fo = f.Open[:-2]/f.Open[-2]
-    fc = f.Close[:-2]/f.Open[:-2]
-    fh = f.High[:-2]/f.Open[:-2]
-    fl = f.Low[:-2]/f.Open[:-2]
+    fc = f.Close[:-2]/f.Open[-2]
+    fh = f.High[:-2]/f.Open[-2]
+    fl = f.Low[:-2]/f.Open[-2]
     fv = f.Volume[:-2]/f.Volume[-2] if f.Volume[-2] != 0 else np.ones_like(f.Volume[:-2])
 
     if dir > 0:
@@ -22,7 +22,7 @@ def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=Non
         x = np.vstack([2-fc, 2-fo, 2-fl, 2-fh])
     x = x*127
     # x = np.vstack([x, fv])
-    x = np.vstack([x, np.ones(x.shape[1])*sl])
+    x = np.vstack([x, np.ones(x.shape[1])*sl*10])
     x = np.vstack([x, np.ones(x.shape[1])*trailing_stop_rate*1000])
     if open_date is not None:
         odate = pd.to_datetime(open_date)
@@ -224,3 +224,8 @@ class MovingWindow():
         self.data.Volume[:-1] = self.hist.Volume[t-self.size+1:t]
         self.data.Volume[-1] = 0      
         return self.data, perf_counter() - t0
+    
+
+if __name__ == "__main__":
+    from dataloading import collect_train_data
+    X, y = collect_train_data("./optimization/", 64)

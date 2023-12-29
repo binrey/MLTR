@@ -18,23 +18,23 @@ class Net(nn.Module):
         n = (1, 4)
         for i in range(self.nl):
             self.f.append(nn.Conv2d(n[0], n[1], (self.nf, 3), padding="same"))
-            # self.f.append(nn.BatchNorm2d(n[1]))
+            self.f.append(nn.BatchNorm2d(n[1]))
             self.f.append(nn.ReLU())
             self.f.append(nn.MaxPool2d((1, 2), (1, 2)))
             n = (n[1], n[1]*2)
         self.conv_valid = nn.Conv2d(n[0], n[1], (self.nf, 4), padding="valid")
-        self.fc_scale = nn.Linear(2, 2)
+        self.fc_scale = nn.Linear(2, n[1])
         self.fc = nn.Linear(n[1], 2)
-        self.dropout = nn.Dropout1d(0.75)
+        self.dropout = nn.Dropout1d(0.5)
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
-        # p = self.fc_scale(x[:, 0, -2:, 0])
+        p = F.relu(self.fc_scale(x[:, 0, -2:, 0]))
         x = self.f(x[:, :, :-2, :])
         x = F.relu(self.conv_valid(x))
         x = torch.flatten(x, 1)
         # x = self.dropout(x)
-        # x = torch.concat([x, p], 1)
+        x = x + p
         x = self.softmax(self.fc(x))
         return x
         # return self.c3(self.c2(self.c1(x)))
