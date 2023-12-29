@@ -30,7 +30,7 @@ def backtest_process(args):
             # btest = backtest(cfg)
             btest_res = btest.profits.sum()
             logger.info(f"back test {num}: {btest_res}")
-            pickle.dump((cfg, btest), open(str(Path("optimization") / f"btest.{num+locnum/100:05.2f}.pickle"), "wb"))
+            pickle.dump((cfg, btest), open(str(Path("optimization") / f"btest.{cfg.ticker}.{num+locnum/100:05.2f}.pickle"), "wb"))
 
 
 def pool_handler():

@@ -164,9 +164,9 @@ class DataParser():
         return hist
         
 
-def collect_train_data(dir, fsize=64):
+def collect_train_data(dir, fsize=64, glob="*.pickle"):
     cfgs, btests = [], []
-    for p in sorted(Path(dir).glob("*.pickle")):
+    for p in sorted(Path(dir).glob(glob)):
         cfg, btest = pickle.load(open(p, "rb"))
         cfgs.append(cfg)
         btests.append(btest)
