@@ -10,10 +10,10 @@ import pickle
 
 
 def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=None):
-    fo = f.Open[:-2]/f.Open[-2]
-    fc = f.Close[:-2]/f.Open[-2]
-    fh = f.High[:-2]/f.Open[-2]
-    fl = f.Low[:-2]/f.Open[-2]
+    fo = f.Open/f.Open[-1]
+    fc = f.Close/f.Open[-1]
+    fh = f.High/f.Open[-1]
+    fl = f.Low/f.Open[-1]
     fv = f.Volume[:-2]/f.Volume[-2] if f.Volume[-2] != 0 else np.ones_like(f.Volume[:-2])
 
     if dir > 0:
@@ -67,8 +67,8 @@ def get_data(X, y, test_period=0, test_split=0.25, n1_split=0, n2_split=1):
     np.random.shuffle(ids_test) 
         
     X_train, X_test, y_train, y_test, profs_train, profs_test = X[ids_train], X[ids_test], y[ids_train], y[ids_test], y[ids_train].copy(), y[ids_test].copy()
-    X_train = X_train[:, :, :-2, :]
-    X_test = X_test[:, :, :-2, :]
+    X_train = X_train[:, :, :-1, :]
+    X_test = X_test[:, :, :-1, :]
     
     # y_train = np.eye(3)[np.argmax(y_train, 1).reshape(-1)].astype(np.float32)
     # y_test = np.eye(3)[np.argmax(y_test, 1).reshape(-1)].astype(np.float32)
@@ -174,7 +174,7 @@ def collect_train_data(dir, fsize=64):
         btests.append(btest)
     print(len(btests))
 
-    tfdict = {"M5":0, "M15":1, "H1":2}
+    tfdict = {"M5":0, "M15":1, "H1":2, "D":3}
     X, y = [], []
     for btest in tqdm(btests, "Load pickles"):
         # print(btest.cfg.ticker, end=" ")
@@ -205,7 +205,7 @@ def collect_train_data2(dir, fsize=64, nparams=4):
         btests.append(btest)
     print(len(btests))
 
-    tfdict = {"M5":0, "M15":1, "H1":2}
+    tfdict = {"M5":0, "M15":1, "H1":2, "D":3}
     X, y = [], []
     posdict = {}
     for btest in tqdm(btests, "Load pickles"):
@@ -223,7 +223,7 @@ def collect_train_data2(dir, fsize=64, nparams=4):
 
     btest = btests[0]
     hist_pd, hist = DataParser(btest.cfg).load()
-    mw = MovingWindow(hist, fsize+2)
+    mw = MovingWindow(hist, fsize)
     for open_date, pos in posdict.items():
         if len(set(pos["sl"])) == nparams and len(set(pos["dir"])) == 1:
             f, _ = mw(pos["id"][0])
