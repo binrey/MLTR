@@ -41,7 +41,7 @@ stops_processors = EasyDict(
 )
 # ----------------------------------------------------------------
 # Configuration
-bitfinex_list = ["BTCUSD", "ETHUSD"]#, "TRXUSD", "XRPUSD"]
+bitfinex_list = ["BTCUSD"]#, "ETHUSD"]#, "TRXUSD", "XRPUSD"]
 yahoo_list = ["MSFT", "AMZN", "AAPL", "GOOG", "NFLX", "TSLA"]
 moex_list = ["SBER", "ROSN", "LKOH", "GMKN", "GAZP"]
 forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
@@ -55,11 +55,11 @@ config = EasyDict(
     body_classifier=Param(body_classifiers["trend"], [body_classifiers[k] for k in ["trend"]]),
     stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_fixed"]]),
     wait_entry_point=Param(9999, [9999]),
-    hist_buffer_size=Param(66, [66]),
+    hist_buffer_size=Param(64, [64]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("H1", ["H1"]),
-    ticker=Param("ETHUSDT", bitfinex_list),
+    period=Param("M15", ["M15"]),
+    ticker=Param("BTCUSDT", bitfinex_list),
     data_type=Param("metatrader", ["metatrader"]),
     save_plots=Param(False, [False]),
     run_model_device=Param("None", [None])

@@ -88,7 +88,7 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
                                               shuffle=True
                                               )
     
-    model = Net2(X_train.shape[2]-2, X_train.shape[3]).to(device) #32-3, 16-2, 8-1
+    model = Net2(X_train.shape[2]-2, X_train.shape[3]).to(device).float() #32-3, 16-2, 8-1
     if calc_test:
         y_test_tensor = torch.tensor(y_test).float().to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -115,6 +115,7 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
             running_loss += loss.item()
             running_roc_train += roc_train
         if calc_test:
+            assert X_test.shape[0] > 0, "No test data"
             test_out = model(X_test)
             roc_test = roc_auc_score(y_test[:, 0], test_out[:, 0].cpu().detach().numpy())
             loss_test = criterion(y_test_tensor, test_out).detach().cpu().numpy()

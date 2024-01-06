@@ -37,7 +37,7 @@ def sigmoid(x):
   return 1 / (1 + np.exp(-x))
 
 
-def get_data(X, y, test_split=0.25, n1_split=0, n2_split=1):
+def get_data(X, y, test_split=0.25, n1_split=0, n2_split=1, period2process=0):
     ids = np.arange(X.shape[0])
     # np.random.shuffle(ids)
     
@@ -61,8 +61,8 @@ def get_data(X, y, test_split=0.25, n1_split=0, n2_split=1):
     periods_test = np.array(periods_test)
     ids_test = np.array(ids_test)
     ids_train = [ix for ix in ids if ix not in ids_test]
-    ids_test = ids_test[periods_test == 2]
-    periods_test = periods_test[periods_test == 2]
+    ids_test = ids_test[periods_test == period2process]
+    periods_test = periods_test[periods_test == period2process]
     np.random.shuffle(ids_train) 
     np.random.shuffle(ids_test) 
         
@@ -179,7 +179,7 @@ def collect_train_data(dir, fsize=64, glob="*.pickle"):
         hist_pd, hist = DataParser(btest.cfg).load()
         mw = MovingWindow(hist, fsize)
         # print(len(btest.positions))
-        for pos in btest.positions[:]:
+        for pos in btest.positions:
             f, _ = mw(pos.open_indx)
             x = build_features(f, 
                             pos.dir, 
