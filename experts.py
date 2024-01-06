@@ -66,7 +66,7 @@ class ExpertFormation(ExpertBase):
             else:
                 return
             
-        logger.debug(f"{h.Id[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, close: {h.Close[-2]}")
+        logger.debug(f"{h.Id[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, open: {h.Open[-1]}")
         
         self.order_dir = 0
         if self.lprice:
@@ -154,11 +154,47 @@ class ClsTrend(ExtensionBase):
             # if trend_type<0:
             #     return False
             i = self.cfg.npairs*2 + 1
-            common.lines = [(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]
+            common.lines = [[(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]]
             # self.get_trend(h[:-self.body_length+2])
             common.lprice = max(common.lines[-1][1], common.lines[-2][1]) if trend_type > 0 else None
             common.sprice = min(common.lines[-1][1], common.lines[-2][1]) if trend_type < 0 else None
             common.cprice = common.lines[-2][1]
+        return is_fig
+
+
+class ClsSaw(ExtensionBase):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(ClsSaw, self).__init__(cfg, name="saw")
+        self.zigzag = ZigZag()
+        
+    def __call__(self, common, h) -> bool:
+        ids, values, types = self.zigzag.update(h)
+        values = np.array(values)[:-1]
+        types = np.array(types)[:-1]
+        ids = ids[:-1]
+        is_fig = False
+        if len(values) >= self.cfg.ncross+1:
+            for i in range(self.cfg.ncross+1, len(values)):
+                val_mean = values[-i:].mean()
+                i_above = values[-i:]>val_mean
+                i_below = np.invert(i_above)
+                n_above = i_above.sum()
+                n_below = len(i_above) - n_above
+                types_above = types[-i:][i_above]
+                types_below = types[-i:][i_below]
+                if h.Close[-1] < values[-i:][i_above][-1] and h.Close[-1] > values[-i:][i_below][-1]:
+                    if abs(n_above - n_below) <= 0 and sum(types_above) == len(types_above) and sum(types_below) == -len(types_below):
+                        is_fig = True
+                        break
+
+        if is_fig:
+            common.lprice = values[-i:].max()
+            common.sprice = values[-i:].min()            
+            common.lines = [[(x, y) for x, y in zip(ids[-i:], values[-i:])],
+                            [(ids[-i], val_mean), (ids[-1], val_mean)],
+                            [(ids[-i], common.lprice), (ids[-1], common.lprice)],
+                            [(ids[-i], common.sprice), (ids[-1], common.sprice)]]
         return is_fig
 
 

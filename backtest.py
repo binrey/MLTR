@@ -42,7 +42,7 @@ def backtest(cfg):
             broker.close_orders(h.Id[-2])
             if cfg.save_plots:
                 ords_lines = [order.lines for order in broker.orders if order.open_indx >= pos.open_indx]
-                lines2plot = [exp.lines] + ords_lines + [pos.lines]
+                lines2plot = exp.lines + ords_lines + [pos.lines]
                 colors = ["blue"]*(len(lines2plot)-1) + ["green" if pos.profit > 0 else "red"]
                 widths = [1]*(len(lines2plot)-1) + [2]
                 
@@ -60,7 +60,7 @@ def backtest(cfg):
                             type='candle', 
                             block=False,
                             alines=dict(alines=lines2plot, colors=colors, linewidths=widths),
-                            savefig=save_path / f"fig-{pos.open_date}.png")
+                            savefig=save_path / f"fig-{str(pos.open_date).split('.')[0]}.png")
                 del fig
             exp.reset_state()
     
@@ -81,33 +81,10 @@ if __name__ == "__main__":
     import sys
     logger.remove()
     logger.add(sys.stderr, level="INFO")
-    
-    plt.subplots(figsize=(20, 10))
     cfg = PyConfig().test()
-    
-    # cfg.date_start="2000-01-01"
-    # cfg.date_end="2021-01-01"
-    # cfg.run_model_device = "cuda"
-    # brok_results = backtest(cfg)
-    # plt.subplot(1, 2, 1)
-    # plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
-    # print(brok_results.profits.sum())
-    # cfg.run_model_device = None
-    # brok_results = backtest(cfg)
-    # plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum(), linewidth=2, alpha=0.6)
-    # print(brok_results.profits.sum())
-    
-    
- 
-    # cfg.date_start="2021-01-01"
-    # cfg.date_end="2024-01-01"
-    # cfg.run_model_device = "cuda"
-    # brok_results = backtest(cfg)
-    # plt.subplot(1, 2, 2)
-    # plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum())
-    # print(brok_results.profits.sum())
     cfg.run_model_device = None
     brok_results = backtest(cfg)
+    plt.subplots(figsize=(20, 10))
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum(), linewidth=2, alpha=0.6)
     print(brok_results.profits.sum())
     
