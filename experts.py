@@ -156,9 +156,9 @@ class ClsTrend(ExtensionBase):
             i = self.cfg.npairs*2 + 1
             common.lines = [[(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]]
             # self.get_trend(h[:-self.body_length+2])
-            common.lprice = max(common.lines[-1][1], common.lines[-2][1]) if trend_type > 0 else None
-            common.sprice = min(common.lines[-1][1], common.lines[-2][1]) if trend_type < 0 else None
-            common.cprice = common.lines[-2][1]
+            common.lprice = max(common.lines[0][-1][1], common.lines[0][-2][1]) if trend_type > 0 else None
+            common.sprice = min(common.lines[0][-1][1], common.lines[0][-2][1]) if trend_type < 0 else None
+            common.cprice = common.lines[0][-2][1]
         return is_fig
 
 
@@ -174,8 +174,10 @@ class ClsSaw(ExtensionBase):
         types = np.array(types)[:-1]
         ids = ids[:-1]
         is_fig = False
-        if len(values) >= self.cfg.ncross+1:
-            for i in range(self.cfg.ncross+1, len(values)):
+        if True:#len(values) >= self.cfg.ncross+1:
+            # for i in range(self.cfg.ncross+1, len(values)):
+            for i in range(5, len(values)):
+                
                 val_mean = values[-i:].mean()
                 i_above = values[-i:]>val_mean
                 i_below = np.invert(i_above)
@@ -183,14 +185,26 @@ class ClsSaw(ExtensionBase):
                 n_below = len(i_above) - n_above
                 types_above = types[-i:][i_above]
                 types_below = types[-i:][i_below]
+                
+                line_above = values[-i:].max()
+                line_below = values[-i:].min()
+                height = (line_above - line_below) / val_mean
                 if h.Close[-1] < values[-i:][i_above][-1] and h.Close[-1] > values[-i:][i_below][-1]:
-                    if abs(n_above - n_below) <= 0 and sum(types_above) == len(types_above) and sum(types_below) == -len(types_below):
-                        is_fig = True
-                        break
+                    # if types[-1] == 1 and values[-1] > values[-3]:
+                    #     break
+                    # if types[-1] == -1 and values[-1] < values[-3]:
+                    #     break
+                    # if sum(types_above==-1) <= self.cfg.nfalse and sum(types_below==1) <= self.cfg.nfalse:
+                    if i/height > self.cfg.ncross:
+                        if True:#sum(types_above==1) >= (self.cfg.ncross+1)/2 and sum(types_below==-1) >= (self.cfg.ncross+1)/2:
+                            is_fig = True
+                            break
+                        
+
 
         if is_fig:
-            common.lprice = values[-i:].max()
-            common.sprice = values[-i:].min()            
+            common.lprice = line_above
+            common.sprice = line_below           
             common.lines = [[(x, y) for x, y in zip(ids[-i:], values[-i:])],
                             [(ids[-i], val_mean), (ids[-1], val_mean)],
                             [(ids[-i], common.lprice), (ids[-1], common.lprice)],
@@ -300,9 +314,9 @@ class StopsDynamic(ExtensionBase):
             tp = -common.order_dir*(h.Open[-1] + common.order_dir*abs(common.lines[0][1]-common.lines[-1][1]))
         if self.cfg.sl_active:
             if common.order_dir > 0:
-                sl = min(common.lines[-2][1], common.lines[-3][1])
+                sl = common.lines[3][0][1]
             if common.order_dir < 0:
-                sl = max(common.lines[-2][1], common.lines[-3][1])
+                sl = common.lines[2][0][1]
             sl *= -common.order_dir
         return tp, sl
 

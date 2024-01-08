@@ -16,6 +16,7 @@ from shutil import rmtree
 logger.remove()
 logger.add(sys.stderr, level="INFO")
 
+
 def backtest_process(args):
       logger.debug(args)
       num, cfg = args
@@ -25,12 +26,10 @@ def backtest_process(args):
             btest = backtest(cfg)
             if len(btest.positions) == 0:
                   break
-            cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
+            # cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
             locnum += 1
-            # btest = backtest(cfg)
-            btest_res = btest.profits.sum()
-            logger.info(f"back test {num}: {btest_res}")
-            pickle.dump((cfg, btest), open(str(Path("optimization") / f"btest.{cfg.ticker}.{num+locnum/100:05.2f}.pickle"), "wb"))
+            pickle.dump((cfg, btest), open(str(Path("optimization") / f"btest.{cfg.ticker}.{num + locnum/100:05.2f}.pickle"), "wb"))
+            break
 
 
 def pool_handler():
@@ -46,12 +45,6 @@ def pool_handler():
       cfgs = [(i, cfg) for i, cfg in enumerate(cfgs)]
       p = Pool(ncpu)
       p.map(backtest_process, cfgs)
-      
-# for proc in procs:
-#       proc.join()
-      
-# opt_summary = pd.DataFrame(opt_summary)
-# pickle.dump(opt_summary, open(str(Path(".") / f"optim_results.pickle"), "wb"))
       
       
 if __name__ == "__main__":

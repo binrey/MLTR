@@ -28,7 +28,7 @@ def backtest(cfg):
     tstart = max(cfg.hist_buffer_size+1, cfg.tstart)
     tend = cfg.tend if cfg.tend is not None else hist.Id.shape[0]
     t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0
-    for t in tqdm(range(tstart, tend)):
+    for t in tqdm(range(tstart, tend), "back test"):
         h, dt = mw(t)
         tdata += dt
         if t < tstart or len(broker.active_orders) == 0:
@@ -65,12 +65,15 @@ def backtest(cfg):
             exp.reset_state()
     
     ttotal = perf_counter() - t0
-    logger.info("-"*40)
-    sformat = "{:>40}: {:>3.0f} %"
-    logger.info("{:>40}: {:.1f} sec".format("total backtest", ttotal))
+    
+    sformat = "{:>30}: {:>3.0f} %"
+    logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}")
+    logger.info("{:>30}: {:.1f} sec".format("total backtest", ttotal))
     logger.info(sformat.format("expert updates", texp/ttotal*100))
     logger.info(sformat.format("broker updates", tbrok/ttotal*100))
     logger.info(sformat.format("data loadings", tdata/ttotal*100))
+    logger.info("-"*30)
+    logger.info(sformat.format("FINAL PROFIT", broker.profits.sum())) 
     
     import pickle
     pickle.dump((cfg, broker), open(str(Path("backtests") / f"btest{0:003.0f}.pickle"), "wb"))
@@ -86,6 +89,5 @@ if __name__ == "__main__":
     brok_results = backtest(cfg)
     plt.subplots(figsize=(20, 10))
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum(), linewidth=2, alpha=0.6)
-    print(brok_results.profits.sum())
     
     plt.savefig("backtest.png")
