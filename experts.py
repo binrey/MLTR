@@ -166,49 +166,23 @@ class ClsSaw(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsSaw, self).__init__(cfg, name="saw")
-        self.zigzag = ZigZag()
         
     def __call__(self, common, h) -> bool:
-        ids, values, types = self.zigzag.update(h)
-        values = np.array(values)[:-1]
-        types = np.array(types)[:-1]
-        ids = ids[:-1]
         is_fig = False
-        if True:#len(values) >= self.cfg.ncross+1:
-            # for i in range(self.cfg.ncross+1, len(values)):
-            for i in range(5, len(values)):
-                
-                val_mean = values[-i:].mean()
-                i_above = values[-i:]>val_mean
-                i_below = np.invert(i_above)
-                n_above = i_above.sum()
-                n_below = len(i_above) - n_above
-                types_above = types[-i:][i_above]
-                types_below = types[-i:][i_below]
-                
-                line_above = values[-i:].max()
-                line_below = values[-i:].min()
-                height = (line_above - line_below) / val_mean
-                if h.Close[-1] < values[-i:][i_above][-1] and h.Close[-1] > values[-i:][i_below][-1]:
-                    # if types[-1] == 1 and values[-1] > values[-3]:
-                    #     break
-                    # if types[-1] == -1 and values[-1] < values[-3]:
-                    #     break
-                    # if sum(types_above==-1) <= self.cfg.nfalse and sum(types_below==1) <= self.cfg.nfalse:
-                    if i/height > self.cfg.ncross:
-                        if True:#sum(types_above==1) >= (self.cfg.ncross+1)/2 and sum(types_below==-1) >= (self.cfg.ncross+1)/2:
-                            is_fig = True
-                            break
-                        
-
+        for i in range(8, h.Id.shape[0], 4):
+            line_above = np.percentile(h.High[-i:], 100-self.cfg.percentile)#h.High[-i:].max()#
+            line_below = np.percentile(h.Low[-i:], self.cfg.percentile)#h.Low[-i:].min()#
+            height = (line_above - line_below) / (line_above + line_below) * 2
+            if h.Close[-1] < line_above and h.Close[-1] > line_below:
+                if i/height > self.cfg.ncross*100:
+                    is_fig = True
+                    break
 
         if is_fig:
             common.lprice = line_above
             common.sprice = line_below           
-            common.lines = [[(x, y) for x, y in zip(ids[-i:], values[-i:])],
-                            [(ids[-i], val_mean), (ids[-1], val_mean)],
-                            [(ids[-i], common.lprice), (ids[-1], common.lprice)],
-                            [(ids[-i], common.sprice), (ids[-1], common.sprice)]]
+            common.lines = [[(h.Id[-i], common.lprice), (h.Id[-1], common.lprice)],
+                            [(h.Id[-i], common.sprice), (h.Id[-1], common.sprice)]]
         return is_fig
 
 
@@ -314,9 +288,9 @@ class StopsDynamic(ExtensionBase):
             tp = -common.order_dir*(h.Open[-1] + common.order_dir*abs(common.lines[0][1]-common.lines[-1][1]))
         if self.cfg.sl_active:
             if common.order_dir > 0:
-                sl = common.lines[3][0][1]
+                sl = common.lines[1][0][1]
             if common.order_dir < 0:
-                sl = common.lines[2][0][1]
+                sl = common.lines[0][0][1]
             sl *= -common.order_dir
         return tp, sl
 
