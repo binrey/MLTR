@@ -24,8 +24,8 @@ body_classifiers = EasyDict(
     saw = EasyDict( 
         func=ClsSaw,
         params=EasyDict(
-            ncross=Param(3, [3, 5, 8, 13]),
-            percentile=Param(10, [4, 8, 16])
+            ncross=Param(15, [7, 9, 11, 15, 20]),
+            percentile=Param(0, [0])
             )
         ) 
 )
@@ -35,7 +35,7 @@ stops_processors = EasyDict(
         func=StopsFixed,
         params=EasyDict(
             tp=Param(None, [None]), 
-            sl=Param(3, [5])
+            sl=Param(2, [2, 3, 5])
             )
         ),
     stops_dynamic = EasyDict(
@@ -60,14 +60,14 @@ config = EasyDict(
     trailing_stop_rate=Param(0.005, [0.0025, 0.005, 0.01, 0.02, 0.03]),
     trailing_stop_type=Param(1, [1]),
     body_classifier=Param(body_classifiers["saw"], [body_classifiers[k] for k in ["saw"]]),
-    stops_processor=Param(stops_processors["stops_dynamic"], [stops_processors[k] for k in ["stops_dynamic"]]),
+    stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_fixed"]]),
     wait_entry_point=Param(999, [999]),
     hist_buffer_size=Param(128, [128]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("H1", ["H1"]),
+    period=Param("M15", ["M15"]),
     ticker=Param("BTCUSD", bitfinex_list),
     data_type=Param("metatrader", ["metatrader"]),
-    save_plots=Param(False, [False]),
+    save_plots=Param(True, [False]),
     run_model_device=Param(None, [None])
 )

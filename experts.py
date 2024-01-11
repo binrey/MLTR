@@ -170,8 +170,8 @@ class ClsSaw(ExtensionBase):
     def __call__(self, common, h) -> bool:
         is_fig = False
         for i in range(8, h.Id.shape[0], 4):
-            line_above = np.percentile(h.High[-i:], 100-self.cfg.percentile)#h.High[-i:].max()#
-            line_below = np.percentile(h.Low[-i:], self.cfg.percentile)#h.Low[-i:].min()#
+            line_above = h.High[-i:].max()#np.percentile(h.High[-i:], 100-self.cfg.percentile)#
+            line_below = h.Low[-i:].min()#np.percentile(h.Low[-i:], self.cfg.percentile)#
             height = (line_above - line_below) / (line_above + line_below) * 2
             if h.Close[-1] < line_above and h.Close[-1] > line_below:
                 if i/height > self.cfg.ncross*100:

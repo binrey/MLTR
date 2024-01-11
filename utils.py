@@ -95,6 +95,10 @@ class Broker:
         self.active_position = None
         self.positions = []
         self.orders = []
+        
+        self.best_profit = 0
+        self.correction = 0
+        self.add_profit = 0
     
     def close_orders(self, close_date, i=None):
         if i is not None:
@@ -157,8 +161,35 @@ class Broker:
             return
         for order in self.active_orders:
             if date == order.open_date:
+                self.best_profit = 0
+                self.correction = 0
+                self.max_correction = 0
+                self.add_profit = 0
+                self.t = 0
                 continue
+            # self.t += 1
             if position.dir == 1 and order.dir == -1 and p > order.price:
-                order.change(date, order.price + self.cfg.trailing_stop_rate*(h.Low[-self.cfg.trailing_stop_type] - order.price))
+                # prof = max(p - position.open_price, 0)
+                # if prof > self.best_profit:
+                #     self.best_profit = prof
+                #     self.add_profit += self.max_correction
+                #     self.correction = 0
+                #     self.max_correction = 0
+                # else:
+                #     self.correction = self.best_profit - prof
+                #     if self.correction > self.max_correction:
+                #         self.max_correction = self.correction
+                
+                order.change(date, order.price + self.cfg.trailing_stop_rate*(1+self.t/10)*(h.Low[-self.cfg.trailing_stop_type] + self.add_profit - order.price))
             if position.dir == -1 and order.dir == 1 and p < order.price:
-                order.change(date, order.price - self.cfg.trailing_stop_rate*(order.price - h.High[-self.cfg.trailing_stop_type]))
+                # prof = max(position.open_price - p, 0)
+                # if prof > self.best_profit:
+                #     self.best_profit = prof
+                #     self.add_profit += self.max_correction
+                #     self.correction = 0
+                #     self.max_correction = 0
+                # else:
+                #     self.correction = self.best_profit - prof
+                #     if self.correction > self.max_correction:
+                #         self.max_correction = self.correction                
+                order.change(date, order.price - self.cfg.trailing_stop_rate*(1+self.t/10)*(order.price - h.High[-self.cfg.trailing_stop_type] + self.add_profit))
