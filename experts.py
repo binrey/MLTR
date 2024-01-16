@@ -137,16 +137,22 @@ class ClsTrend(ExtensionBase):
         ids, values, types = self.zigzag.update(h)
         is_fig = False
         if len(ids) >= self.cfg.npairs*2+1:
-            flag2, flag3 = False, False
+            flag = False
             if types[-2] > 0:
-                flag2 = values[-2] > values[-4] and values[-3] > values[-5]
+                flag = values[-2] > values[-4] and values[-3] > values[-5]
                 if self.cfg.npairs == 3:
-                    flag3 = values[-4] > values[-6] and values[-5] > values[-7]
+                    flag = flag and values[-4] > values[-6] and values[-5] > values[-7]
             if types[-2] < 0:
-                flag2 = values[-2] < values[-4] and values[-3] < values[-5]
+                flag = values[-2] < values[-4] and values[-3] < values[-5]
                 if self.cfg.npairs == 3:
-                    flag3 = values[-4] < values[-6] and values[-5] < values[-7]
-            if (self.cfg.npairs <= 2 and flag2) or (self.cfg.npairs == 3 and flag2 and flag3):
+                    flag = flag and values[-4] < values[-6] and values[-5] < values[-7]
+            if flag:
+                flag = flag and abs(values[-2] - values[-5])/abs(values[-3] - values[-4]) >= self.cfg.minspace
+                # for i in range(2, self.cfg.npairs*2):
+                #     flag = flag and ids[-i] - ids[-i-1] >= self.cfg.minspace
+                #     if not flag:
+                #         break
+            if flag:
                 is_fig = True
                 trend_type = types[-2]                        
     
@@ -162,10 +168,10 @@ class ClsTrend(ExtensionBase):
         return is_fig
 
 
-class ClsSaw(ExtensionBase):
+class ClsTunnel(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
-        super(ClsSaw, self).__init__(cfg, name="saw")
+        super(ClsTunnel, self).__init__(cfg, name="tunnel")
         
     def __call__(self, common, h) -> bool:
         is_fig = False
@@ -183,6 +189,54 @@ class ClsSaw(ExtensionBase):
             common.sprice = line_below           
             common.lines = [[(h.Id[-i], common.lprice), (h.Id[-1], common.lprice)],
                             [(h.Id[-i], common.sprice), (h.Id[-1], common.sprice)]]
+        return is_fig
+
+
+class ClsSawTrend(ExtensionBase):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(ClsSawTrend, self).__init__(cfg, name="sawtrend")
+        # self.zigzag = ZigZagOpt(max_drop=0.0)
+        self.zigzag = ZigZag()
+        self.channel = False
+        
+    def __call__(self, common, h) -> bool:
+        is_fig = False
+        for i in range(8, h.Id.shape[0], 4):
+            line_above = h.High[-i:].max()#np.percentile(h.High[-i:], 100-self.cfg.percentile)#
+            line_below = h.Low[-i:].min()#np.percentile(h.Low[-i:], self.cfg.percentile)#
+            height = (line_above - line_below) / (line_above + line_below) * 2
+            if h.Close[-1] < line_above and h.Close[-1] > line_below:
+                if i/height > self.cfg.ncross*100:
+                    self.channel = True
+                    common.lines = [[(h.Id[-i], line_below), (h.Id[-1], line_below)],
+                            [(h.Id[-i], line_above), (h.Id[-1], line_above)]]
+                    return is_fig
+                
+        if self.channel:
+            ids, values, types = self.zigzag.update(h)
+            is_fig = False
+            if len(ids) >= self.cfg.npairs*2+1:
+                flag2, flag3 = False, False
+                if types[-2] > 0:
+                    flag2 = values[-2] > values[-4] and values[-3] > values[-5]
+                    if self.cfg.npairs == 3:
+                        flag3 = values[-4] > values[-6] and values[-5] > values[-7]
+                if types[-2] < 0:
+                    flag2 = values[-2] < values[-4] and values[-3] < values[-5]
+                    if self.cfg.npairs == 3:
+                        flag3 = values[-4] < values[-6] and values[-5] < values[-7]
+                if (self.cfg.npairs <= 2 and flag2) or (self.cfg.npairs == 3 and flag2 and flag3):
+                    is_fig = True
+                    trend_type = types[-2]                        
+    
+        if is_fig:
+            self.channel = False
+            i = self.cfg.npairs*2 + 1
+            common.lines += [[(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]]
+            common.lprice = max(common.lines[-1][-1][1], common.lines[-1][-2][1]) if trend_type > 0 else None
+            common.sprice = min(common.lines[-1][-1][1], common.lines[-1][-2][1]) if trend_type < 0 else None
+            common.cprice = common.lines[0][-2][1]
         return is_fig
 
 

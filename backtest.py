@@ -73,7 +73,7 @@ def backtest(cfg):
     logger.info(sformat.format("broker updates", tbrok/ttotal*100))
     logger.info(sformat.format("data loadings", tdata/ttotal*100))
     logger.info("-"*30)
-    logger.info(sformat.format("FINAL PROFIT", broker.profits.sum())) 
+    logger.info(sformat.format("FINAL PROFIT", broker.profits.sum()) + f" ({len(broker.positions)} deals)") 
     
     import pickle
     pickle.dump((cfg, broker), open(str(Path("backtests") / f"btest{0:003.0f}.pickle"), "wb"))
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     cfg = PyConfig().test()
     cfg.run_model_device = None
     brok_results = backtest(cfg)
-    plt.subplots(figsize=(20, 10))
+    plt.subplots(figsize=(15, 8))
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum(), linewidth=2, alpha=0.6)
-    
+    plt.tight_layout()
     plt.savefig("backtest.png")
