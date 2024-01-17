@@ -22,8 +22,8 @@ def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=Non
         x = np.vstack([2-fc, 2-fo, 2-fl, 2-fh])
     x = x*127
     # x = np.vstack([x, fv])
-    x = np.vstack([x, np.ones(x.shape[1])*sl*10])
-    x = np.vstack([x, np.ones(x.shape[1])*trailing_stop_rate*1000])
+    # x = np.vstack([x, np.ones(x.shape[1])*sl*10])
+    # x = np.vstack([x, np.ones(x.shape[1])*trailing_stop_rate*1000])
     if open_date is not None:
         odate = pd.to_datetime(open_date)
         odate = odate.year*10000 + odate.month*100 + odate.day       

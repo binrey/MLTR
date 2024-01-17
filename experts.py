@@ -44,7 +44,7 @@ class ExpertFormation(ExpertBase):
         
         if self.cfg.run_model_device is not None:
             from ml import Net, Net2
-            self.model = Net2(4, self.cfg.hist_buffer_size)
+            self.model = Net2(4, int(self.cfg.hist_buffer_size/4))
             self.model.load_state_dict(torch.load("model.pth"))
             # self.model.set_threshold(0.6)
             self.model.eval()
@@ -146,8 +146,8 @@ class ClsTrend(ExtensionBase):
                 flag = values[-2] < values[-4] and values[-3] < values[-5]
                 if self.cfg.npairs == 3:
                     flag = flag and values[-4] < values[-6] and values[-5] < values[-7]
-            if flag:
-                flag = flag and abs(values[-2] - values[-5])/abs(values[-3] - values[-4]) >= self.cfg.minspace
+            # if flag:
+                # flag = flag and abs(values[-2] - values[-5])/abs(values[-3] - values[-4]) >= self.cfg.minspace
                 # for i in range(2, self.cfg.npairs*2):
                 #     flag = flag and ids[-i] - ids[-i-1] >= self.cfg.minspace
                 #     if not flag:
