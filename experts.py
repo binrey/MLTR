@@ -185,10 +185,14 @@ class ClsTunnel(ExtensionBase):
                     break
 
         if is_fig:
-            common.lprice = line_above
-            common.sprice = line_below           
-            common.lines = [[(h.Id[-i], common.lprice), (h.Id[-1], common.lprice)],
-                            [(h.Id[-i], common.sprice), (h.Id[-1], common.sprice)]]
+            if (line_above + line_below)/2 > h.Close.mean():
+                common.lprice = h.High[-1]
+                common.cprice = line_below
+            else:
+                common.sprice = h.Low[-1]
+                common.cprice = line_above    
+                 
+            common.lines = [[(h.Id[-i], common.lprice), (h.Id[-1], common.lprice)] if common.lprice is not None else [(h.Id[-i], common.sprice), (h.Id[-1], common.sprice)]]
         return is_fig
 
 
@@ -197,7 +201,7 @@ class ClsSawTrend(ExtensionBase):
         self.cfg = cfg
         super(ClsSawTrend, self).__init__(cfg, name="sawtrend")
         # self.zigzag = ZigZagOpt(max_drop=0.0)
-        self.zigzag = ZigZag()
+        self.zigzag = ZigZag2()
         self.channel = False
         
     def __call__(self, common, h) -> bool:
@@ -268,55 +272,6 @@ class ClsTriangleSimp(ExtensionBase):
             common.lines = [[(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]]
             common.lprice = max(common.lines[0][-1][1], common.lines[0][-2][1])
             common.sprice = min(common.lines[0][-1][1], common.lines[0][-2][1]) 
-        return is_fig
-
-
-class ClsTriangleComp(ExtensionBase):
-    def __init__(self, cfg):
-        self.cfg = cfg
-        super(ClsTriangleComp, self).__init__(cfg, name="trngl_comp")
-        self.zigzag = ZigZag()
-        
-    def __call__(self, common, h) -> bool:
-        ids, values, types = self.zigzag.update(h)
-        # ids, dates, values, types = zz_opt(h[-self.body_maxsize:])
-        is_fig = False
-        types_filt, vals_filt, ids_ = [], [], []
-        for i in range(2, len(ids)):
-            cur_type = types[-i]
-            cur_val = values[-i]
-            if len(types_filt) < 2:
-                types_filt.append(cur_type)
-                vals_filt.append(cur_val)
-                ids_.append(-i)
-            else:
-                if len(types_filt) == 2:
-                    valmax, valmin = max(vals_filt), min(vals_filt)
-                if types_filt[-1] == 1 and cur_type == -1:
-                    if cur_val <= valmin:
-                        valmin = cur_val
-                        types_filt.append(cur_type)
-                        vals_filt.append(cur_val)
-                        ids_.append(-i)
-                if types_filt[-1] == -1 and cur_type == 1:
-                    if cur_val >= valmax:
-                        valmax = cur_val
-                        types_filt.append(cur_type)
-                        vals_filt.append(cur_val)  
-                        ids_.append(-i)
-
-        if len(types_filt) >= self.cfg.npairs*2:
-            is_fig = True
-            logger.debug(f"Found figure p-types : {types_filt}") 
-            logger.debug(f"Found figure p-values: {vals_filt}") 
-                    
-        if is_fig:
-            i = self.cfg.npairs*2 + 1
-            common.lines = [(x, y) for x, y in zip([ids[j] for j in ids_[-i:][::-1]], [values[j] for j in ids_[-i:][::-1]])]
-            # common.lines = [(x, y) for x, y in zip(dates[-ids_[-1]:-1], values[-ids_[-1]:-1])]
-            common.lprice = max(common.lines[-1][1], common.lines[-2][1])
-            common.sprice = min(common.lines[-1][1], common.lines[-2][1]) 
-
         return is_fig
 
 
