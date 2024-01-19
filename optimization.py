@@ -26,10 +26,10 @@ def backtest_process(args):
             btest = backtest(cfg)
             if len(btest.positions) == 0:
                   break
-            cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
+            # cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
             locnum += 1
             pickle.dump((cfg, btest), open(str(Path("optimization") / f"btest.{cfg.ticker}.{num + locnum/100:05.2f}.pickle"), "wb"))
-            #break
+            break
 
 
 def pool_handler():

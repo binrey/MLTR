@@ -18,13 +18,13 @@ class ZigZag:
             if self.mask[i-1] != 0:
                 continue
             self.mask[i-1] = self.mask[i-2]
-            if h.Low[i] < self.min_last and h.High[i] < self.max_last:
+            if h.Low[i] <= self.min_last and h.High[i] <= self.max_last:
                 self.mask[i-1] = -1
-                if h.High[i-2] > h.High[i-1]:
+                if h.High[i-2] >= h.High[i-1]:
                     self.mask[i-2] = -1
-            if h.High[i] > self.max_last and h.Low[i] > self.min_last:
+            if h.High[i] >= self.max_last and h.Low[i] >= self.min_last:
                 self.mask[i-1] = 1
-                if h.Low[i-2] < h.Low[i-1]:
+                if h.Low[i-2] <= h.Low[i-1]:
                     self.mask[i-2] = 1
             self.min_last, self.max_last = h.Low[i], h.High[i]
         self.last_id = h.Id[-1]
@@ -55,8 +55,58 @@ class ZigZag:
         upd_buffers(h.Id[i]+1, h.Low[-1] if - mask[i] > 0 else h.High[-1], mask[i])
         return ids, values, types   
     
+
+class ZigZag2:
+    def __init__(self):
+        self.mask, self.min_last, self.max_last, self.last_close, self.last_id = None, None, None, None, 0
+
+    def _get_mask(self, h):
+        if self.mask is None or h.Id[-1] - self.last_id > 1:
+            self.min_last, self.max_last, self.last_close = h.Low[0], h.High[0], h.Close[0]
+            self.mask = np.zeros(h.Id.shape[0] - 1)
+            self.mask[0] = 1 if h.High[1] > self.max_last else -1
+        else:
+            self.mask[:-1] = self.mask[1:]
+            self.mask[-1] = 0
+        for i in range(2, h.Id.shape[0]):
+            if self.mask[i-1] != 0:
+                continue
+            self.mask[i-1] = self.mask[i-2]
+            if h.Close[i] <= self.last_close:
+                self.mask[i-1] = -1
+            if h.Close[i] >= self.last_close:
+                self.mask[i-1] = 1
+            self.min_last, self.max_last, self.last_close = h.Low[i], h.High[i], h.Close[i]
+        self.last_id = h.Id[-1]
+        return self.mask
+
+    def update(self, h):
+        self._get_mask(h)
+        return self.mask2zigzag(h, self.mask, use_min_max=True)
     
-class ZigZagOpt(ZigZag):
+    def mask2zigzag(self, h, mask, use_min_max=False):
+        ids, values, types = [], [], []
+        def upd_buffers(i, v, t):
+            ids.append(i)
+            values.append(v)
+            types.append(t)
+        for i in range(mask.shape[0]):
+            if use_min_max:
+                y = h.Low[i] if mask[i] > 0 else h.High[i]
+            else:
+                y = h.Close[i]
+            if i > 0: 
+                if mask[i] != node:
+                    upd_buffers(h.Id[i], y, node)
+                    node = mask[i]
+            else:
+                node = mask[i]
+                upd_buffers(h.Id[i], y, -node)
+        upd_buffers(h.Id[i]+1, h.Close[-1], mask[i])
+        return ids, values, types   
+
+
+class ZigZagOpt(ZigZag2):
     def __init__(self, min_nodes=1, max_drop=1, simp_while_grow=False):
         super(ZigZagOpt, self).__init__()
         self.min_nodes = min_nodes
@@ -150,7 +200,7 @@ if __name__ == "__main__":
     hist_pd, hist = DataParser(cfg).load()
     mw = MovingWindow(hist, cfg.hist_buffer_size)
     data_wind, _ = mw(700)
-    indc = ZigZagOpt(max_drop=0.1)
+    indc = ZigZagOpt(max_drop=0.01)
     ids, values, types = indc.update(data_wind)
     print(ids, types, values)
     indc.plot(save_path)
@@ -175,8 +225,9 @@ if __name__ == "__main__":
                 type='candle', 
                 block=False,
                 alines=dict(alines=lines, colors=colors, linewidths=thks),
-                savefig=save_path / f"_final.jpg"
+                # savefig=save_path / f"_final.jpg"
                 )
+    mpf.show()
     
 
         

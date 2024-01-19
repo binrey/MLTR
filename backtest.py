@@ -85,7 +85,6 @@ if __name__ == "__main__":
     logger.remove()
     logger.add(sys.stderr, level="INFO")
     cfg = PyConfig().test()
-    cfg.run_model_device = None
     brok_results = backtest(cfg)
     plt.subplots(figsize=(15, 8))
     plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum(), linewidth=2, alpha=0.6)

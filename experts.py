@@ -6,7 +6,7 @@ import yaml
 from easydict import EasyDict
 from loguru import logger
 
-from indicators import ZigZag, ZigZagOpt
+from indicators import ZigZag, ZigZag2, ZigZagOpt
 from utils import Order
 from dataloading import build_features
 import torch
@@ -44,7 +44,7 @@ class ExpertFormation(ExpertBase):
         
         if self.cfg.run_model_device is not None:
             from ml import Net, Net2
-            self.model = Net2(4, int(self.cfg.hist_buffer_size/4))
+            self.model = Net2(4, 32)
             self.model.load_state_dict(torch.load("model.pth"))
             # self.model.set_threshold(0.6)
             self.model.eval()
@@ -130,8 +130,8 @@ class ClsTrend(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsTrend, self).__init__(cfg, name="trend")
-        # self.zigzag = ZigZagOpt(max_drop=0.0)
-        self.zigzag = ZigZag()
+        self.zigzag = ZigZagOpt(max_drop=self.cfg.maxdrop)
+        #self.zigzag = ZigZag2()
         
     def __call__(self, common, h) -> bool:
         ids, values, types = self.zigzag.update(h)
@@ -245,7 +245,7 @@ class ClsTriangleSimp(ExtensionBase):
         self.cfg = cfg
         super(ClsTriangleSimp, self).__init__(cfg, name="trngl_simp")
 #        self.zigzag = ZigZagOpt(max_drop=0.1)
-        self.zigzag = ZigZag()
+        self.zigzag = ZigZag2()
         
     def __call__(self, common, h) -> bool:
         ids, values, types = self.zigzag.update(h)        
@@ -265,9 +265,9 @@ class ClsTriangleSimp(ExtensionBase):
                     
         if is_fig:
             i = self.cfg.npairs*2 + 1
-            common.lines = [(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]
-            common.lprice = max(common.lines[-1][1], common.lines[-2][1])
-            common.sprice = min(common.lines[-1][1], common.lines[-2][1]) 
+            common.lines = [[(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]]
+            common.lprice = max(common.lines[0][-1][1], common.lines[0][-2][1])
+            common.sprice = min(common.lines[0][-1][1], common.lines[0][-2][1]) 
         return is_fig
 
 

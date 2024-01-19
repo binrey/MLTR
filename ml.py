@@ -51,11 +51,12 @@ class Net2(nn.Module):
     def __init__(self, nf, nl, threshold=0):
         super().__init__()
         self.nf = nf
-        self.nl = {8:1, 16:2, 32:3, 64:4, 128:5}.get(nl)
+        self.nl = nl
+        nl = {8:1, 16:2, 32:3, 64:4, 128:5}.get(nl)
         self.set_threshold(threshold)
         self.f = nn.Sequential()
-        n = (1, 4)
-        for i in range(self.nl):
+        n = (4, 4)
+        for i in range(nl):
             self.f.append(nn.Conv2d(n[0], n[1], (self.nf, 3), padding="same"))
             self.f.append(nn.BatchNorm2d(n[1]))
             self.f.append(nn.ReLU())
@@ -72,8 +73,8 @@ class Net2(nn.Module):
         ma8 = nn.AvgPool2d((1, 8), (1, 1))(x)
         ma16 = nn.AvgPool2d((1, 16), (1, 1))(x)
         ma32 = nn.AvgPool2d((1, 32), (1, 1))(x)
-        # x = torch.concat((x[:, :, :, -32:], ma8[:, :, :, -32:], ma16[:, :, :, -32:], ma32[:, :, :, -32:]), dim=2)
-        x = x[:, :, :, :32]
+        x = torch.concat((x[:, :, :, -self.nl:], ma8[:, :, :, -self.nl:], ma16[:, :, :, -self.nl:], ma32[:, :, :, -self.nl:]), dim=1)
+        #x = x[:, :, :, :self.nl]
         x = self.f(x)
         x = self.dropout(x)
         x = self.conv_valid(x)
@@ -93,7 +94,7 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
                                               shuffle=True
                                               )
     
-    model = Net2(X_train.shape[2], int(X_train.shape[3]/2)).to(device).float() #32-3, 16-2, 8-1
+    model = Net2(X_train.shape[2], 32).to(device).float() #32-3, 16-2, 8-1
     if calc_test:
         y_test_tensor = torch.tensor(y_test).float().to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
