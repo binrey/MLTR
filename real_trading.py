@@ -119,11 +119,6 @@ if __name__ == "__main__":
         api_key="aA2DKjelcik0WbJyxI",
         api_secret="hIhnPUEBVmDII1FfeYEicTljZjwrUHW8pTm8",
     )
-
-    print(session.get_wallet_balance(
-        accountType="UNIFIED",
-        coin="BTC",
-    ))
     
     exp = ExpertFormation(cfg)
     broker = Broker(cfg)
@@ -133,15 +128,16 @@ if __name__ == "__main__":
             rmtree(save_path)
         save_path.mkdir()
     
-    
-    get_rounded_time = lambda tmessage: int(int(tmessage["timeSecond"])/10)
-    t0 = get_rounded_time(session.get_server_time()["result"])
-    t = t0
-    while t == t0:
-        tmessage = session.get_server_time()["result"]
-        t = get_rounded_time(tmessage)
-        print(t0, t)
-        message = session.get_kline(category="spot",
+    get_rounded_time = lambda tmessage: int(int(tmessage["timeSecond"])/60)
+    while True:
+        t = t0 = get_rounded_time(session.get_server_time()["result"])
+        while t == t0:
+            tmessage = session.get_server_time()["result"]
+            t = get_rounded_time(tmessage)
+            print(tmessage["timeSecond"], t0, t)
+            sleep(1)
+        
+        message = session.get_kline(category="linear",
                         symbol=cfg.ticker,
                         interval=cfg.period[1:],
                         start=0,
@@ -149,19 +145,33 @@ if __name__ == "__main__":
                         limit=cfg.hist_buffer_size)
         
         h = get_bybit_hist(message["result"], cfg.hist_buffer_size)
-        open_orders = session.get_open_orders(category="spot")["result"]["list"]
-        if len(open_orders) == 0:
+        open_orders = session.get_open_orders(category="linear", symbol=cfg.ticker)["result"]["list"]
+        positions = session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
+        open_positions = [pos for pos in positions if float(pos["size"])]
+        
+        if len(open_orders) == 0 and len(open_positions) == 0:
             texp = exp.update(h)
             broker.active_orders = exp.orders
         
         if cfg.save_plots:
             hist2plot = pd.DataFrame(h)
             hist2plot.index = pd.to_datetime(hist2plot.Date)
+            lines2plot = exp.lines
+            for line in lines2plot:
+                for i, point in enumerate(line):
+                    y = point[1]
+                    try:
+                        y = y.item()
+                    except:
+                        pass
+                    line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)
+                    
             fig = mpf.plot(hist2plot, 
                 type='candle', 
                 block=False,
+                alines=dict(alines=lines2plot),
                 savefig=save_path / f"fig-{str(t).split('.')[0]}.png")
             del fig
-        sleep(1)
+        
     
     
