@@ -193,3 +193,7 @@ class Broker:
                 #     if self.correction > self.max_correction:
                 #         self.max_correction = self.correction                
                 order.change(date, order.price - self.cfg.trailing_stop_rate*(1+self.t/10)*(order.price - h.High[-self.cfg.trailing_stop_type] + self.add_profit))
+            # prof = position.dir*(p - position.open_price)
+            # if prof > self.best_profit:
+            #     order.change(date, order.price + position.dir*(prof - self.best_profit))
+            #     self.best_profit = prof

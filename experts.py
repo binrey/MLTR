@@ -193,8 +193,8 @@ class ClsTunnel(ExtensionBase):
     def __call__(self, common, h) -> bool:
         is_fig = False
         for i in range(8, h.Id.shape[0], 4):
-            line_above = h.High[-i:].max()#np.percentile(h.High[-i:], 100-self.cfg.percentile)#
-            line_below = h.Low[-i:].min()#np.percentile(h.Low[-i:], self.cfg.percentile)#
+            line_above = h.Close[-i:].max()#np.percentile(h.High[-i:], 100-self.cfg.percentile)#
+            line_below = h.Close[-i:].min()#np.percentile(h.Low[-i:], self.cfg.percentile)#
             height = (line_above - line_below) / (line_above + line_below) * 2
             if h.Close[-1] < line_above and h.Close[-1] > line_below:
                 if i/height > self.cfg.ncross*100:
@@ -203,10 +203,10 @@ class ClsTunnel(ExtensionBase):
 
         if is_fig:
             if (line_above + line_below)/2 > h.Close.mean():
-                common.lprice = h.High[-2]
+                common.lprice = line_below
                 common.cprice = line_below
             else:
-                common.sprice = h.Low[-2]
+                common.sprice = line_above
                 common.cprice = line_above    
                  
             common.lines = [[(h.Id[-i], common.lprice), (h.Id[-1], common.lprice)] if common.lprice is not None else [(h.Id[-i], common.sprice), (h.Id[-1], common.sprice)]]
