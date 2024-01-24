@@ -15,74 +15,11 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
 from easydict import EasyDict
+from copy import deepcopy
 
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen
-
-def fight(cfg):
-    exp = ExpertFormation(cfg)
-    broker = Broker(cfg)
-    hist_pd, hist = DataParser(cfg).load()
-    mw = MovingWindow(hist, cfg.hist_buffer_size)
-    if cfg.save_plots:
-        save_path = Path("backtests") / f"{cfg.ticker}-{cfg.period}"
-        if save_path.exists():
-            rmtree(save_path)
-        save_path.mkdir()
-    tstart = max(cfg.hist_buffer_size+1, cfg.tstart)
-    tend = cfg.tend if cfg.tend is not None else hist.Id.shape[0]
-    t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0
-    for t in tqdm(range(tstart, tend), "back test"):
-        h, dt = mw(t)
-        tdata += dt
-        if t < tstart or len(broker.active_orders) == 0:
-            texp += exp.update(h)
-            broker.active_orders = exp.orders
-        
-        pos, dt = broker.update(h)
-        tbrok += dt
-        if pos is not None:
-            logger.debug(f"t = {t} -> postprocess closed position")
-            broker.close_orders(h.Id[-2])
-            if cfg.save_plots:
-                ords_lines = [order.lines for order in broker.orders if order.open_indx >= pos.open_indx]
-                lines2plot = exp.lines + ords_lines + [pos.lines]
-                colors = ["blue"]*(len(lines2plot)-1) + ["green" if pos.profit > 0 else "red"]
-                widths = [1]*(len(lines2plot)-1) + [2]
-                
-                hist2plot = hist_pd.iloc[lines2plot[0][0][0]:lines2plot[-1][-1][0]+1]
-                for line in lines2plot:
-                    for i, point in enumerate(line):
-                        y = point[1]
-                        try:
-                            y = y.item()
-                        except:
-                            pass
-                        line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)
-                
-                fig = mpf.plot(hist2plot, 
-                            type='candle', 
-                            block=False,
-                            alines=dict(alines=lines2plot, colors=colors, linewidths=widths),
-                            savefig=save_path / f"fig-{str(pos.open_date).split('.')[0]}.png")
-                del fig
-            exp.reset_state()
-    
-    ttotal = perf_counter() - t0
-    
-    sformat = "{:>30}: {:>3.0f} %"
-    logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}")
-    logger.info("{:>30}: {:.1f} sec".format("total backtest", ttotal))
-    logger.info(sformat.format("expert updates", texp/ttotal*100))
-    logger.info(sformat.format("broker updates", tbrok/ttotal*100))
-    logger.info(sformat.format("data loadings", tdata/ttotal*100))
-    logger.info("-"*30)
-    logger.info(sformat.format("FINAL PROFIT", broker.profits.sum()) + f" ({len(broker.positions)} deals)") 
-    
-    import pickle
-    pickle.dump((cfg, broker), open(str(Path("backtests") / f"btest{0:003.0f}.pickle"), "wb"))
-    return broker
-    
+ 
 def get_bybit_hist(mresult, size):
     data = EasyDict(Date=np.empty(size, dtype=np.datetime64),
         Id=np.zeros(size, dtype=np.int64),
@@ -152,36 +89,40 @@ if __name__ == "__main__":
             pos_side = 1 if pos["side"] == "Buy" else -1
             sl = float(pos["stopLoss"])
             sl = sl + pos_side*cfg.trailing_stop_rate*abs(h.Open[-1] - sl)
-            session.set_trading_stop(
+            resp = session.set_trading_stop(
                 category="linear",
                 symbol=cfg.ticker,
                 stopLoss=sl,
                 slTriggerB="IndexPrice",
                 positionIdx=0,
             )
+            logger.debug(resp)
         
         if len(open_orders) == 0 and len(open_positions) == 0:
             texp = exp.update(h)
+            if cfg.save_plots:
+                hist2plot = pd.DataFrame(h)
+                hist2plot.index = pd.to_datetime(hist2plot.Date)
+                lines2plot = deepcopy(exp.lines)
+                for line in lines2plot:
+                    for i, point in enumerate(line):
+                        y = point[1]
+                        try:
+                            y = y.item()
+                        except:
+                            pass
+                        line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)
+                        
+                fig = mpf.plot(hist2plot, 
+                    type='candle', 
+                    block=False,
+                    alines=dict(alines=lines2plot),
+                    savefig=save_path / f"fig-{str(t).split('.')[0]}.png")
+                del fig            
+        else:
+            exp.reset_state()
             
-        if cfg.save_plots:
-            hist2plot = pd.DataFrame(h)
-            hist2plot.index = pd.to_datetime(hist2plot.Date)
-            for line in exp.lines:
-                for i, point in enumerate(line):
-                    y = point[1]
-                    try:
-                        y = y.item()
-                    except:
-                        pass
-                    line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)
-                    
-            fig = mpf.plot(hist2plot, 
-                type='candle', 
-                block=False,
-                alines=dict(alines=exp.lines),
-                savefig=save_path / f"fig-{str(t).split('.')[0]}.png")
-            exp.lines = []
-            del fig
+
         
     
     

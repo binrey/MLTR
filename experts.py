@@ -71,13 +71,13 @@ class ExpertFormation(ExpertBase):
         
         self.order_dir = 0
         if self.lprice:
-            if h.Open[-1] > self.lprice:
+            if h.Open[-1] >= self.lprice:
                 self.order_dir = 1
             if self.cprice and h.Open[-1] < self.cprice:
                 self.reset_state()
                 return
         if self.sprice:
-            if h.Open[-1] < self.sprice:
+            if h.Open[-1] <= self.sprice:
                 self.order_dir = -1
             if self.cprice and h.Open[-1] > self.cprice:
                 self.reset_state()
@@ -98,20 +98,20 @@ class ExpertFormation(ExpertBase):
             
         if self.order_dir != 0:
             tp, sl = self.stops_processor(self, h)
-            if self.cfg.real_trading:
-                self.create_real_orders(self.order_dir, tp, sl)
-            else:
-                self.create_test_orders(h.Id[-1], self.order_dir, tp, sl)
+            self.create_orders(h.Id[-1], self.order_dir, tp, sl)
 
         if self.wait_entry_point == 0:
             self.formation_found = False
         else:
             self.wait_entry_point -= 1
+
             
-    def create_real_orders(self, order_dir, tp, sl):
-        pass
-            
-    def create_test_orders(self, time_id, order_dir, tp, sl):
+class BacktestExpert(ExpertFormation):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(BacktestExpert, self).__init__(cfg)
+        
+    def create_orders(self, time_id, order_dir, tp, sl):
         self.orders = [Order(order_dir, Order.TYPE.MARKET, time_id, time_id)]
         if tp:
             self.orders.append(Order(tp, Order.TYPE.LIMIT, time_id, time_id))
@@ -120,6 +120,7 @@ class ExpertFormation(ExpertBase):
         logger.debug(f"{time_id} send order {self.orders[0]}, " + 
                         f"tp: {self.orders[1] if len(self.orders)>1 else 'NO'}, " +
                         f"sl: {self.orders[2] if len(self.orders)>2 else 'NO'}")
+        
             
 class ByBitExpert(ExpertFormation):
     def __init__(self, cfg, session):
@@ -127,7 +128,7 @@ class ByBitExpert(ExpertFormation):
         self.session = session
         super(ByBitExpert, self).__init__(cfg)
         
-    def create_real_orders(self, order_dir, tp, sl):
+    def create_orders(self, time_id, order_dir, tp, sl):
         resp = self.session.place_order(
             category="linear",
             symbol="BTCUSDT",
@@ -140,6 +141,7 @@ class ByBitExpert(ExpertFormation):
             takeProfit="" if tp is None else str(tp)
             )
         logger.debug(resp)
+        
         
 class ClsTrend(ExtensionBase):
     def __init__(self, cfg):
@@ -201,10 +203,10 @@ class ClsTunnel(ExtensionBase):
 
         if is_fig:
             if (line_above + line_below)/2 > h.Close.mean():
-                common.lprice = h.High[-1]
+                common.lprice = h.High[-2]
                 common.cprice = line_below
             else:
-                common.sprice = h.Low[-1]
+                common.sprice = h.Low[-2]
                 common.cprice = line_above    
                  
             common.lines = [[(h.Id[-i], common.lprice), (h.Id[-1], common.lprice)] if common.lprice is not None else [(h.Id[-i], common.sprice), (h.Id[-1], common.sprice)]]

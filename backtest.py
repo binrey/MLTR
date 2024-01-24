@@ -9,14 +9,14 @@ from loguru import logger
 from tqdm import tqdm
 from dataloading import MovingWindow, DataParser
 pd.options.mode.chained_assignment = None
-from experts import ExpertFormation, PyConfig
+from experts import BacktestExpert, PyConfig
 from utils import Broker
 
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen
 
 def backtest(cfg):
-    exp = ExpertFormation(cfg)
+    exp = BacktestExpert(cfg)
     broker = Broker(cfg)
     hist_pd, hist = DataParser(cfg).load()
     mw = MovingWindow(hist, cfg.hist_buffer_size)
