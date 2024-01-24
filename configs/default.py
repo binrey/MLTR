@@ -37,7 +37,7 @@ stops_processors = EasyDict(
         func=StopsFixed,
         params=EasyDict(
             tp=Param(None, [None]), 
-            sl=Param(2, [2, 3, 5])
+            sl=Param(0.5, [2, 3, 5])
             )
         ),
     stops_dynamic = EasyDict(
@@ -56,10 +56,11 @@ moex_list = ["SBER", "ROSN", "LKOH", "GMKN", "GAZP"]
 forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
 
 config = EasyDict(
+    real_trading=Param(True, [False]),
     date_start=Param("2010-01-01", ["2010-01-01"]),
     date_end=Param("2024-01-01", ["2024-01-01"]),
     no_trading_days=Param(set(), [set()]),
-    trailing_stop_rate=Param(0.02, [0.00125, 0.0025, 0.005]),
+    trailing_stop_rate=Param(0.005, [0.00125, 0.0025, 0.005]),
     trailing_stop_type=Param(1, [1]),
     body_classifier=Param(body_classifiers["dummy"], [body_classifiers[k] for k in ["tunnel"]]),
     stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_fixed"]]),
@@ -67,7 +68,7 @@ config = EasyDict(
     hist_buffer_size=Param(32, [32]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("M15", ["M15"]),
+    period=Param("M1", ["M15"]),
     ticker=Param("BTCUSDT", ["BTCUSD", "ETHUSD"]),
     data_type=Param("metatrader", ["metatrader"]),
     save_plots=Param(True, [False]),

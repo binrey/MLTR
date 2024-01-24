@@ -9,7 +9,7 @@ from loguru import logger
 from tqdm import tqdm
 from dataloading import MovingWindow, DataParser
 pd.options.mode.chained_assignment = None
-from experts import ExpertFormation, PyConfig
+from experts import ByBitExpert, PyConfig
 from utils import Broker
 import numpy as np
 import pandas as pd
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     
     
     logger.remove()
-    logger.add(sys.stderr, level="INFO")
+    logger.add(sys.stderr, level="DEBUG")
     cfg = PyConfig().test()
     
 
@@ -120,8 +120,7 @@ if __name__ == "__main__":
         api_secret="hIhnPUEBVmDII1FfeYEicTljZjwrUHW8pTm8",
     )
     
-    exp = ExpertFormation(cfg)
-    broker = Broker(cfg)
+    exp = ByBitExpert(cfg, session)
     if cfg.save_plots:
         save_path = Path("real_trading") / f"{cfg.ticker}-{cfg.period}"
         if save_path.exists():
@@ -149,15 +148,25 @@ if __name__ == "__main__":
         positions = session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
         open_positions = [pos for pos in positions if float(pos["size"])]
         
+        for pos in open_positions:
+            pos_side = 1 if pos["side"] == "Buy" else -1
+            sl = float(pos["stopLoss"])
+            sl = sl + pos_side*cfg.trailing_stop_rate*abs(h.Open[-1] - sl)
+            session.set_trading_stop(
+                category="linear",
+                symbol=cfg.ticker,
+                stopLoss=sl,
+                slTriggerB="IndexPrice",
+                positionIdx=0,
+            )
+        
         if len(open_orders) == 0 and len(open_positions) == 0:
             texp = exp.update(h)
-            broker.active_orders = exp.orders
-        
+            
         if cfg.save_plots:
             hist2plot = pd.DataFrame(h)
             hist2plot.index = pd.to_datetime(hist2plot.Date)
-            lines2plot = exp.lines
-            for line in lines2plot:
+            for line in exp.lines:
                 for i, point in enumerate(line):
                     y = point[1]
                     try:
@@ -169,8 +178,9 @@ if __name__ == "__main__":
             fig = mpf.plot(hist2plot, 
                 type='candle', 
                 block=False,
-                alines=dict(alines=lines2plot),
+                alines=dict(alines=exp.lines),
                 savefig=save_path / f"fig-{str(t).split('.')[0]}.png")
+            exp.lines = []
             del fig
         
     

@@ -10,11 +10,12 @@ from indicators import ZigZag, ZigZag2, ZigZagOpt
 from utils import Order
 from dataloading import build_features
 import torch
+from pybit.unified_trading import HTTP
 
 
 class ExpertBase(ABC):
     def __init__(self):
-        self.lines = None
+        self.lines = []
         self.orders = []
             
     @abstractmethod
@@ -97,35 +98,49 @@ class ExpertFormation(ExpertBase):
             
         if self.order_dir != 0:
             tp, sl = self.stops_processor(self, h)
-            self.orders = [Order(self.order_dir, Order.TYPE.MARKET, h.Id[-1], h.Id[-1])]
-            if tp:
-                self.orders.append(Order(tp, Order.TYPE.LIMIT, h.Id[-1], h.Id[-1]))
-            if sl:
-                self.orders.append(Order(sl, Order.TYPE.LIMIT, h.Id[-1], h.Id[-1]))
-            logger.debug(f"{h.Id[-1]} send order {self.orders[0]}, " + 
-                         f"tp: {self.orders[1] if len(self.orders)>1 else 'NO'}, " +
-                         f"sl: {self.orders[2] if len(self.orders)>2 else 'NO'}")
-        
+            if self.cfg.real_trading:
+                self.create_real_orders(self.order_dir, tp, sl)
+            else:
+                self.create_test_orders(h.Id[-1], self.order_dir, tp, sl)
+
         if self.wait_entry_point == 0:
             self.formation_found = False
         else:
             self.wait_entry_point -= 1
             
+    def create_real_orders(self, order_dir, tp, sl):
+        pass
             
-    def get_trend(self, h):
-        self.trend_length = 0
-        body_tail = self.lines[0][1]
-        self.lines = [(), (h.index[-1], body_tail)] + self.lines
-        tmin = -self.trend_maxsize + h.Low[-self.trend_maxsize:].argmin()
-        tmax = -self.trend_maxsize + h.High[-self.trend_maxsize:].argmax()
-        if h.High[tmax] - body_tail > body_tail - h.Low[tmin]:
-            self.lines[0] = (h.index[tmax], h.High[tmax])
-            self.body_length += -tmax + 1
-        else:
-            self.lines[0] = (h.index[tmin], h.Low[tmin])    
-            self.body_length += -tmin + 1
+    def create_test_orders(self, time_id, order_dir, tp, sl):
+        self.orders = [Order(order_dir, Order.TYPE.MARKET, time_id, time_id)]
+        if tp:
+            self.orders.append(Order(tp, Order.TYPE.LIMIT, time_id, time_id))
+        if sl:
+            self.orders.append(Order(sl, Order.TYPE.LIMIT, time_id, time_id))
+        logger.debug(f"{time_id} send order {self.orders[0]}, " + 
+                        f"tp: {self.orders[1] if len(self.orders)>1 else 'NO'}, " +
+                        f"sl: {self.orders[2] if len(self.orders)>2 else 'NO'}")
             
-
+class ByBitExpert(ExpertFormation):
+    def __init__(self, cfg, session):
+        self.cfg = cfg
+        self.session = session
+        super(ByBitExpert, self).__init__(cfg)
+        
+    def create_real_orders(self, order_dir, tp, sl):
+        resp = self.session.place_order(
+            category="linear",
+            symbol="BTCUSDT",
+            side="Buy" if order_dir > 0 else "Sell",
+            orderType="Market",
+            qty="0.001",
+            timeInForce="GTC",
+            # orderLinkId="spot-test-postonly",
+            stopLoss="" if sl is None else str(abs(sl)),
+            takeProfit="" if tp is None else str(tp)
+            )
+        logger.debug(resp)
+        
 class ClsTrend(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
@@ -230,14 +245,15 @@ class ClsTriangleSimp(ExtensionBase):
 class ClsDummy(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
-        super(ClsDummy, self).__init__(cfg, name="sawtrend")
+        super(ClsDummy, self).__init__(cfg, name="dummy")
         
     def __call__(self, common, h) -> bool:
         if h.Low[-2] < h.Open[-1] < h.High[-2]:
             common.lprice = max(h.High[-2], h.Low[-2])
             common.sprice = min(h.High[-2], h.Low[-2])
-            common.lines = [[(h.Id[-2], common.lprice), (h.Id[-1], common.lprice)], [(h.Id[-2], common.sprice), (h.Id[-1], common.sprice)]]
-        return True
+            common.lines = [[(h.Id[-5], common.lprice), (h.Id[-1], common.lprice)], [(h.Id[-5], common.sprice), (h.Id[-1], common.sprice)]]
+            return True
+        return False
     
 
 class StopsFixed(ExtensionBase):
