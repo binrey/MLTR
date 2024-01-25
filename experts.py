@@ -193,8 +193,8 @@ class ClsTunnel(ExtensionBase):
     def __call__(self, common, h) -> bool:
         is_fig = False
         for i in range(8, h.Id.shape[0], 4):
-            line_above = h.Close[-i:].max()#np.percentile(h.High[-i:], 100-self.cfg.percentile)#
-            line_below = h.Close[-i:].min()#np.percentile(h.Low[-i:], self.cfg.percentile)#
+            line_above = h.High[-i:].max()#np.percentile(h.High[-i:], 100-self.cfg.percentile)#
+            line_below = h.Low[-i:].min()#np.percentile(h.Low[-i:], self.cfg.percentile)#
             middle_line = (line_above + line_below) / 2
             height = (line_above - line_below) / middle_line
             if h.Close[-1] < line_above and h.Close[-1] > line_below:
@@ -203,13 +203,14 @@ class ClsTunnel(ExtensionBase):
                     break
 
         if is_fig:
+            # common.lprice = line_above
+            # common.sprice = line_below 
+            common.sl = {1: h.Low[-i:].min(), -1:h.High[-i:].max()}   
+                     
             if middle_line > h.Close.mean():
                 common.lprice = line_below
-                common.cprice = line_below
             else:
                 common.sprice = line_above
-                common.cprice = line_above    
-                 
             common.lines = [[(h.Id[-i], line_above), (h.Id[-1], line_above)], [(h.Id[-i], line_below), (h.Id[-1], line_below)]]
 
         return is_fig
@@ -279,13 +280,10 @@ class StopsDynamic(ExtensionBase):
     def __call__(self, common, h):
         tp, sl = None, None
         if self.cfg.tp_active:
-            tp = -common.order_dir*(h.Open[-1] + common.order_dir*abs(common.lines[0][1]-common.lines[-1][1]))
+            tp = -common.order_dir*common.tp[common.order_dir]
         if self.cfg.sl_active:
-            if common.order_dir > 0:
-                sl = common.lines[1][0][1]
-            if common.order_dir < 0:
-                sl = common.lines[0][0][1]
-            sl *= -common.order_dir
+            sl_add = (common.sl[-1] - common.sl[1])
+            sl = -common.order_dir*(common.sl[common.order_dir] - common.order_dir*sl_add)
         return tp, sl
 
         
