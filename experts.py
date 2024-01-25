@@ -131,10 +131,10 @@ class ByBitExpert(ExpertFormation):
     def create_orders(self, time_id, order_dir, tp, sl):
         resp = self.session.place_order(
             category="linear",
-            symbol="BTCUSDT",
+            symbol=self.cfg.ticker,
             side="Buy" if order_dir > 0 else "Sell",
             orderType="Market",
-            qty="0.001",
+            qty="0.01",
             timeInForce="GTC",
             # orderLinkId="spot-test-postonly",
             stopLoss="" if sl is None else str(abs(sl)),
@@ -195,21 +195,23 @@ class ClsTunnel(ExtensionBase):
         for i in range(8, h.Id.shape[0], 4):
             line_above = h.Close[-i:].max()#np.percentile(h.High[-i:], 100-self.cfg.percentile)#
             line_below = h.Close[-i:].min()#np.percentile(h.Low[-i:], self.cfg.percentile)#
-            height = (line_above - line_below) / (line_above + line_below) * 2
+            middle_line = (line_above + line_below) / 2
+            height = (line_above - line_below) / middle_line
             if h.Close[-1] < line_above and h.Close[-1] > line_below:
                 if i/height > self.cfg.ncross*100:
                     is_fig = True
                     break
 
         if is_fig:
-            if (line_above + line_below)/2 > h.Close.mean():
+            if middle_line > h.Close.mean():
                 common.lprice = line_below
                 common.cprice = line_below
             else:
                 common.sprice = line_above
                 common.cprice = line_above    
                  
-            common.lines = [[(h.Id[-i], common.lprice), (h.Id[-1], common.lprice)] if common.lprice is not None else [(h.Id[-i], common.sprice), (h.Id[-1], common.sprice)]]
+            common.lines = [[(h.Id[-i], line_above), (h.Id[-1], line_above)], [(h.Id[-i], line_below), (h.Id[-1], line_below)]]
+
         return is_fig
 
 

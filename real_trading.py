@@ -64,13 +64,16 @@ if __name__ == "__main__":
             rmtree(save_path)
         save_path.mkdir()
     
-    get_rounded_time = lambda tmessage: int(int(tmessage["timeSecond"])/60)
+    get_rounded_time = lambda tmessage: int(int(tmessage["timeSecond"])/60/int(cfg.period[1:]))
     while True:
         t = t0 = get_rounded_time(session.get_server_time()["result"])
         while t == t0:
-            tmessage = session.get_server_time()["result"]
-            t = get_rounded_time(tmessage)
-            print(tmessage["timeSecond"], t0, t)
+            try:
+                tmessage = session.get_server_time()["result"]
+                t = get_rounded_time(tmessage)
+                print(tmessage["timeSecond"], t0, t)
+            except Exception as ex:
+                print(ex)
             sleep(1)
         
         message = session.get_kline(category="linear",
