@@ -285,7 +285,7 @@ class StopsDynamic(ExtensionBase):
         if self.cfg.tp_active:
             tp = -common.order_dir*common.tp[common.order_dir]
         if self.cfg.sl_active:
-            sl_add = (common.sl[-1] - common.sl[1])
+            sl_add = 0#(common.sl[-1] - common.sl[1])
             sl = -common.order_dir*(common.sl[common.order_dir] - common.order_dir*sl_add)
         return tp, sl
 
