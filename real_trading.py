@@ -49,6 +49,11 @@ if __name__ == "__main__":
     logger.remove()
     logger.add(sys.stderr, level="DEBUG")
     cfg = PyConfig().test()
+    cfg.ticker = sys.argv[1]
+    cfg.save_plots = True
+    cfg.period = "M5"
+    cfg.trailing_stop_rate = 0.01
+    cfg.lot = 0.01 if cfg.ticker == "ETHUSDT" else 0.001
     
 
     session = HTTP(
@@ -104,24 +109,29 @@ if __name__ == "__main__":
         if len(open_orders) == 0 and len(open_positions) == 0:
             texp = exp.update(h)
             if cfg.save_plots:
-                hist2plot = pd.DataFrame(h)
-                hist2plot.index = pd.to_datetime(hist2plot.Date)
-                lines2plot = deepcopy(exp.lines)
-                for line in lines2plot:
-                    for i, point in enumerate(line):
-                        y = point[1]
-                        try:
-                            y = y.item()
-                        except:
-                            pass
-                        line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)
-                        
-                fig = mpf.plot(hist2plot, 
-                    type='candle', 
-                    block=False,
-                    alines=dict(alines=lines2plot),
-                    savefig=save_path / f"fig-{str(t).split('.')[0]}.png")
-                del fig            
+                try:
+                    hist2plot = pd.DataFrame(h)
+                    hist2plot.index = pd.to_datetime(hist2plot.Date)
+                    lines2plot = deepcopy(exp.lines)
+                    for line in lines2plot:
+                        for i, point in enumerate(line):
+                            y = point[1]
+                            try:
+                                y = y.item()
+                            except:
+                                pass
+                            line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)
+                            
+                    fig = mpf.plot(hist2plot, 
+                        type='candle', 
+                        block=False,
+                        alines=dict(alines=lines2plot),
+                        savefig=save_path / f"fig-{str(t).split('.')[0]}.png")
+                    del fig        
+                except Exception as ex:
+                    print(ex)
+                    print(hist2plot.Id)  
+                    print(point[0])  
         else:
             exp.reset_state()
             

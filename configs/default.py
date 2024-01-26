@@ -55,6 +55,7 @@ moex_list = ["SBER", "ROSN", "LKOH", "GMKN", "GAZP"]
 forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
 
 config = EasyDict(
+    lot=Param(0.01, [0.01]),
     date_start=Param("2010-01-01", ["2010-01-01"]),
     date_end=Param("2024-01-01", ["2024-01-01"]),
     no_trading_days=Param(set(), [set()]),
@@ -66,9 +67,9 @@ config = EasyDict(
     hist_buffer_size=Param(64, [64]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("M15", ["M15"]),
+    period=Param("M5", ["M15"]),
     ticker=Param("BTCUSDT", ["BTCUSDT", "ETHUSDT"]),
     data_type=Param("metatrader", ["metatrader"]),
-    save_plots=Param(False, [False]),
+    save_plots=Param(True, [False]),
     run_model_device=Param(None, [None])
 )
