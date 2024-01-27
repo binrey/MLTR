@@ -128,18 +128,21 @@ class ByBitExpert(ExpertFormation):
         super(ByBitExpert, self).__init__(cfg)
         
     def create_orders(self, time_id, order_dir, tp, sl):
-        resp = self.session.place_order(
-            category="linear",
-            symbol=self.cfg.ticker,
-            side="Buy" if order_dir > 0 else "Sell",
-            orderType="Market",
-            qty="0.01",
-            timeInForce="GTC",
-            # orderLinkId="spot-test-postonly",
-            stopLoss="" if sl is None else str(abs(sl)),
-            takeProfit="" if tp is None else str(tp)
-            )
-        logger.debug(resp)
+        try:
+            resp = self.session.place_order(
+                category="linear",
+                symbol=self.cfg.ticker,
+                side="Buy" if order_dir > 0 else "Sell",
+                orderType="Market",
+                qty=str(self.cfg.lot),
+                timeInForce="GTC",
+                # orderLinkId="spot-test-postonly",
+                stopLoss="" if sl is None else str(abs(sl)),
+                takeProfit="" if tp is None else str(tp)
+                )
+            logger.debug(resp)
+        except Exception as ex:
+            print(ex)
         
         
 class ClsTrend(ExtensionBase):
@@ -285,7 +288,7 @@ class StopsDynamic(ExtensionBase):
         if self.cfg.tp_active:
             tp = -common.order_dir*common.tp[common.order_dir]
         if self.cfg.sl_active:
-            sl_add = (common.sl[-1] - common.sl[1])
+            sl_add = 0#(common.sl[-1] - common.sl[1])
             sl = -common.order_dir*(common.sl[common.order_dir] - common.order_dir*sl_add)
         return tp, sl
 
