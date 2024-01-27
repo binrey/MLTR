@@ -6,15 +6,16 @@ import yaml
 from easydict import EasyDict
 from loguru import logger
 
-from indicators import ZigZag, ZigZagOpt
+from indicators import ZigZag, ZigZag2, ZigZagOpt
 from utils import Order
 from dataloading import build_features
 import torch
+from pybit.unified_trading import HTTP
 
 
 class ExpertBase(ABC):
     def __init__(self):
-        self.lines = None
+        self.lines = []
         self.orders = []
             
     @abstractmethod
@@ -43,8 +44,8 @@ class ExpertFormation(ExpertBase):
         self.reset_state()
         
         if self.cfg.run_model_device is not None:
-            from ml import Net
-            self.model = Net(4, self.cfg.hist_buffer_size-2)
+            from ml import Net, Net2
+            self.model = Net2(4, 32)
             self.model.load_state_dict(torch.load("model.pth"))
             # self.model.set_threshold(0.6)
             self.model.eval()
@@ -66,17 +67,17 @@ class ExpertFormation(ExpertBase):
             else:
                 return
             
-        logger.debug(f"{h.Id[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, close: {h.Close[-2]}")
+        logger.debug(f"{h.Id[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, open: {h.Open[-1]}")
         
         self.order_dir = 0
         if self.lprice:
-            if h.Open[-1] > self.lprice:
+            if h.Open[-1] >= self.lprice:
                 self.order_dir = 1
             if self.cprice and h.Open[-1] < self.cprice:
                 self.reset_state()
                 return
         if self.sprice:
-            if h.Open[-1] < self.sprice:
+            if h.Open[-1] <= self.sprice:
                 self.order_dir = -1
             if self.cprice and h.Open[-1] > self.cprice:
                 self.reset_state()
@@ -95,57 +96,79 @@ class ExpertFormation(ExpertBase):
             y = [0.5, 1, 2, 4, 8][self.model.predict(x).item()]
             
         if self.order_dir != 0:
-            tp, sl = self.stops_processor(self, h, y)
-            self.orders = [Order(self.order_dir, Order.TYPE.MARKET, h.Id[-1], h.Id[-1])]
-            if tp:
-                self.orders.append(Order(tp, Order.TYPE.LIMIT, h.Id[-1], h.Id[-1]))
-            if sl:
-                self.orders.append(Order(sl, Order.TYPE.LIMIT, h.Id[-1], h.Id[-1]))
-            logger.debug(f"{h.Id[-1]} send order {self.orders[0]}, " + 
-                         f"tp: {self.orders[1] if len(self.orders)>1 else 'NO'}, " +
-                         f"sl: {self.orders[2] if len(self.orders)>2 else 'NO'}")
-        
+            tp, sl = self.stops_processor(self, h)
+            self.create_orders(h.Id[-1], self.order_dir, tp, sl)
+
         if self.wait_entry_point == 0:
             self.formation_found = False
         else:
             self.wait_entry_point -= 1
-            
-            
-    def get_trend(self, h):
-        self.trend_length = 0
-        body_tail = self.lines[0][1]
-        self.lines = [(), (h.index[-1], body_tail)] + self.lines
-        tmin = -self.trend_maxsize + h.Low[-self.trend_maxsize:].argmin()
-        tmax = -self.trend_maxsize + h.High[-self.trend_maxsize:].argmax()
-        if h.High[tmax] - body_tail > body_tail - h.Low[tmin]:
-            self.lines[0] = (h.index[tmax], h.High[tmax])
-            self.body_length += -tmax + 1
-        else:
-            self.lines[0] = (h.index[tmin], h.Low[tmin])    
-            self.body_length += -tmin + 1
-            
 
+            
+class BacktestExpert(ExpertFormation):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(BacktestExpert, self).__init__(cfg)
+        
+    def create_orders(self, time_id, order_dir, tp, sl):
+        self.orders = [Order(order_dir, Order.TYPE.MARKET, time_id, time_id)]
+        if tp:
+            self.orders.append(Order(tp, Order.TYPE.LIMIT, time_id, time_id))
+        if sl:
+            self.orders.append(Order(sl, Order.TYPE.LIMIT, time_id, time_id))
+        logger.debug(f"{time_id} send order {self.orders[0]}, " + 
+                        f"tp: {self.orders[1] if len(self.orders)>1 else 'NO'}, " +
+                        f"sl: {self.orders[2] if len(self.orders)>2 else 'NO'}")
+        
+            
+class ByBitExpert(ExpertFormation):
+    def __init__(self, cfg, session):
+        self.cfg = cfg
+        self.session = session
+        super(ByBitExpert, self).__init__(cfg)
+        
+    def create_orders(self, time_id, order_dir, tp, sl):
+        resp = self.session.place_order(
+            category="linear",
+            symbol=self.cfg.ticker,
+            side="Buy" if order_dir > 0 else "Sell",
+            orderType="Market",
+            qty="0.01",
+            timeInForce="GTC",
+            # orderLinkId="spot-test-postonly",
+            stopLoss="" if sl is None else str(abs(sl)),
+            takeProfit="" if tp is None else str(tp)
+            )
+        logger.debug(resp)
+        
+        
 class ClsTrend(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsTrend, self).__init__(cfg, name="trend")
-        # self.zigzag = ZigZagOpt(max_drop=0.0)
-        self.zigzag = ZigZag()
+        self.zigzag = ZigZagOpt(max_drop=self.cfg.maxdrop)
+        #self.zigzag = ZigZag2()
         
     def __call__(self, common, h) -> bool:
         ids, values, types = self.zigzag.update(h)
         is_fig = False
         if len(ids) >= self.cfg.npairs*2+1:
-            flag2, flag3 = False, False
+            flag = False
             if types[-2] > 0:
-                flag2 = values[-2] > values[-4] and values[-3] > values[-5]
+                flag = values[-2] > values[-4] and values[-3] > values[-5]
                 if self.cfg.npairs == 3:
-                    flag3 = values[-4] > values[-6] and values[-5] > values[-7]
+                    flag = flag and values[-4] > values[-6] and values[-5] > values[-7]
             if types[-2] < 0:
-                flag2 = values[-2] < values[-4] and values[-3] < values[-5]
+                flag = values[-2] < values[-4] and values[-3] < values[-5]
                 if self.cfg.npairs == 3:
-                    flag3 = values[-4] < values[-6] and values[-5] < values[-7]
-            if (self.cfg.npairs <= 2 and flag2) or (self.cfg.npairs == 3 and flag2 and flag3):
+                    flag = flag and values[-4] < values[-6] and values[-5] < values[-7]
+            # if flag:
+                # flag = flag and abs(values[-2] - values[-5])/abs(values[-3] - values[-4]) >= self.cfg.minspace
+                # for i in range(2, self.cfg.npairs*2):
+                #     flag = flag and ids[-i] - ids[-i-1] >= self.cfg.minspace
+                #     if not flag:
+                #         break
+            if flag:
                 is_fig = True
                 trend_type = types[-2]                        
     
@@ -153,11 +176,42 @@ class ClsTrend(ExtensionBase):
             # if trend_type<0:
             #     return False
             i = self.cfg.npairs*2 + 1
-            common.lines = [(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]
+            common.lines = [[(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]]
             # self.get_trend(h[:-self.body_length+2])
-            common.lprice = max(common.lines[-1][1], common.lines[-2][1]) if trend_type > 0 else None
-            common.sprice = min(common.lines[-1][1], common.lines[-2][1]) if trend_type < 0 else None
-            common.cprice = common.lines[-2][1]
+            common.lprice = max(common.lines[0][-1][1], common.lines[0][-2][1]) if trend_type > 0 else None
+            common.sprice = min(common.lines[0][-1][1], common.lines[0][-2][1]) if trend_type < 0 else None
+            common.cprice = common.lines[0][-2][1]
+        return is_fig
+
+
+class ClsTunnel(ExtensionBase):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(ClsTunnel, self).__init__(cfg, name="tunnel")
+        
+    def __call__(self, common, h) -> bool:
+        is_fig = False
+        for i in range(8, h.Id.shape[0], 4):
+            line_above = h.High[-i:].max()#np.percentile(h.High[-i:], 100-self.cfg.percentile)#
+            line_below = h.Low[-i:].min()#np.percentile(h.Low[-i:], self.cfg.percentile)#
+            middle_line = (line_above + line_below) / 2
+            height = (line_above - line_below) / middle_line
+            if h.Close[-1] < line_above and h.Close[-1] > line_below:
+                if i/height > self.cfg.ncross*100:
+                    is_fig = True
+                    break
+
+        if is_fig:
+            # common.lprice = line_above
+            # common.sprice = line_below 
+            common.sl = {1: h.Low[-i:].min(), -1:h.High[-i:].max()}   
+                     
+            if middle_line > h.Close.mean():
+                common.lprice = line_below
+            else:
+                common.sprice = line_above
+            common.lines = [[(h.Id[-i], line_above), (h.Id[-1], line_above)], [(h.Id[-i], line_below), (h.Id[-1], line_below)]]
+
         return is_fig
 
 
@@ -166,7 +220,7 @@ class ClsTriangleSimp(ExtensionBase):
         self.cfg = cfg
         super(ClsTriangleSimp, self).__init__(cfg, name="trngl_simp")
 #        self.zigzag = ZigZagOpt(max_drop=0.1)
-        self.zigzag = ZigZag()
+        self.zigzag = ZigZag2()
         
     def __call__(self, common, h) -> bool:
         ids, values, types = self.zigzag.update(h)        
@@ -186,60 +240,25 @@ class ClsTriangleSimp(ExtensionBase):
                     
         if is_fig:
             i = self.cfg.npairs*2 + 1
-            common.lines = [(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]
-            common.lprice = max(common.lines[-1][1], common.lines[-2][1])
-            common.sprice = min(common.lines[-1][1], common.lines[-2][1]) 
+            common.lines = [[(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]]
+            common.lprice = max(common.lines[0][-1][1], common.lines[0][-2][1])
+            common.sprice = min(common.lines[0][-1][1], common.lines[0][-2][1]) 
         return is_fig
 
 
-class ClsTriangleComp(ExtensionBase):
+class ClsDummy(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
-        super(ClsTriangleComp, self).__init__(cfg, name="trngl_comp")
-        self.zigzag = ZigZag()
+        super(ClsDummy, self).__init__(cfg, name="dummy")
         
     def __call__(self, common, h) -> bool:
-        ids, values, types = self.zigzag.update(h)
-        # ids, dates, values, types = zz_opt(h[-self.body_maxsize:])
-        is_fig = False
-        types_filt, vals_filt, ids_ = [], [], []
-        for i in range(2, len(ids)):
-            cur_type = types[-i]
-            cur_val = values[-i]
-            if len(types_filt) < 2:
-                types_filt.append(cur_type)
-                vals_filt.append(cur_val)
-                ids_.append(-i)
-            else:
-                if len(types_filt) == 2:
-                    valmax, valmin = max(vals_filt), min(vals_filt)
-                if types_filt[-1] == 1 and cur_type == -1:
-                    if cur_val <= valmin:
-                        valmin = cur_val
-                        types_filt.append(cur_type)
-                        vals_filt.append(cur_val)
-                        ids_.append(-i)
-                if types_filt[-1] == -1 and cur_type == 1:
-                    if cur_val >= valmax:
-                        valmax = cur_val
-                        types_filt.append(cur_type)
-                        vals_filt.append(cur_val)  
-                        ids_.append(-i)
-
-        if len(types_filt) >= self.cfg.npairs*2:
-            is_fig = True
-            logger.debug(f"Found figure p-types : {types_filt}") 
-            logger.debug(f"Found figure p-values: {vals_filt}") 
-                    
-        if is_fig:
-            i = self.cfg.npairs*2 + 1
-            common.lines = [(x, y) for x, y in zip([ids[j] for j in ids_[-i:][::-1]], [values[j] for j in ids_[-i:][::-1]])]
-            # common.lines = [(x, y) for x, y in zip(dates[-ids_[-1]:-1], values[-ids_[-1]:-1])]
-            common.lprice = max(common.lines[-1][1], common.lines[-2][1])
-            common.sprice = min(common.lines[-1][1], common.lines[-2][1]) 
-
-        return is_fig
-
+        if h.Low[-2] < h.Open[-1] < h.High[-2]:
+            common.lprice = max(h.High[-2], h.Low[-2])
+            common.sprice = min(h.High[-2], h.Low[-2])
+            common.lines = [[(h.Id[-5], common.lprice), (h.Id[-1], common.lprice)], [(h.Id[-5], common.sprice), (h.Id[-1], common.sprice)]]
+            return True
+        return False
+    
 
 class StopsFixed(ExtensionBase):
     def __init__(self, cfg):
@@ -264,13 +283,10 @@ class StopsDynamic(ExtensionBase):
     def __call__(self, common, h):
         tp, sl = None, None
         if self.cfg.tp_active:
-            tp = -common.order_dir*(h.Open[-1] + common.order_dir*abs(common.lines[0][1]-common.lines[-1][1]))
+            tp = -common.order_dir*common.tp[common.order_dir]
         if self.cfg.sl_active:
-            if common.order_dir > 0:
-                sl = min(common.lines[-2][1], common.lines[-3][1])
-            if common.order_dir < 0:
-                sl = max(common.lines[-2][1], common.lines[-3][1])
-            sl *= -common.order_dir
+            sl_add = (common.sl[-1] - common.sl[1])
+            sl = -common.order_dir*(common.sl[common.order_dir] - common.order_dir*sl_add)
         return tp, sl
 
         

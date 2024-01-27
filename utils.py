@@ -3,6 +3,10 @@ from loguru import logger
 from time import perf_counter
 
 
+def date2str(date):
+    return str(date).split('.')[0]
+
+
 class Order:
     class TYPE:
         MARKET = "market order"
@@ -30,7 +34,6 @@ class Order:
     
     @property
     def lines(self):
-        # return [(self.open_date, self.price), (self.close_date, self.price)]
         return self._change_hist
     
     def change(self, date, price):
@@ -56,7 +59,7 @@ class Position:
         self.close_price = None
         self.close_date = None
         self.profit = None
-        logger.debug(f"{date} open position {self.id}")
+        logger.debug(f"{date2str(date)} open position {self.id}")
     
     def __str__(self):
         return f"pos {self.dir} {self.id}"
@@ -78,7 +81,7 @@ class Position:
         self.close_date = date
         self.close_indx = indx
         self.profit = (self.close_price - self.open_price)*self.dir/self.open_price*100
-        logger.debug(f"{date} close position {self.id} at {self.close_price:.2f}, profit: {self.profit:.2f}")
+        logger.debug(f"{date2str(date)} close position {self.id} at {self.close_price:.2f}, profit: {self.profit:.2f}")
         return self.profit
     
     @property
@@ -92,6 +95,10 @@ class Broker:
         self.active_position = None
         self.positions = []
         self.orders = []
+        
+        self.best_profit = 0
+        self.correction = 0
+        self.add_profit = 0
     
     def close_orders(self, close_date, i=None):
         if i is not None:
@@ -114,17 +121,17 @@ class Broker:
             triggered_price = None
             triggered_date = None
             if order.type == Order.TYPE.MARKET and order.open_indx == h.Id[-1]:
-                logger.debug(f"{date} process order {order.id} (O:{h.Open[-1]})")
+                logger.debug(f"{date2str(date)} process order {order.id} (O:{h.Open[-1]})")
                 triggered_price = h.Open[-1]*order.dir
                 triggered_date, triggered_id = date, h.Id[-1]
                 order.change(h.Id[-1], h.Open[-1])
             if order.type == Order.TYPE.LIMIT and order.open_indx != h.Id[-1]:
                 if (h.Low[-2] > order.price and h.Open[-1] < order.price) or (h.High[-2] < order.price and h.Open[-1] > order.price):
-                    logger.debug(f"{date} process order {order.id}, and change price to O:{h.Open[-1]}")    
+                    logger.debug(f"{date2str(date)} process order {order.id}, and change price to O:{h.Open[-1]}")    
                     triggered_price = h.Open[-1]*order.dir 
                     triggered_date, triggered_id = date, h.Id[-1]                      
                 elif h.High[-2] >= order.price and h.Low[-2] <= order.price:
-                    logger.debug(f"{date} process order {order.id} (L:{h.Low[-2]} <= {order.price:.2f} <= H:{h.High[-2]})")
+                    logger.debug(f"{date2str(date)} process order {order.id} (L:{h.Low[-2]} <= {order.price:.2f} <= H:{h.High[-2]})")
                     triggered_price = order.price*order.dir
                     triggered_date, triggered_id = h.Date[-2], h.Id[-2]
                     
@@ -154,8 +161,39 @@ class Broker:
             return
         for order in self.active_orders:
             if date == order.open_date:
+                self.best_profit = 0
+                self.correction = 0
+                self.max_correction = 0
+                self.add_profit = 0
+                self.t = 0
                 continue
+            # self.t += 1
             if position.dir == 1 and order.dir == -1 and p > order.price:
-                order.change(date, order.price + self.cfg.trailing_stop_rate*(h.Low[-self.cfg.trailing_stop_type] - order.price))
+                # prof = max(p - position.open_price, 0)
+                # if prof > self.best_profit:
+                #     self.best_profit = prof
+                #     self.add_profit += self.max_correction
+                #     self.correction = 0
+                #     self.max_correction = 0
+                # else:
+                #     self.correction = self.best_profit - prof
+                #     if self.correction > self.max_correction:
+                #         self.max_correction = self.correction
+                
+                order.change(date, order.price + self.cfg.trailing_stop_rate*(1+self.t/10)*(h.Low[-self.cfg.trailing_stop_type] + self.add_profit - order.price))
             if position.dir == -1 and order.dir == 1 and p < order.price:
-                order.change(date, order.price - self.cfg.trailing_stop_rate*(order.price - h.High[-self.cfg.trailing_stop_type]))
+                # prof = max(position.open_price - p, 0)
+                # if prof > self.best_profit:
+                #     self.best_profit = prof
+                #     self.add_profit += self.max_correction
+                #     self.correction = 0
+                #     self.max_correction = 0
+                # else:
+                #     self.correction = self.best_profit - prof
+                #     if self.correction > self.max_correction:
+                #         self.max_correction = self.correction                
+                order.change(date, order.price - self.cfg.trailing_stop_rate*(1+self.t/10)*(order.price - h.High[-self.cfg.trailing_stop_type] + self.add_profit))
+            # prof = position.dir*(p - position.open_price)
+            # if prof > self.best_profit:
+            #     order.change(date, order.price + position.dir*(prof - self.best_profit))
+            #     self.best_profit = prof
