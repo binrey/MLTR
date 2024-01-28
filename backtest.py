@@ -4,6 +4,7 @@ from time import perf_counter
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import pandas as pd
+import numpy as np
 # import yfinance as yf
 from loguru import logger
 from tqdm import tqdm
@@ -14,6 +15,61 @@ from utils import Broker
 
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen
+
+class BackTestResults:
+    def __init__(self, backtest_broker, date_start, date_end):
+        self.profits = backtest_broker.profits
+        self.balance = self.profits.cumsum()
+        self.dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
+        self.final_profit = self.profits[-1]
+        self.profit_per_day = self.convert_hist(self.profits, self.dates, date_start, date_end)
+        self.profit_stair, self.metrics = self.calc_metrics(self.profit_per_day)
+
+    @staticmethod
+    def calc_metrics(ts):
+        ymax = ts[0]
+        twait = 0
+        twaits = []
+        h = []
+        for y in ts:
+            if y >= ymax:
+                ymax = y
+                if twait>0:
+                    #print(t, twait ,ymax)
+                    twaits.append(twait)
+                    twait = 0
+            else:
+                twait += 1
+            h.append(ymax)
+        max_loss = (np.array(h) - ts).max()
+        twaits = np.array(twaits) if len(twaits) else np.array([len(ts)])
+        twaits.sort()
+        lin_err = sum(ts - np.arange(0, ts[-1], ts[-1]/len(ts)))
+        lin_err /= len(ts)*ts[-1]
+        metrics = {"waits_top3_mean": twaits[-3:].mean(), 
+                   "lin_err": 1 - lin_err, 
+                   "loss_max": max_loss}
+        return h, metrics
+
+    @staticmethod
+    def convert_hist(profits, dates, t0, t1):
+        dates2load = pd.date_range(start="/".join([t0.split("-")[i] for i in [1, 2, 0]]), 
+                                   end="/".join([t1.split("-")[i] for i in [1, 2, 0]]), 
+                                   freq="D")
+        target_dates = [pd.to_datetime(d).date() for d in dates2load]
+        profit = profits.cumsum()
+        balance = [0]
+        unbias=False
+        for d in target_dates:
+            # Select balance records with same day
+            day_profs = [balance[-1]] + [b for b, sd in zip(profit, dates) if sd == d]
+            # If there are records for currend day, store latest of them, else fill days with no records with latest sored record
+            balance.append(day_profs[-1])
+        res = np.array(balance)
+        if unbias:
+            res = res - profit[0]
+        return res
+
 
 def backtest(cfg):
     exp = BacktestExpert(cfg)
@@ -65,7 +121,7 @@ def backtest(cfg):
             exp.reset_state()
     
     ttotal = perf_counter() - t0
-    
+    backtest_results = BackTestResults(broker, cfg.date_start, cfg.date_end)
     sformat = "{:>30}: {:>3.0f} %"
     logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}")
     logger.info("{:>30}: {:.1f} sec".format("total backtest", ttotal))
@@ -75,9 +131,9 @@ def backtest(cfg):
     logger.info("-"*30)
     logger.info(sformat.format("FINAL PROFIT", broker.profits.sum()) + f" ({len(broker.positions)} deals)") 
     
-    import pickle
-    pickle.dump((cfg, broker), open(str(Path("backtests") / f"btest{0:003.0f}.pickle"), "wb"))
-    return broker
+    # import pickle
+    # pickle.dump((cfg, broker), open(str(Path("backtests") / f"btest{0:003.0f}.pickle"), "wb"))
+    return backtest_results
     
     
 if __name__ == "__main__":
@@ -85,8 +141,8 @@ if __name__ == "__main__":
     logger.remove()
     logger.add(sys.stderr, level="INFO")
     cfg = PyConfig().test()
-    brok_results = backtest(cfg)
+    btest_results = backtest(cfg)
     plt.subplots(figsize=(15, 8))
-    plt.plot([pos.close_date for pos in brok_results.positions], brok_results.profits.cumsum(), linewidth=2, alpha=0.6)
+    plt.plot(btest_results.dates, btest_results.balance, linewidth=2, alpha=0.6)
     plt.tight_layout()
     plt.savefig("backtest.png")

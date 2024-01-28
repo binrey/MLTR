@@ -195,8 +195,8 @@ class ClsTunnel(ExtensionBase):
     def __call__(self, common, h) -> bool:
         is_fig = False
         for i in range(8, h.Id.shape[0], 4):
-            line_above = h.High[-i:].max()#np.percentile(h.High[-i:], 100-self.cfg.percentile)#
-            line_below = h.Low[-i:].min()#np.percentile(h.Low[-i:], self.cfg.percentile)#
+            line_above = h.High[-i:].mean()#np.percentile(h.High[-i:], 100-self.cfg.percentile)#
+            line_below = h.Low[-i:].mean()#np.percentile(h.Low[-i:], self.cfg.percentile)#
             middle_line = (line_above + line_below) / 2
             height = (line_above - line_below) / middle_line
             if h.Close[-1] < line_above and h.Close[-1] > line_below:
@@ -214,6 +214,42 @@ class ClsTunnel(ExtensionBase):
             else:
                 common.sprice = line_above
             common.lines = [[(h.Id[-i], line_above), (h.Id[-1], line_above)], [(h.Id[-i], line_below), (h.Id[-1], line_below)]]
+
+        return is_fig
+
+
+class ClsTunnel1(ExtensionBase):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(ClsTunnel1, self).__init__(cfg, name="tunnel")
+        
+    def __call__(self, common, h) -> bool:
+        is_fig = False
+        for i in range(8, h.Id.shape[0], 4):
+            line_above = h.High[-i:].mean()#np.percentile(h.High[-i:], 100-self.cfg.percentile)#
+            line_below = h.Low[-i:].mean()#np.percentile(h.Low[-i:], self.cfg.percentile)#
+            middle_line = h.Close[-i:].mean()
+            n = 0
+            for j in range(i):
+                if h.High[-j] > middle_line and h.Low[-j] < middle_line:
+                    n += 1
+            if h.Close[-1] < line_above and h.Close[-1] > line_below:
+                if n > self.cfg.ncross:
+                    is_fig = True
+                    break
+
+        if is_fig:
+            common.lprice = line_above
+            common.sprice = line_below 
+            common.sl = {1: h.Low[-i:].min(), -1:h.High[-i:].max()}   
+                     
+            # if middle_line > h.Close.mean():
+            #     common.lprice = line_below
+            # else:
+            #     common.sprice = line_above
+            common.lines = [[(h.Id[-i], line_above), (h.Id[-1], line_above)], 
+                            [(h.Id[-i], line_below), (h.Id[-1], line_below)],
+                            [(h.Id[-i], middle_line), (h.Id[-1], middle_line)]]
 
         return is_fig
 
