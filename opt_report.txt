@@ -1,0 +1,247 @@
+2024-01-29 17:39:20.222 | INFO     | __main__:pool_handler:37 - Number of cpu : 20
+2024-01-29 17:39:20.222 | INFO     | __main__:pool_handler:41 - optimization steps number: 24
+2024-01-29 17:39:21.245 | INFO     | backtest:backtest:128 - BTCUSDT-H1: tunnel:4, sl=stops_dyn:False-True, sl-rate=0.002
+2024-01-29 17:39:21.245 | INFO     | backtest:backtest:129 -                 total backtest: 0.8 sec
+2024-01-29 17:39:21.245 | INFO     | backtest:backtest:130 -                 expert updates:  17 %
+2024-01-29 17:39:21.245 | INFO     | backtest:backtest:131 -                 broker updates:  26 %
+2024-01-29 17:39:21.245 | INFO     | backtest:backtest:132 -                  data loadings:  52 %
+2024-01-29 17:39:21.245 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.246 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 715 % (229 deals)
+2024-01-29 17:39:21.246 | INFO     | backtest:backtest:135 -                      LINEARITY:  89 %
+
+2024-01-29 17:39:21.330 | INFO     | backtest:backtest:128 - BTCUSDT-H1: tunnel:8, sl=stops_dyn:False-True, sl-rate=0.002
+2024-01-29 17:39:21.330 | INFO     | backtest:backtest:129 -                 total backtest: 0.8 sec
+2024-01-29 17:39:21.330 | INFO     | backtest:backtest:130 -                 expert updates:  20 %
+2024-01-29 17:39:21.330 | INFO     | backtest:backtest:131 -                 broker updates:  24 %
+2024-01-29 17:39:21.330 | INFO     | backtest:backtest:132 -                  data loadings:  51 %
+2024-01-29 17:39:21.331 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.331 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 738 % (240 deals)
+2024-01-29 17:39:21.331 | INFO     | backtest:backtest:135 -                      LINEARITY:  90 %
+
+2024-01-29 17:39:21.477 | INFO     | backtest:backtest:128 - ETHUSDT-H1: tunnel:8, sl=stops_dyn:False-True, sl-rate=0.002
+2024-01-29 17:39:21.477 | INFO     | backtest:backtest:129 -                 total backtest: 1.0 sec
+2024-01-29 17:39:21.477 | INFO     | backtest:backtest:130 -                 expert updates:  23 %
+2024-01-29 17:39:21.478 | INFO     | backtest:backtest:131 -                 broker updates:  21 %
+2024-01-29 17:39:21.478 | INFO     | backtest:backtest:132 -                  data loadings:  50 %
+2024-01-29 17:39:21.478 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.478 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 531 % (264 deals)
+2024-01-29 17:39:21.478 | INFO     | backtest:backtest:135 -                      LINEARITY:  88 %
+
+2024-01-29 17:39:21.515 | INFO     | backtest:backtest:128 - BTCUSDT-H1: tunnel:8, sl=stops_dyn:False-True, sl-rate=0.004
+2024-01-29 17:39:21.515 | INFO     | backtest:backtest:129 -                 total backtest: 1.0 sec
+2024-01-29 17:39:21.515 | INFO     | backtest:backtest:130 -                 expert updates:  28 %
+2024-01-29 17:39:21.515 | INFO     | backtest:backtest:131 -                 broker updates:  21 %
+2024-01-29 17:39:21.515 | INFO     | backtest:backtest:132 -                  data loadings:  47 %
+2024-01-29 17:39:21.515 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.515 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 722 % (406 deals)
+2024-01-29 17:39:21.515 | INFO     | backtest:backtest:135 -                      LINEARITY:  86 %
+
+2024-01-29 17:39:21.522 | INFO     | backtest:backtest:128 - ETHUSDT-H1: tunnel:4, sl=stops_dyn:False-True, sl-rate=0.002
+2024-01-29 17:39:21.522 | INFO     | backtest:backtest:129 -                 total backtest: 1.0 sec
+2024-01-29 17:39:21.522 | INFO     | backtest:backtest:130 -                 expert updates:  17 %
+2024-01-29 17:39:21.522 | INFO     | backtest:backtest:131 -                 broker updates:  24 %
+2024-01-29 17:39:21.522 | INFO     | backtest:backtest:132 -                  data loadings:  53 %
+2024-01-29 17:39:21.522 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.522 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 483 % (284 deals)
+2024-01-29 17:39:21.522 | INFO     | backtest:backtest:135 -                      LINEARITY:  86 %
+
+2024-01-29 17:39:21.576 | INFO     | backtest:backtest:128 - BTCUSDT-H1: tunnel:16, sl=stops_dyn:False-True, sl-rate=0.002
+2024-01-29 17:39:21.576 | INFO     | backtest:backtest:129 -                 total backtest: 1.1 sec
+2024-01-29 17:39:21.576 | INFO     | backtest:backtest:130 -                 expert updates:  37 %
+2024-01-29 17:39:21.576 | INFO     | backtest:backtest:131 -                 broker updates:  19 %
+2024-01-29 17:39:21.576 | INFO     | backtest:backtest:132 -                  data loadings:  40 %
+2024-01-29 17:39:21.576 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.577 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 637 % (280 deals)
+2024-01-29 17:39:21.577 | INFO     | backtest:backtest:135 -                      LINEARITY:  87 %
+
+2024-01-29 17:39:21.620 | INFO     | backtest:backtest:128 - ETHUSDT-H1: tunnel:4, sl=stops_dyn:False-True, sl-rate=0.006
+2024-01-29 17:39:21.620 | INFO     | backtest:backtest:129 -                 total backtest: 1.1 sec
+2024-01-29 17:39:21.620 | INFO     | backtest:backtest:130 -                 expert updates:  29 %
+2024-01-29 17:39:21.620 | INFO     | backtest:backtest:131 -                 broker updates:  21 %
+2024-01-29 17:39:21.620 | INFO     | backtest:backtest:132 -                  data loadings:  44 %
+2024-01-29 17:39:21.620 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.620 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 697 % (589 deals)
+2024-01-29 17:39:21.621 | INFO     | backtest:backtest:135 -                      LINEARITY:  87 %
+
+2024-01-29 17:39:21.629 | INFO     | backtest:backtest:128 - BTCUSDT-H1: tunnel:8, sl=stops_dyn:False-True, sl-rate=0.006
+2024-01-29 17:39:21.629 | INFO     | backtest:backtest:129 -                 total backtest: 1.1 sec
+2024-01-29 17:39:21.629 | INFO     | backtest:backtest:130 -                 expert updates:  34 %
+2024-01-29 17:39:21.629 | INFO     | backtest:backtest:131 -                 broker updates:  20 %
+2024-01-29 17:39:21.629 | INFO     | backtest:backtest:132 -                  data loadings:  42 %
+2024-01-29 17:39:21.629 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.629 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 677 % (539 deals)
+2024-01-29 17:39:21.630 | INFO     | backtest:backtest:135 -                      LINEARITY:  92 %
+
+2024-01-29 17:39:21.630 | INFO     | backtest:backtest:128 - BTCUSDT-H1: tunnel:4, sl=stops_dyn:False-True, sl-rate=0.008
+2024-01-29 17:39:21.630 | INFO     | backtest:backtest:129 -                 total backtest: 1.1 sec
+2024-01-29 17:39:21.630 | INFO     | backtest:backtest:130 -                 expert updates:  31 %
+2024-01-29 17:39:21.630 | INFO     | backtest:backtest:131 -                 broker updates:  20 %
+2024-01-29 17:39:21.630 | INFO     | backtest:backtest:132 -                  data loadings:  44 %
+2024-01-29 17:39:21.630 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.631 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 507 % (688 deals)
+2024-01-29 17:39:21.631 | INFO     | backtest:backtest:135 -                      LINEARITY:  90 %
+
+2024-01-29 17:39:21.666 | INFO     | backtest:backtest:128 - BTCUSDT-H1: tunnel:4, sl=stops_dyn:False-True, sl-rate=0.004
+2024-01-29 17:39:21.667 | INFO     | backtest:backtest:129 -                 total backtest: 1.2 sec
+2024-01-29 17:39:21.667 | INFO     | backtest:backtest:130 -                 expert updates:  22 %
+2024-01-29 17:39:21.667 | INFO     | backtest:backtest:131 -                 broker updates:  23 %
+2024-01-29 17:39:21.667 | INFO     | backtest:backtest:132 -                  data loadings:  50 %
+2024-01-29 17:39:21.667 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.667 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 747 % (356 deals)
+2024-01-29 17:39:21.667 | INFO     | backtest:backtest:135 -                      LINEARITY:  86 %
+
+2024-01-29 17:39:21.695 | INFO     | backtest:backtest:128 - ETHUSDT-H1: tunnel:8, sl=stops_dyn:False-True, sl-rate=0.006
+2024-01-29 17:39:21.696 | INFO     | backtest:backtest:129 -                 total backtest: 1.1 sec
+2024-01-29 17:39:21.696 | INFO     | backtest:backtest:130 -                 expert updates:  40 %
+2024-01-29 17:39:21.696 | INFO     | backtest:backtest:131 -                 broker updates:  18 %
+2024-01-29 17:39:21.696 | INFO     | backtest:backtest:132 -                  data loadings:  38 %
+2024-01-29 17:39:21.696 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.696 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 634 % (610 deals)
+2024-01-29 17:39:21.696 | INFO     | backtest:backtest:135 -                      LINEARITY:  82 %
+
+2024-01-29 17:39:21.698 | INFO     | backtest:backtest:128 - ETHUSDT-H1: tunnel:4, sl=stops_dyn:False-True, sl-rate=0.008
+2024-01-29 17:39:21.699 | INFO     | backtest:backtest:129 -                 total backtest: 1.1 sec
+2024-01-29 17:39:21.699 | INFO     | backtest:backtest:130 -                 expert updates:  32 %
+2024-01-29 17:39:21.699 | INFO     | backtest:backtest:131 -                 broker updates:  23 %
+2024-01-29 17:39:21.699 | INFO     | backtest:backtest:132 -                  data loadings:  42 %
+2024-01-29 17:39:21.699 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.699 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 641 % (708 deals)
+2024-01-29 17:39:21.699 | INFO     | backtest:backtest:135 -                      LINEARITY:  88 %
+
+2024-01-29 17:39:21.706 | INFO     | backtest:backtest:128 - ETHUSDT-H1: tunnel:16, sl=stops_dyn:False-True, sl-rate=0.002
+2024-01-29 17:39:21.706 | INFO     | backtest:backtest:129 -                 total backtest: 1.2 sec
+2024-01-29 17:39:21.706 | INFO     | backtest:backtest:130 -                 expert updates:  44 %
+2024-01-29 17:39:21.706 | INFO     | backtest:backtest:131 -                 broker updates:  18 %
+2024-01-29 17:39:21.706 | INFO     | backtest:backtest:132 -                  data loadings:  34 %
+2024-01-29 17:39:21.706 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.706 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 555 % (235 deals)
+2024-01-29 17:39:21.706 | INFO     | backtest:backtest:135 -                      LINEARITY:  90 %
+
+2024-01-29 17:39:21.765 | INFO     | backtest:backtest:128 - ETHUSDT-H1: tunnel:4, sl=stops_dyn:False-True, sl-rate=0.004
+2024-01-29 17:39:21.765 | INFO     | backtest:backtest:129 -                 total backtest: 1.3 sec
+2024-01-29 17:39:21.765 | INFO     | backtest:backtest:130 -                 expert updates:  31 %
+2024-01-29 17:39:21.765 | INFO     | backtest:backtest:131 -                 broker updates:  25 %
+2024-01-29 17:39:21.765 | INFO     | backtest:backtest:132 -                  data loadings:  39 %
+2024-01-29 17:39:21.765 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.765 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 631 % (425 deals)
+2024-01-29 17:39:21.765 | INFO     | backtest:backtest:135 -                      LINEARITY:  90 %
+
+2024-01-29 17:39:21.781 | INFO     | backtest:backtest:128 - BTCUSDT-H1: tunnel:16, sl=stops_dyn:False-True, sl-rate=0.006
+2024-01-29 17:39:21.781 | INFO     | backtest:backtest:129 -                 total backtest: 1.3 sec
+2024-01-29 17:39:21.782 | INFO     | backtest:backtest:130 -                 expert updates:  52 %
+2024-01-29 17:39:21.782 | INFO     | backtest:backtest:131 -                 broker updates:  14 %
+2024-01-29 17:39:21.782 | INFO     | backtest:backtest:132 -                  data loadings:  30 %
+2024-01-29 17:39:21.782 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.782 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 633 % (534 deals)
+2024-01-29 17:39:21.782 | INFO     | backtest:backtest:135 -                      LINEARITY:  91 %
+
+2024-01-29 17:39:21.785 | INFO     | backtest:backtest:128 - BTCUSDT-H1: tunnel:4, sl=stops_dyn:False-True, sl-rate=0.006
+2024-01-29 17:39:21.785 | INFO     | backtest:backtest:129 -                 total backtest: 1.3 sec
+2024-01-29 17:39:21.785 | INFO     | backtest:backtest:130 -                 expert updates:  36 %
+2024-01-29 17:39:21.785 | INFO     | backtest:backtest:131 -                 broker updates:  23 %
+2024-01-29 17:39:21.785 | INFO     | backtest:backtest:132 -                  data loadings:  35 %
+2024-01-29 17:39:21.785 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.785 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 653 % (521 deals)
+2024-01-29 17:39:21.785 | INFO     | backtest:backtest:135 -                      LINEARITY:  92 %
+
+2024-01-29 17:39:21.840 | INFO     | backtest:backtest:128 - ETHUSDT-H1: tunnel:16, sl=stops_dyn:False-True, sl-rate=0.004
+2024-01-29 17:39:21.840 | INFO     | backtest:backtest:129 -                 total backtest: 1.3 sec
+2024-01-29 17:39:21.840 | INFO     | backtest:backtest:130 -                 expert updates:  54 %
+2024-01-29 17:39:21.840 | INFO     | backtest:backtest:131 -                 broker updates:  14 %
+2024-01-29 17:39:21.841 | INFO     | backtest:backtest:132 -                  data loadings:  29 %
+2024-01-29 17:39:21.841 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.841 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 634 % (387 deals)
+2024-01-29 17:39:21.841 | INFO     | backtest:backtest:135 -                      LINEARITY:  92 %
+
+2024-01-29 17:39:21.963 | INFO     | backtest:backtest:128 - ETHUSDT-H1: tunnel:8, sl=stops_dyn:False-True, sl-rate=0.004
+2024-01-29 17:39:21.963 | INFO     | backtest:backtest:129 -                 total backtest: 1.5 sec
+2024-01-29 17:39:21.963 | INFO     | backtest:backtest:130 -                 expert updates:  46 %
+2024-01-29 17:39:21.963 | INFO     | backtest:backtest:131 -                 broker updates:  19 %
+2024-01-29 17:39:21.963 | INFO     | backtest:backtest:132 -                  data loadings:  31 %
+2024-01-29 17:39:21.963 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.964 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 588 % (426 deals)
+2024-01-29 17:39:21.964 | INFO     | backtest:backtest:135 -                      LINEARITY:  92 %
+
+2024-01-29 17:39:21.982 | INFO     | backtest:backtest:128 - ETHUSDT-H1: tunnel:16, sl=stops_dyn:False-True, sl-rate=0.006
+2024-01-29 17:39:21.982 | INFO     | backtest:backtest:129 -                 total backtest: 1.5 sec
+2024-01-29 17:39:21.982 | INFO     | backtest:backtest:130 -                 expert updates:  60 %
+2024-01-29 17:39:21.982 | INFO     | backtest:backtest:131 -                 broker updates:  12 %
+2024-01-29 17:39:21.982 | INFO     | backtest:backtest:132 -                  data loadings:  25 %
+2024-01-29 17:39:21.982 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.982 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 662 % (529 deals)
+2024-01-29 17:39:21.983 | INFO     | backtest:backtest:135 -                      LINEARITY:  85 %
+
+2024-01-29 17:39:21.983 | INFO     | backtest:backtest:128 - BTCUSDT-H1: tunnel:16, sl=stops_dyn:False-True, sl-rate=0.004
+2024-01-29 17:39:21.983 | INFO     | backtest:backtest:129 -                 total backtest: 1.5 sec
+2024-01-29 17:39:21.983 | INFO     | backtest:backtest:130 -                 expert updates:  56 %
+2024-01-29 17:39:21.983 | INFO     | backtest:backtest:131 -                 broker updates:  16 %
+2024-01-29 17:39:21.983 | INFO     | backtest:backtest:132 -                  data loadings:  25 %
+2024-01-29 17:39:21.983 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:21.983 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 682 % (386 deals)
+2024-01-29 17:39:21.983 | INFO     | backtest:backtest:135 -                      LINEARITY:  87 %
+
+2024-01-29 17:39:22.134 | INFO     | backtest:backtest:128 - BTCUSDT-H1: tunnel:8, sl=stops_dyn:False-True, sl-rate=0.008
+2024-01-29 17:39:22.134 | INFO     | backtest:backtest:129 -                 total backtest: 0.7 sec
+2024-01-29 17:39:22.134 | INFO     | backtest:backtest:130 -                 expert updates:  46 %
+2024-01-29 17:39:22.134 | INFO     | backtest:backtest:131 -                 broker updates:  21 %
+2024-01-29 17:39:22.135 | INFO     | backtest:backtest:132 -                  data loadings:  29 %
+2024-01-29 17:39:22.135 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:22.135 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 479 % (726 deals)
+2024-01-29 17:39:22.135 | INFO     | backtest:backtest:135 -                      LINEARITY:  93 %
+
+2024-01-29 17:39:22.190 | INFO     | backtest:backtest:128 - ETHUSDT-H1: tunnel:8, sl=stops_dyn:False-True, sl-rate=0.008
+2024-01-29 17:39:22.191 | INFO     | backtest:backtest:129 -                 total backtest: 0.7 sec
+2024-01-29 17:39:22.191 | INFO     | backtest:backtest:130 -                 expert updates:  49 %
+2024-01-29 17:39:22.191 | INFO     | backtest:backtest:131 -                 broker updates:  19 %
+2024-01-29 17:39:22.191 | INFO     | backtest:backtest:132 -                  data loadings:  28 %
+2024-01-29 17:39:22.191 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:22.191 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 617 % (717 deals)
+2024-01-29 17:39:22.191 | INFO     | backtest:backtest:135 -                      LINEARITY:  84 %
+
+2024-01-29 17:39:22.421 | INFO     | backtest:backtest:128 - BTCUSDT-H1: tunnel:16, sl=stops_dyn:False-True, sl-rate=0.008
+2024-01-29 17:39:22.421 | INFO     | backtest:backtest:129 -                 total backtest: 0.8 sec
+2024-01-29 17:39:22.421 | INFO     | backtest:backtest:130 -                 expert updates:  62 %
+2024-01-29 17:39:22.422 | INFO     | backtest:backtest:131 -                 broker updates:  14 %
+2024-01-29 17:39:22.422 | INFO     | backtest:backtest:132 -                  data loadings:  21 %
+2024-01-29 17:39:22.422 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:22.422 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 479 % (675 deals)
+2024-01-29 17:39:22.422 | INFO     | backtest:backtest:135 -                      LINEARITY:  90 %
+
+2024-01-29 17:39:22.585 | INFO     | backtest:backtest:128 - ETHUSDT-H1: tunnel:16, sl=stops_dyn:False-True, sl-rate=0.008
+2024-01-29 17:39:22.585 | INFO     | backtest:backtest:129 -                 total backtest: 0.9 sec
+2024-01-29 17:39:22.585 | INFO     | backtest:backtest:130 -                 expert updates:  67 %
+2024-01-29 17:39:22.585 | INFO     | backtest:backtest:131 -                 broker updates:  11 %
+2024-01-29 17:39:22.586 | INFO     | backtest:backtest:132 -                  data loadings:  18 %
+2024-01-29 17:39:22.586 | INFO     | backtest:backtest:133 - ------------------------------
+2024-01-29 17:39:22.587 | INFO     | backtest:backtest:134 -                   FINAL PROFIT: 564 % (637 deals)
+2024-01-29 17:39:22.587 | INFO     | backtest:backtest:135 -                      LINEARITY:  82 %
+
+2024-01-29 17:39:22.619 | INFO     | __main__:optimize:52 - optimization time: 2.4 sec
+
+2024-01-29 17:39:22.628 | INFO     | __main__:optimize:83 - 
+    trailing_stop_rate body_classifier   ticker  final_balance  ndeals
+13               0.006        tunnel:4  ETHUSDT     696.893842     589
+17               0.006       tunnel:16  ETHUSDT     662.033480     529
+19               0.008        tunnel:4  ETHUSDT     641.280773     708
+
+2024-01-29 17:39:22.631 | INFO     | __main__:optimize:83 - 
+   trailing_stop_rate body_classifier   ticker  final_balance  ndeals
+6               0.004        tunnel:4  BTCUSDT     747.021033     356
+2               0.002        tunnel:8  BTCUSDT     737.871432     240
+8               0.004        tunnel:8  BTCUSDT     722.265449     406
+
+2024-01-29 17:39:22.640 | INFO     | __main__:optimize:120 - 
+                            ticker  final_balance  ndeals test_ids  linearity     maxwait
+param_set                                                                                
+0.004 tunnel:16   .BTCUSDT.ETHUSDT     657.626687     386   .10.11   0.901215  156.333333
+0.004 tunnel:8    .BTCUSDT.ETHUSDT     655.005803     416     .8.9   0.895259  158.333333
+0.002 tunnel:16   .BTCUSDT.ETHUSDT     595.732409     257     .4.5   0.910887  163.333333
+0.002 tunnel:8    .BTCUSDT.ETHUSDT     634.187628     252     .2.3   0.917019  169.666667
+0.004 tunnel:4    .BTCUSDT.ETHUSDT     688.917796     390     .6.7   0.892424  180.666667
+0.002 tunnel:4    .BTCUSDT.ETHUSDT     598.970226     256     .0.1   0.905483  190.000000
+0.006 tunnel:4    .ETHUSDT.BTCUSDT     675.189240     555   .13.12   0.896214  190.000000
+0.006 tunnel:16   .ETHUSDT.BTCUSDT     647.650976     531   .17.16   0.878680  197.666667
+0.008 tunnel:4    .ETHUSDT.BTCUSDT     574.042962     698   .19.18   0.892844  209.333333
+0.008 tunnel:8    .ETHUSDT.BTCUSDT     547.722829     721   .21.20   0.882093  214.666667
+0.006 tunnel:8    .BTCUSDT.ETHUSDT     655.635740     574   .14.15   0.871692  233.333333
+0.008 tunnel:16   .ETHUSDT.BTCUSDT     521.245408     656   .23.22   0.858040  284.666667
