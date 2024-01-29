@@ -12,6 +12,7 @@ from dataloading import MovingWindow, DataParser
 pd.options.mode.chained_assignment = None
 from experts import BacktestExpert, PyConfig
 from utils import Broker
+logger.remove(0)
 
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen

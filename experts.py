@@ -205,14 +205,14 @@ class ClsTunnel(ExtensionBase):
                     break
 
         if is_fig:
-            # common.lprice = line_above
-            # common.sprice = line_below 
+            common.lprice = line_above
+            common.sprice = line_below 
             common.sl = {1: h.Low[-i:].min(), -1:h.High[-i:].max()}   
                      
-            if middle_line > h.Close.mean():
-                common.lprice = line_below
-            else:
-                common.sprice = line_above
+            # if middle_line > h.Close.mean():
+            #     common.lprice = line_below
+            # else:
+            #     common.sprice = line_above
             common.lines = [[(h.Id[-i], line_above), (h.Id[-1], line_above)], [(h.Id[-i], line_below), (h.Id[-1], line_below)]]
 
         return is_fig

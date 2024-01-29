@@ -79,6 +79,7 @@ def optimize(optim_cfg):
       
       opt_summary = pd.DataFrame(opt_summary)
       opt_summary.sort_values(by=["final_balance"], ascending=False, inplace=True)
+      
       for ticker in set(opt_summary.ticker):
             logger.info(f"\n{opt_summary[opt_summary.ticker == ticker][opt_summary.ndeals < 2500].head(3)}\n")
       
@@ -129,7 +130,7 @@ def optimize(optim_cfg):
       for test_id in range(min(opt_res.shape[0], 5)):
             plt.plot(balances_av[opt_res.index[test_id]], linewidth=2 if test_id==0 else 1)
             row = opt_res.iloc[test_id]
-            legend.append(f"{opt_res.index[test_id]}: bal={row.final_balance:.0f} ({row.ndeals}) lin={row.linearity:.0f} mwait={row.maxwait:.0f}")
+            legend.append(f"{opt_res.index[test_id]}: bal={row.final_balance:.0f} ({row.ndeals}) lin={row.linearity:.2f} mwait={row.maxwait:.0f}")
       plt.legend(legend)
       # plt.plot()      
       plt.grid("on")      
@@ -138,10 +139,9 @@ def optimize(optim_cfg):
       plt.clf()
                
                   
-if __name__ == "__main__":      
+if __name__ == "__main__":  
       logger.remove()
-      logger.add("optimization/opt_report.txt", level="INFO", rotation="59 seconds")      
-      
+      logger.add("optimization/opt_report.txt", level="INFO", rotation="30 seconds")         
       save_path = Path("optimization") / "data"
       if save_path.exists():
             rmtree(save_path)
