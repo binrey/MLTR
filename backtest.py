@@ -20,10 +20,11 @@ class BackTestResults:
     def __init__(self, backtest_broker, date_start, date_end):
         self.profits = backtest_broker.profits
         self.balance = self.profits.cumsum()
+        self.ndeals = len(self.profits)
         self.dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
-        self.final_profit = self.profits[-1]
-        self.profit_per_day = self.convert_hist(self.profits, self.dates, date_start, date_end)
-        self.profit_stair, self.metrics = self.calc_metrics(self.profit_per_day)
+        self.final_balance = self.balance[-1]
+        self.daily_balance = self.convert_hist(self.profits, self.dates, date_start, date_end)
+        self.daily_bstair, self.metrics = self.calc_metrics(self.daily_balance)
 
     @staticmethod
     def calc_metrics(ts):
@@ -41,13 +42,14 @@ class BackTestResults:
             else:
                 twait += 1
             h.append(ymax)
-        max_loss = (np.array(h) - ts).max()
+        h = np.array(h)
+        max_loss = (h - ts).max()
         twaits = np.array(twaits) if len(twaits) else np.array([len(ts)])
         twaits.sort()
-        lin_err = sum(ts - np.arange(0, ts[-1], ts[-1]/len(ts)))
+        lin_err = sum(np.abs(ts - np.arange(0, ts[-1], ts[-1]/len(ts))))
         lin_err /= len(ts)*ts[-1]
         metrics = {"waits_top3_mean": twaits[-3:].mean(), 
-                   "lin_err": 1 - lin_err, 
+                   "linearity": 1 - lin_err, 
                    "loss_max": max_loss}
         return h, metrics
 
@@ -129,7 +131,8 @@ def backtest(cfg):
     logger.info(sformat.format("broker updates", tbrok/ttotal*100))
     logger.info(sformat.format("data loadings", tdata/ttotal*100))
     logger.info("-"*30)
-    logger.info(sformat.format("FINAL PROFIT", broker.profits.sum()) + f" ({len(broker.positions)} deals)") 
+    logger.info(sformat.format("FINAL PROFIT", backtest_results.final_balance) + f" ({backtest_results.ndeals} deals)") 
+    logger.info(sformat.format("LINEARITY", backtest_results.metrics["linearity"]*100)) 
     
     # import pickle
     # pickle.dump((cfg, broker), open(str(Path("backtests") / f"btest{0:003.0f}.pickle"), "wb"))
