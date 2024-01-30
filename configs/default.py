@@ -26,7 +26,7 @@ body_classifiers = EasyDict(
     tunnel = EasyDict( 
         func=ClsTunnel,
         params=EasyDict(
-            ncross=Param(8, [4, 8, 16])
+            ncross=Param(12, [3, 5, 8, 12])
             )
         ) 
 )
@@ -59,7 +59,7 @@ config = EasyDict(
     date_start=Param("2017-09-01", ["2017-09-01"]),
     date_end=Param("2024-01-01", ["2024-01-01"]),
     no_trading_days=Param(set(), [set()]),
-    trailing_stop_rate=Param(0.005, [0.002, 0.004, 0.006, 0.008]),
+    trailing_stop_rate=Param(0.008, [0.002, 0.004, 0.006, 0.008]),
     trailing_stop_type=Param(1, [1]),
     body_classifier=Param(body_classifiers["tunnel"], [body_classifiers[k] for k in ["tunnel"]]),
     stops_processor=Param(stops_processors["stops_dynamic"], [stops_processors[k] for k in ["stops_dynamic"]]),

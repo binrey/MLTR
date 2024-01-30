@@ -187,10 +187,10 @@ class ClsTrend(ExtensionBase):
         return is_fig
 
 
-class ClsTunnel(ExtensionBase):
+class ClsTunnel_(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
-        super(ClsTunnel, self).__init__(cfg, name="tunnel")
+        super(ClsTunnel_, self).__init__(cfg, name="tunnel")
         
     def __call__(self, common, h) -> bool:
         is_fig = False
@@ -218,31 +218,54 @@ class ClsTunnel(ExtensionBase):
         return is_fig
 
 
-class ClsTunnel1(ExtensionBase):
+class ClsTunnel(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
-        super(ClsTunnel1, self).__init__(cfg, name="tunnel")
+        super(ClsTunnel, self).__init__(cfg, name="tunnel")
         
     def __call__(self, common, h) -> bool:
         is_fig = False
+        best_metric = 0
         for i in range(8, h.Id.shape[0], 4):
-            line_above = h.High[-i:].mean()#np.percentile(h.High[-i:], 100-self.cfg.percentile)#
-            line_below = h.Low[-i:].mean()#np.percentile(h.Low[-i:], self.cfg.percentile)#
-            middle_line = h.Close[-i:].mean()
-            n = 0
-            for j in range(i):
-                if h.High[-j] > middle_line and h.Low[-j] < middle_line:
-                    n += 1
+            # v1
+            # line_above = h.Close[-i:].max()
+            # line_below = h.Close[-i:].min()
+            # v2
+            line_above = h.High[-i:].mean()
+            line_below = h.Low[-i:].mean()
+            # v3
+            # line_above = h.High[-i:].max()
+            # line_below = h.Low[-i:].min()    
+                    
+            # v1
+            # middle_line = h.Close[-i:].mean()
+            # v2
+            middle_line = (line_above + line_below) / 2
+            
+
             if h.Close[-1] < line_above and h.Close[-1] > line_below:
-                if n > self.cfg.ncross:
-                    is_fig = True
-                    break
+                
+                # v1
+                metric = i / ((line_above - line_below) / middle_line) / 100
+                if metric > best_metric:
+                    best_metric = metric
+                # v2
+                # n = 0
+                # for j in range(i):
+                #     if h.High[-j] > middle_line and h.Low[-j] < middle_line:
+                #         n += 1                
+                # if n > self.cfg.ncross:
+                #     is_fig = True
+                #     break
+        if best_metric > self.cfg.ncross:
+            is_fig = True
 
         if is_fig:
+            common.sl = {1: h.Low[-i:].min(), -1:h.High[-i:].max()}   
+            # v1
             common.lprice = line_above
             common.sprice = line_below 
-            common.sl = {1: h.Low[-i:].min(), -1:h.High[-i:].max()}   
-                     
+            # v2
             # if middle_line > h.Close.mean():
             #     common.lprice = line_below
             # else:

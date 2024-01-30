@@ -45,11 +45,12 @@ class BackTestResults:
             h.append(ymax)
         h = np.array(h)
         max_loss = (h - ts).max()
+        twaits.append(twait)
         twaits = np.array(twaits) if len(twaits) else np.array([len(ts)])
         twaits.sort()
         lin_err = sum(np.abs(ts - np.arange(0, ts[-1], ts[-1]/len(ts))[:len(ts)]))
         lin_err /= len(ts)*ts[-1]
-        metrics = {"waits_top3_mean": twaits[-3:].mean(), 
+        metrics = {"waits_top3_mean": twaits.max(),#[-5:].mean(), 
                    "linearity": 1 - lin_err, 
                    "loss_max": max_loss}
         return h, metrics
@@ -133,8 +134,8 @@ def backtest(cfg):
     logger.info(sformat.format("data loadings", tdata/ttotal*100))
     logger.info("-"*30)
     logger.info(sformat.format("FINAL PROFIT", backtest_results.final_balance) + f" ({backtest_results.ndeals} deals)") 
-    logger.info(sformat.format("LINEARITY", backtest_results.metrics["linearity"]*100)+"\n") 
-    
+    logger.info(sformat.format("LINEARITY", backtest_results.metrics["linearity"]*100)) 
+    logger.info(sformat.format("MAXWAIT", backtest_results.metrics["waits_top3_mean"])[:-2]+"\n") 
     # import pickle
     # pickle.dump((cfg, broker), open(str(Path("backtests") / f"btest{0:003.0f}.pickle"), "wb"))
     return backtest_results

@@ -33,6 +33,10 @@ def backtest_process(args):
 
 
 def pool_handler(optim_cfg):
+      save_path = Path("optimization") / "data"
+      if save_path.exists():
+            rmtree(save_path)
+      save_path.mkdir(exist_ok=True)
       ncpu = multiprocessing.cpu_count()
       logger.info(f"Number of cpu : {ncpu}")
 
@@ -46,9 +50,10 @@ def pool_handler(optim_cfg):
       p.map(backtest_process, cfgs)
       
       
-def optimize(optim_cfg):
+def optimize(optim_cfg, run_backtests=True):
       t0 = time()
-      opt_res = pool_handler(optim_cfg)
+      if run_backtests:
+            pool_handler(optim_cfg)
       logger.info(f"optimization time: {time() - t0:.1f} sec\n")
             
       cfgs, btests = [], []
@@ -81,7 +86,7 @@ def optimize(optim_cfg):
       opt_summary.sort_values(by=["final_balance"], ascending=False, inplace=True)
       
       for ticker in set(opt_summary.ticker):
-            logger.info(f"\n{opt_summary[opt_summary.ticker == ticker][opt_summary.ndeals < 2500].head(3)}\n")
+            logger.info(f"\n{opt_summary[opt_summary.ticker == ticker][opt_summary.ndeals < 2500].head(10)}\n")
       
       opt_res = {"param_set":[], "ticker":[], "final_balance":[], "ndeals":[], "test_ids":[]}
       for i in range(opt_summary.shape[0]):
@@ -120,20 +125,22 @@ def optimize(optim_cfg):
       opt_res.sort_values(by=[sortby], ascending=True, inplace=True)
       logger.info(f"\n{opt_res}\n\n")
 
-      # plt.figure(figsize=(15, 7))
-      # plt.plot(balance1, alpha=0.4)
-      # plt.plot(balance2, alpha=0.4)
-      # plt.plot(balance_av, alpha=0.4)
-      # plt.plot(bstair_av)
-      # plt.fill(np.hstack([balance_av - bstair_av, np.zeros(1)]))
+      plt.figure(figsize=(12, 12))
+      plt.subplot(2, 1, 1)
       legend = []
       for test_id in range(min(opt_res.shape[0], 5)):
             plt.plot(balances_av[opt_res.index[test_id]], linewidth=2 if test_id==0 else 1)
             row = opt_res.iloc[test_id]
             legend.append(f"{opt_res.index[test_id]}: bal={row.final_balance:.0f} ({row.ndeals}) lin={row.linearity:.2f} mwait={row.maxwait:.0f}")
-      plt.legend(legend)
-      # plt.plot()      
+      plt.legend(legend) 
       plt.grid("on")      
+      plt.subplot(2, 1, 2)
+      i = 0
+      test_ids = list(map(int, opt_res.test_ids.iloc[i].split(".")[1:]))
+      for test_id in test_ids:
+            plt.plot(btests[test_id].daily_balance)
+      plt.plot(balances_av[opt_res.index[test_id]], linewidth=3)
+      plt.grid("on")        
       plt.tight_layout()
       plt.savefig(f"optimization/opt-{optim_cfg.period[0]}-{sortby}.png")
       plt.clf()
@@ -141,15 +148,11 @@ def optimize(optim_cfg):
                   
 if __name__ == "__main__":  
       logger.remove()
-      logger.add("optimization/opt_report.txt", level="INFO", rotation="30 seconds")         
-      save_path = Path("optimization") / "data"
-      if save_path.exists():
-            rmtree(save_path)
-      save_path.mkdir(exist_ok=True)
+      logger.add("optimization/opt_report.txt", level="INFO", rotation="60 seconds")         
       
       optim_cfg = PyConfig().optim()
       for period in ["H1", "M15"]:
             optim_cfg.period = [period]
-            optimize(optim_cfg)
+            optimize(optim_cfg, run_backtests=False)
         
         
