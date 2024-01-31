@@ -205,11 +205,11 @@ class ClsTunnel(ExtensionBase):
             # line_above = h.Close[-i:].max()
             # line_below = h.Close[-i:].min()
             # v2
-            # line_above = h.High[-i:].mean()
-            # line_below = h.Low[-i:].mean()
+            line_above = h.High[-i:].mean()
+            line_below = h.Low[-i:].mean()
             # v3
-            line_above = h.High[-i:].max()
-            line_below = h.Low[-i:].min()    
+            # line_above = h.High[-i:].max()
+            # line_below = h.Low[-i:].min()    
                     
             # v1
             # middle_line = h.Close[-i:].mean()
@@ -245,13 +245,13 @@ class ClsTunnel(ExtensionBase):
             i = best_params["i"]
             common.sl = {1: h.Low[-i:].min(), -1:h.High[-i:].max()}   
             # v1
-            # common.lprice = best_params["line_above"]
-            # common.sprice = best_params["line_below"] 
+            common.lprice = best_params["line_above"]
+            common.sprice = best_params["line_below"] 
             # v2
-            if middle_line > h.Close.mean():
-                common.lprice = line_below
-            else:
-                common.sprice = line_above
+            # if middle_line > h.Close.mean():
+            #     common.lprice = line_below
+            # else:
+            #     common.sprice = line_above
             common.lines = [[(h.Id[-i], best_params["line_above"]), (h.Id[-1], best_params["line_above"])], 
                             [(h.Id[-i], best_params["line_below"]), (h.Id[-1], best_params["line_below"])],
                             [(h.Id[-i], best_params["middle_line"]), (h.Id[-1], best_params["middle_line"])]]
