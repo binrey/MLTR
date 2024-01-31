@@ -112,7 +112,7 @@ def optimize(optim_cfg, run_backtests=True):
             balance_av = sum_daily_balance/len(test_ids)
             bstair_av, metrics = BackTestResults.calc_metrics(balance_av)
             linearity.append(metrics["linearity"])
-            maxwait.append(metrics["waits_top3_mean"])
+            maxwait.append(metrics["maxwait"])
             opt_res["final_balance"].iloc[i] = balance_av[-1]
             balances_av[opt_res.index[i]] = balance_av
       opt_res["linearity"] = linearity
@@ -121,11 +121,11 @@ def optimize(optim_cfg, run_backtests=True):
       
       opt_res = opt_res[opt_res.ndeals<2500]
       
-      sortby = "maxwait" #"linearity" #"final_balance" #
-      opt_res.sort_values(by=[sortby], ascending=True, inplace=True)
+      sortby = "final_balance" #"linearity" #"final_balance" #
+      opt_res.sort_values(by=[sortby], ascending=False, inplace=True)
       logger.info(f"\n{opt_res}\n\n")
 
-      plt.figure(figsize=(12, 12))
+      plt.figure(figsize=(8, 8))
       plt.subplot(2, 1, 1)
       legend = []
       for test_id in range(min(opt_res.shape[0], 5)):
@@ -137,13 +137,18 @@ def optimize(optim_cfg, run_backtests=True):
       plt.subplot(2, 1, 2)
       i = 0
       test_ids = list(map(int, opt_res.test_ids.iloc[i].split(".")[1:]))
+      legend = []
       for test_id in test_ids:
+            row = opt_res.iloc[i]
+            _, metrics = BackTestResults.calc_metrics(btests[test_id].daily_balance)
             plt.plot(btests[test_id].daily_balance)
-      plt.plot(balances_av[opt_res.index[test_id]], linewidth=3)
+            legend.append(f"{btests[test_id].cfg.ticker} bal={btests[test_id].final_balance:.0f} ({btests[test_id].ndeals}) lin={metrics['linearity']:.2f} mwait={metrics['maxwait']:.0f}")
+      plt.plot(balances_av[opt_res.index[i]], linewidth=3)
+      plt.legend(legend) 
       plt.grid("on")        
       plt.tight_layout()
       plt.savefig(f"optimization/opt-{optim_cfg.period[0]}-{sortby}.png")
-      plt.clf()
+      plt.show()
                
                   
 if __name__ == "__main__":  
@@ -153,6 +158,6 @@ if __name__ == "__main__":
       optim_cfg = PyConfig().optim()
       for period in ["H1", "M15"]:
             optim_cfg.period = [period]
-            optimize(optim_cfg, run_backtests=False)
+            optimize(optim_cfg, run_backtests=True)
         
         

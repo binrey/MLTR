@@ -19,6 +19,7 @@ logger.remove(0)
 
 class BackTestResults:
     def __init__(self, backtest_broker, date_start, date_end):
+        self.cfg = backtest_broker.cfg
         self.profits = backtest_broker.profits
         self.balance = self.profits.cumsum()
         self.ndeals = len(self.profits)
@@ -50,7 +51,7 @@ class BackTestResults:
         twaits.sort()
         lin_err = sum(np.abs(ts - np.arange(0, ts[-1], ts[-1]/len(ts))[:len(ts)]))
         lin_err /= len(ts)*ts[-1]
-        metrics = {"waits_top3_mean": twaits.max(),#[-5:].mean(), 
+        metrics = {"maxwait": twaits.max(),#[-5:].mean(), 
                    "linearity": 1 - lin_err, 
                    "loss_max": max_loss}
         return h, metrics
@@ -135,7 +136,7 @@ def backtest(cfg):
     logger.info("-"*30)
     logger.info(sformat.format("FINAL PROFIT", backtest_results.final_balance) + f" ({backtest_results.ndeals} deals)") 
     logger.info(sformat.format("LINEARITY", backtest_results.metrics["linearity"]*100)) 
-    logger.info(sformat.format("MAXWAIT", backtest_results.metrics["waits_top3_mean"])[:-2]+"\n") 
+    logger.info(sformat.format("MAXWAIT", backtest_results.metrics["maxwait"])[:-2]+"\n") 
     # import pickle
     # pickle.dump((cfg, broker), open(str(Path("backtests") / f"btest{0:003.0f}.pickle"), "wb"))
     return backtest_results
