@@ -97,14 +97,17 @@ if __name__ == "__main__":
             pos_side = 1 if pos["side"] == "Buy" else -1
             sl = float(pos["stopLoss"])
             sl = sl + pos_side*cfg.trailing_stop_rate*abs(h.Open[-1] - sl)
-            resp = session.set_trading_stop(
-                category="linear",
-                symbol=cfg.ticker,
-                stopLoss=sl,
-                slTriggerB="IndexPrice",
-                positionIdx=0,
-            )
-            logger.debug(resp)
+            try:
+                resp = session.set_trading_stop(
+                    category="linear",
+                    symbol=cfg.ticker,
+                    stopLoss=sl,
+                    slTriggerB="IndexPrice",
+                    positionIdx=0,
+                )
+                logger.debug(resp)
+            except Exception as ex:
+                print(ex)
         
         if len(open_orders) == 0 and len(open_positions) == 0:
             texp = exp.update(h)

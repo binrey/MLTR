@@ -135,7 +135,7 @@ def backtest(cfg):
     logger.info(sformat.format("data loadings", tdata/ttotal*100))
     logger.info("-"*30)
     logger.info(sformat.format("FINAL PROFIT", backtest_results.final_balance) + f" ({backtest_results.ndeals} deals)") 
-    logger.info(sformat.format("LINEARITY", backtest_results.metrics["linearity"]*100)) 
+    logger.info(sformat.format("RECOVRY FACTOR", backtest_results.metrics["linearity"])[:-2]) 
     logger.info(sformat.format("MAXWAIT", backtest_results.metrics["maxwait"])[:-2]+"\n") 
     # import pickle
     # pickle.dump((cfg, broker), open(str(Path("backtests") / f"btest{0:003.0f}.pickle"), "wb"))
