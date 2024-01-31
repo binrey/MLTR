@@ -52,7 +52,7 @@ class BackTestResults:
         lin_err = sum(np.abs(ts - np.arange(0, ts[-1], ts[-1]/len(ts))[:len(ts)]))
         lin_err /= len(ts)*ts[-1]
         metrics = {"maxwait": twaits.max(),#[-5:].mean(), 
-                   "linearity": 1 - lin_err, 
+                   "linearity": ts[-1]/max_loss, 
                    "loss_max": max_loss}
         return h, metrics
 

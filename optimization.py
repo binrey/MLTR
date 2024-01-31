@@ -17,7 +17,7 @@ import numpy as np
 
 
 def backtest_process(args):
-      global opt_res
+      global data_path
       logger.debug(args)
       num, cfg = args
       logger.debug(f"start backtest {num}")
@@ -28,15 +28,15 @@ def backtest_process(args):
                   break
             # cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
             locnum += 1
-            pickle.dump((cfg, btest), open(str(Path("optimization") / "data" / f"btest.{num + locnum/100:05.2f}.{cfg.ticker}.pickle"), "wb"))
+            pickle.dump((cfg, btest), open(str(data_path / f"btest.{num + locnum/100:05.2f}.{cfg.ticker}.pickle"), "wb"))
             break
 
 
 def pool_handler(optim_cfg):
-      save_path = Path("optimization") / "data"
-      if save_path.exists():
-            rmtree(save_path)
-      save_path.mkdir(exist_ok=True)
+      global data_path
+      if data_path.exists():
+            rmtree(data_path)
+      data_path.mkdir(exist_ok=True)
       ncpu = multiprocessing.cpu_count()
       logger.info(f"Number of cpu : {ncpu}")
 
@@ -51,7 +51,9 @@ def pool_handler(optim_cfg):
       
       
 def optimize(optim_cfg, run_backtests=True):
+      global data_path
       logger.remove()
+      data_path = Path("optimization") / f"data_{optim_cfg.period[0]}"
       t0 = time()
       if run_backtests:
             pool_handler(optim_cfg)
@@ -59,7 +61,7 @@ def optimize(optim_cfg, run_backtests=True):
       logger.info(f"optimization time: {time() - t0:.1f} sec\n")
             
       cfgs, btests = [], []
-      for p in sorted(Path("optimization/data").glob("*.pickle")):
+      for p in sorted(data_path.glob("*.pickle")):
             cfg, btest = pickle.load(open(p, "rb"))
             cfgs.append(cfg)
             btests.append(btest)
@@ -123,7 +125,7 @@ def optimize(optim_cfg, run_backtests=True):
       
       opt_res = opt_res[opt_res.ndeals<2500]
       
-      sortby = "final_balance" #"linearity" #"final_balance" #
+      sortby = "linearity" #"linearity" #"final_balance" #
       opt_res.sort_values(by=[sortby], ascending=False, inplace=True)
       logger.info(f"\n{opt_res}\n\n")
 
@@ -157,6 +159,6 @@ if __name__ == "__main__":
       optim_cfg = PyConfig().optim()
       for period in ["H1", "M15"]:
             optim_cfg.period = [period]
-            optimize(optim_cfg, run_backtests=True)
+            optimize(optim_cfg, run_backtests=False)
         
         

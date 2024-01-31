@@ -26,7 +26,7 @@ body_classifiers = EasyDict(
     tunnel = EasyDict( 
         func=ClsTunnel,
         params=EasyDict(
-            ncross=Param(12, [5, 8, 13, 21])
+            ncross=Param(12, [5, 8, 13, 21, 34])
             )
         ) 
 )
