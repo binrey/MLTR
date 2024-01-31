@@ -1,0 +1,98 @@
+2024-01-31 13:21:44.471 | INFO     | __main__:optimize:59 - optimization time: 2.0 sec
+
+2024-01-31 13:21:44.481 | INFO     | __main__:optimize:91 - 
+    trailing_stop_rate body_classifier   ticker  final_balance  ndeals
+2                0.002        tunnel:8  BTCUSDT     737.845531     138
+0                0.002        tunnel:5  BTCUSDT     725.083099     162
+4                0.002       tunnel:13  BTCUSDT     702.770122     129
+6                0.002       tunnel:21  BTCUSDT     687.626112     131
+12               0.004       tunnel:13  BTCUSDT     685.242135     255
+18               0.006        tunnel:8  BTCUSDT     638.540233     396
+10               0.004        tunnel:8  BTCUSDT     628.839571     286
+14               0.004       tunnel:21  BTCUSDT     615.982966     227
+8                0.004        tunnel:5  BTCUSDT     615.163510     308
+20               0.006       tunnel:13  BTCUSDT     604.882840     366
+
+2024-01-31 13:21:44.484 | INFO     | __main__:optimize:91 - 
+    trailing_stop_rate body_classifier   ticker  final_balance  ndeals
+15               0.004       tunnel:21  ETHUSDT     828.970662     233
+23               0.006       tunnel:21  ETHUSDT     825.244263     337
+21               0.006       tunnel:13  ETHUSDT     780.343536     395
+19               0.006        tunnel:8  ETHUSDT     708.492730     442
+13               0.004       tunnel:13  ETHUSDT     701.462287     280
+17               0.006        tunnel:5  ETHUSDT     689.277974     466
+31               0.008       tunnel:21  ETHUSDT     672.754631     443
+27               0.008        tunnel:8  ETHUSDT     652.877733     557
+11               0.004        tunnel:8  ETHUSDT     638.763724     312
+29               0.008       tunnel:13  ETHUSDT     633.314519     503
+
+2024-01-31 13:21:44.497 | INFO     | __main__:optimize:128 - 
+                            ticker  final_balance  ndeals test_ids  linearity  maxwait
+param_set                                                                             
+0.004 tunnel:21   .ETHUSDT.BTCUSDT     722.476814     230   .15.14   0.909191      251
+0.004 tunnel:13   .ETHUSDT.BTCUSDT     693.352211     267   .13.12   0.896181      251
+0.006 tunnel:13   .ETHUSDT.BTCUSDT     692.613188     380   .21.20   0.897988      202
+0.006 tunnel:21   .ETHUSDT.BTCUSDT     686.187776     342   .23.22   0.899448      202
+0.006 tunnel:8    .ETHUSDT.BTCUSDT     673.516482     419   .19.18   0.891314      202
+0.002 tunnel:13   .BTCUSDT.ETHUSDT     644.635966     143     .4.5   0.910812      251
+0.002 tunnel:5    .BTCUSDT.ETHUSDT     638.383241     176     .0.1   0.915533      251
+0.002 tunnel:8    .BTCUSDT.ETHUSDT     636.589929     162     .2.3   0.909938      251
+0.006 tunnel:5    .ETHUSDT.BTCUSDT     635.923536     444   .17.16   0.899056      202
+0.002 tunnel:21   .BTCUSDT.ETHUSDT     634.449876     135     .6.7   0.902308      251
+0.004 tunnel:8    .ETHUSDT.BTCUSDT     633.801648     299   .11.10   0.911897      224
+0.004 tunnel:5    .BTCUSDT.ETHUSDT     606.288344     325     .8.9   0.905020      230
+0.008 tunnel:21   .ETHUSDT.BTCUSDT     582.613444     444   .31.30   0.886210      280
+0.008 tunnel:8    .ETHUSDT.BTCUSDT     579.658502     544   .27.26   0.885201      280
+0.008 tunnel:13   .ETHUSDT.BTCUSDT     541.862874     499   .29.28   0.876705      280
+0.008 tunnel:5    .ETHUSDT.BTCUSDT     520.735954     585   .25.24   0.892382      280
+
+
+2024-01-31 13:21:52.357 | INFO     | __main__:optimize:59 - optimization time: 7.1 sec
+
+2024-01-31 13:21:52.367 | INFO     | __main__:optimize:91 - 
+    trailing_stop_rate body_classifier   ticker  final_balance  ndeals
+14               0.004       tunnel:21  BTCUSDT     687.525909    1254
+8                0.004        tunnel:5  BTCUSDT     652.317474    1413
+12               0.004       tunnel:13  BTCUSDT     635.580120    1366
+10               0.004        tunnel:8  BTCUSDT     629.890099    1404
+22               0.006       tunnel:21  BTCUSDT     612.745314    1769
+20               0.006       tunnel:13  BTCUSDT     583.185360    1892
+18               0.006        tunnel:8  BTCUSDT     541.828566    1966
+2                0.002        tunnel:8  BTCUSDT     537.465046     888
+30               0.008       tunnel:21  BTCUSDT     528.655429    2273
+16               0.006        tunnel:5  BTCUSDT     521.018358    1995
+
+2024-01-31 13:21:52.370 | INFO     | __main__:optimize:91 - 
+    trailing_stop_rate body_classifier   ticker  final_balance  ndeals
+11               0.004        tunnel:8  ETHUSDT     826.942544    1423
+9                0.004        tunnel:5  ETHUSDT     796.463233    1457
+13               0.004       tunnel:13  ETHUSDT     724.417729    1383
+19               0.006        tunnel:8  ETHUSDT     714.596465    1987
+15               0.004       tunnel:21  ETHUSDT     698.941789    1272
+17               0.006        tunnel:5  ETHUSDT     660.609290    2043
+21               0.006       tunnel:13  ETHUSDT     653.438006    1921
+27               0.008        tunnel:8  ETHUSDT     632.076882    2468
+1                0.002        tunnel:5  ETHUSDT     627.879043     998
+23               0.006       tunnel:21  ETHUSDT     608.592267    1775
+
+2024-01-31 13:21:52.381 | INFO     | __main__:optimize:128 - 
+                            ticker  final_balance  ndeals test_ids  linearity  maxwait
+param_set                                                                             
+0.004 tunnel:8    .ETHUSDT.BTCUSDT     728.416321    1413   .11.10   0.891325      285
+0.004 tunnel:5    .ETHUSDT.BTCUSDT     724.390354    1435     .9.8   0.897093      285
+0.004 tunnel:21   .ETHUSDT.BTCUSDT     693.233849    1263   .15.14   0.885886      285
+0.004 tunnel:13   .ETHUSDT.BTCUSDT     679.998924    1374   .13.12   0.879323      285
+0.006 tunnel:8    .ETHUSDT.BTCUSDT     628.212515    1976   .19.18   0.901972      183
+0.006 tunnel:13   .ETHUSDT.BTCUSDT     618.311683    1906   .21.20   0.914678      183
+0.006 tunnel:21   .BTCUSDT.ETHUSDT     610.668791    1772   .22.23   0.920828      183
+0.006 tunnel:5    .ETHUSDT.BTCUSDT     590.813824    2019   .17.16   0.908459      199
+0.002 tunnel:5    .ETHUSDT.BTCUSDT     572.932255     951     .1.0   0.906212      280
+0.008 tunnel:8    .ETHUSDT.BTCUSDT     571.624292    2460   .27.26   0.862075      182
+0.008 tunnel:5    .ETHUSDT.BTCUSDT     568.186723    2488   .25.24   0.867187      182
+0.002 tunnel:8    .ETHUSDT.BTCUSDT     553.881599     940     .3.2   0.899134      280
+0.008 tunnel:13   .ETHUSDT.BTCUSDT     539.575704    2401   .29.28   0.830839      182
+0.008 tunnel:21   .ETHUSDT.BTCUSDT     531.880486    2262   .31.30   0.812881      276
+0.002 tunnel:13   .ETHUSDT.BTCUSDT     488.350229     920     .5.4   0.896300      280
+0.002 tunnel:21   .ETHUSDT.BTCUSDT     480.211927     820     .7.6   0.900496      231
+
+

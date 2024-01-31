@@ -51,9 +51,11 @@ def pool_handler(optim_cfg):
       
       
 def optimize(optim_cfg, run_backtests=True):
+      logger.remove()
       t0 = time()
       if run_backtests:
             pool_handler(optim_cfg)
+      logger.add("optimization/opt_report.txt", level="INFO", rotation="30 seconds") 
       logger.info(f"optimization time: {time() - t0:.1f} sec\n")
             
       cfgs, btests = [], []
@@ -143,18 +145,15 @@ def optimize(optim_cfg, run_backtests=True):
             _, metrics = BackTestResults.calc_metrics(btests[test_id].daily_balance)
             plt.plot(btests[test_id].daily_balance)
             legend.append(f"{btests[test_id].cfg.ticker} bal={btests[test_id].final_balance:.0f} ({btests[test_id].ndeals}) lin={metrics['linearity']:.2f} mwait={metrics['maxwait']:.0f}")
-      plt.plot(balances_av[opt_res.index[i]], linewidth=3)
+      plt.plot(balances_av[opt_res.index[i]], linewidth=3, color="black")
       plt.legend(legend) 
       plt.grid("on")        
       plt.tight_layout()
       plt.savefig(f"optimization/opt-{optim_cfg.period[0]}-{sortby}.png")
-      plt.show()
+      plt.clf
                
                   
 if __name__ == "__main__":  
-      logger.remove()
-      logger.add("optimization/opt_report.txt", level="INFO", rotation="60 seconds")         
-      
       optim_cfg = PyConfig().optim()
       for period in ["H1", "M15"]:
             optim_cfg.period = [period]
