@@ -169,13 +169,5 @@ class Broker:
                 continue
             t = h.Id[-1] - order.open_indx
             sl_rate = self.cfg.trailing_stop_rate
-            if position.dir == 1 and order.dir == -1 and p > order.price:
-                dp = h.Low[-self.cfg.trailing_stop_type] - order.price
-                order.change(date, order.price + sl_rate * dp)
-            if position.dir == -1 and order.dir == 1 and p < order.price:
-                dp = order.price - h.High[-self.cfg.trailing_stop_type]
-                order.change(date, order.price - sl_rate * dp)
-            # prof = position.dir*(p - position.open_price)
-            # if prof > self.best_profit:
-            #     order.change(date, order.price + position.dir*(prof - self.best_profit))
-            #     self.best_profit = prof
+            dp = h.Open[-1] - order.price
+            order.change(date, order.price + sl_rate * dp)

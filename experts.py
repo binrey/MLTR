@@ -10,7 +10,7 @@ from indicators import ZigZag, ZigZag2, ZigZagOpt
 from utils import Order
 from dataloading import build_features
 import torch
-from pybit.unified_trading import HTTP
+from utils import Broker
 
 
 class ExpertBase(ABC):
@@ -21,9 +21,14 @@ class ExpertBase(ABC):
     @abstractmethod
     def get_body(self) -> None:
         pass
-        
-    def update(self, h):
+    
+    @abstractmethod
+    def create_orders(self) -> None:
+        pass
+    
+    def update(self, h, active_position):
         t0 = perf_counter()
+        self.active_position = active_position
         self.get_body(h)
         return perf_counter() - t0
 
@@ -42,6 +47,7 @@ class ExpertFormation(ExpertBase):
         self.stops_processor = cfg.stops_processor.func
         self.wait_length = cfg.wait_entry_point
         self.reset_state()
+        self.order_sent = False
         
         if self.cfg.run_model_device is not None:
             from ml import Net, Net2
@@ -60,6 +66,11 @@ class ExpertFormation(ExpertBase):
         self.cprice = None
             
     def get_body(self, h):
+        if self.active_position is not None:
+            return
+        
+        self.order_sent = False
+        
         if self.formation_found == False:
             self.formation_found = self.body_cls(self, h)
             if self.formation_found:
@@ -71,13 +82,13 @@ class ExpertFormation(ExpertBase):
         
         self.order_dir = 0
         if self.lprice:
-            if h.Open[-1] >= self.lprice:
+            if h.Open[-1] >= self.lprice and h.Close[-2] > self.lprice:
                 self.order_dir = 1
             if self.cprice and h.Open[-1] < self.cprice:
                 self.reset_state()
                 return
         if self.sprice:
-            if h.Open[-1] <= self.sprice:
+            if h.Open[-1] <= self.sprice and h.Close[-2] < self.sprice:
                 self.order_dir = -1
             if self.cprice and h.Open[-1] > self.cprice:
                 self.reset_state()
@@ -98,6 +109,8 @@ class ExpertFormation(ExpertBase):
         if self.order_dir != 0:
             tp, sl = self.stops_processor(self, h)
             self.create_orders(h.Id[-1], self.order_dir, tp, sl)
+            self.order_sent = True
+            self.reset_state()
 
         if self.wait_entry_point == 0:
             self.formation_found = False
@@ -237,13 +250,13 @@ class ClsTunnel(ExtensionBase):
                         }
                     )                   
                     
-                if best_params["metric"] > self.cfg.ncross:
-                    is_fig = True
-                    break
+        if best_params["metric"] > self.cfg.ncross:
+            is_fig = True
+            # break
 
         if is_fig:
             i = best_params["i"]
-            common.sl = {1: h.Low[-i:].min(), -1:h.High[-i:].max()}   
+            common.sl = {1: h.Low[-i:].min(), -1: h.High[-i:].max()}   
             # v1
             common.lprice = best_params["line_above"]
             common.sprice = best_params["line_below"] 
@@ -297,8 +310,9 @@ class ClsDummy(ExtensionBase):
         
     def __call__(self, common, h) -> bool:
         if h.Low[-2] < h.Open[-1] < h.High[-2]:
-            common.lprice = max(h.High[-2], h.Low[-2])
-            common.sprice = min(h.High[-2], h.Low[-2])
+            common.lprice = h.Close[-1] #max(h.High[-2], h.Low[-2])
+            common.sprice = h.Close[-1] #min(h.High[-2], h.Low[-2])
+            common.sl = {1: common.sprice, -1: common.lprice}  
             common.lines = [[(h.Id[-5], common.lprice), (h.Id[-1], common.lprice)], [(h.Id[-5], common.sprice), (h.Id[-1], common.sprice)]]
             return True
         return False

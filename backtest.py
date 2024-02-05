@@ -92,22 +92,27 @@ def backtest(cfg):
     for t in tqdm(range(tstart, tend), "back test"):
         h, dt = mw(t)
         tdata += dt
-        if t < tstart or len(broker.active_orders) == 0:
-            texp += exp.update(h)
+        texp += exp.update(h, broker.active_position)
+        if len(exp.orders):
             broker.active_orders = exp.orders
+            exp.orders = []
         
-        pos, dt = broker.update(h)
+        closed_pos, dt = broker.update(h)
         tbrok += dt
-        if pos is not None:
+        # if closed_pos is not None:
+        if broker.active_position is None and exp.order_sent:
             logger.debug(f"t = {t} -> postprocess closed position")
             broker.close_orders(h.Id[-2])
             if cfg.save_plots:
-                ords_lines = [order.lines for order in broker.orders if order.open_indx >= pos.open_indx]
-                lines2plot = exp.lines + ords_lines + [pos.lines]
-                colors = ["blue"]*(len(lines2plot)-1) + ["green" if pos.profit > 0 else "red"]
+                ords_lines = [order.lines for order in broker.orders if order.open_indx >= closed_pos.open_indx]
+                lines2plot = exp.lines + ords_lines + [closed_pos.lines]
+                colors = ["blue"]*(len(lines2plot)-1) + ["green" if closed_pos.profit > 0 else "red"]
                 widths = [1]*(len(lines2plot)-1) + [2]
                 
-                hist2plot = hist_pd.iloc[lines2plot[0][0][0]:lines2plot[-1][-1][0]+1]
+                t1plot = lines2plot[-1][-1][0]
+                t0plot = lines2plot[0][0][0]
+                dbars = max(0, cfg.hist_buffer_size - (t1plot - t0plot))
+                hist2plot = hist_pd.iloc[lines2plot[0][0][0]-dbars:lines2plot[-1][-1][0]+1]
                 for line in lines2plot:
                     for i, point in enumerate(line):
                         y = point[1]
@@ -121,9 +126,8 @@ def backtest(cfg):
                             type='candle', 
                             block=False,
                             alines=dict(alines=lines2plot, colors=colors, linewidths=widths),
-                            savefig=save_path / f"fig-{str(pos.open_date).split('.')[0]}.png")
+                            savefig=save_path / f"fig-{str(closed_pos.open_date).split('.')[0]}.png")
                 del fig
-            exp.reset_state()
     
     ttotal = perf_counter() - t0
     backtest_results = BackTestResults(broker, cfg.date_start, cfg.date_end)

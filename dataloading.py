@@ -101,6 +101,7 @@ class DataParser():
                     "FORTS": self.metatrader,
                     "bitfinex": self.bitfinex,
                     "yahoo": self.yahoo,
+                    "bybit": self.bybit
                     }.get(self.cfg.data_type, None)(flist[0])
         else:
             raise FileNotFoundError(p)
@@ -161,6 +162,16 @@ class DataParser():
         hist["Id"] = list(range(hist.shape[0]))
         return hist
         
+    def bybit(self, data_file):
+        pd.options.mode.chained_assignment = None
+        hist = pd.read_csv(data_file, sep=",")
+        hist.columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
+        hist["Date"] = pd.to_datetime(hist.Date.values)
+        hist = self._trim_by_date(hist)
+        hist["Id"] = list(range(hist.shape[0]))
+        hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
+        hist.set_index("Date", inplace=True, drop=True)
+        return hist, hist_dict
 
 def collect_train_data(dir, fsize=64, glob="*.pickle"):
     cfgs, btests = [], []

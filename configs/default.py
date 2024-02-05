@@ -26,7 +26,7 @@ body_classifiers = EasyDict(
     tunnel = EasyDict( 
         func=ClsTunnel,
         params=EasyDict(
-            ncross=Param(17, [17])
+            ncross=Param(7, [15, 17, 20, 24])
             )
         ) 
 )
@@ -36,7 +36,7 @@ stops_processors = EasyDict(
         func=StopsFixed,
         params=EasyDict(
             tp=Param(None, [None]), 
-            sl=Param(2, [1, 2, 3, 5])
+            sl=Param(0.2, [1, 2, 3, 5])
             )
         ),
     stops_dynamic = EasyDict(
@@ -59,17 +59,17 @@ config = EasyDict(
     date_start=Param("2017-09-01", ["2017-09-01"]),
     date_end=Param("2024-01-01", ["2024-01-01"]),
     no_trading_days=Param(set(), [set()]),
-    trailing_stop_rate=Param(0.007, [0.007]),
+    trailing_stop_rate=Param(0.007, [0.005, 0.006, 0.007, 0.008]),
     trailing_stop_type=Param(1, [1]),
-    body_classifier=Param(body_classifiers["tunnel"], [body_classifiers[k] for k in ["tunnel"]]),
-    stops_processor=Param(stops_processors["stops_dynamic"], [stops_processors[k] for k in ["stops_dynamic"]]),
+    body_classifier=Param(body_classifiers["dummy"], [body_classifiers[k] for k in ["tunnel"]]),
+    stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_dynamic"]]),
     wait_entry_point=Param(999, [999]),
     hist_buffer_size=Param(64, [64]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("M15", ["M15"]),
+    period=Param("M1", ["M15"]),
     ticker=Param("BTCUSDT", ["BTCUSDT", "ETHUSDT"]),
     data_type=Param("metatrader", ["metatrader"]),
-    save_plots=Param(True, [False]),
+    save_plots=Param(False, [False]),
     run_model_device=Param(None, [None])
 )

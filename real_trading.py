@@ -4,13 +4,13 @@ from time import perf_counter, sleep
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import pandas as pd
-# import yfinance as yf
+from utils import Position
 from loguru import logger
 from tqdm import tqdm
 from dataloading import MovingWindow, DataParser
 pd.options.mode.chained_assignment = None
 from experts import ByBitExpert, PyConfig
-from utils import Broker
+from datetime import datetime
 import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
@@ -41,18 +41,32 @@ def get_bybit_hist(mresult, size):
     return data
     
     
+def trailing_sl(cfg, pos):
+    sl = float(pos["stopLoss"])
+    try:
+        sl = sl + cfg.trailing_stop_rate*(h.Open[-1] - sl)
+        resp = session.set_trading_stop(
+            category="linear",
+            symbol=cfg.ticker,
+            stopLoss=sl,
+            slTriggerB="IndexPrice",
+            positionIdx=0,
+        )
+        logger.debug(resp)
+    except Exception as ex:
+        print(ex)
+    return sl
+                
+                
 if __name__ == "__main__":
     import sys
     from pybit.unified_trading import HTTP
-    
     
     logger.remove()
     logger.add(sys.stderr, level="DEBUG")
     cfg = PyConfig().test()
     cfg.ticker = sys.argv[1]
     cfg.save_plots = True
-    cfg.period = "M5"
-    cfg.trailing_stop_rate = 0.01
     cfg.lot = 0.01 if cfg.ticker == "ETHUSDT" else 0.001
     
 
@@ -70,74 +84,83 @@ if __name__ == "__main__":
         save_path.mkdir()
     
     get_rounded_time = lambda tmessage: int(int(tmessage["timeSecond"])/60/int(cfg.period[1:]))
+    hist2plot = None  
     while True:
         t = t0 = get_rounded_time(session.get_server_time()["result"])
         while t == t0:
+            sleep(1)
             try:
                 tmessage = session.get_server_time()["result"]
                 t = get_rounded_time(tmessage)
-                print(tmessage["timeSecond"], t0, t)
+                print(datetime.fromtimestamp(int(session.get_server_time()["result"]["timeSecond"])), t0, t)
             except Exception as ex:
                 print(ex)
-            sleep(1)
         
+        open_orders = session.get_open_orders(category="linear", symbol=cfg.ticker)["result"]["list"]
+        positions = session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
+        open_position = None
+        for pos in positions :
+            if float(pos["size"]):
+                open_position = pos
+        
+        
+            
+        if cfg.save_plots:
+            if hist2plot is not None:
+                h = pd.DataFrame(h).iloc[-2:-1]
+                h.index = pd.to_datetime(h.Date)
+                hist2plot = pd.concat([hist2plot, h])
+                lines2plot[-1].append((pd.to_datetime(hist2plot.iloc[-1].Date), sl))
+                            
+            if open_position is not None and hist2plot is None:
+                hist2plot = pd.DataFrame(h)
+                hist2plot.index = pd.to_datetime(hist2plot.Date)
+                lines2plot = deepcopy(exp.lines)
+                for line in lines2plot:
+                    for i, point in enumerate(line):
+                        y = point[1]
+                        try:
+                            y = y.item()
+                        except:
+                            pass
+                        line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)    
+                open_time = pd.to_datetime(hist2plot.iloc[-1].Date)
+                lines2plot.append([(open_time, float(open_position["avgPrice"])), (None, float(open_position["avgPrice"]))])
+                lines2plot.append([(open_time, float(open_position["stopLoss"]))])
+                hist2plot = hist2plot.iloc[:-1]
+                
+        if open_position is not None:
+            sl = trailing_sl(cfg, open_position)
+            
         message = session.get_kline(category="linear",
                         symbol=cfg.ticker,
                         interval=cfg.period[1:],
                         start=0,
                         end=int(tmessage["timeSecond"])*1000,
                         limit=cfg.hist_buffer_size)
-        
         h = get_bybit_hist(message["result"], cfg.hist_buffer_size)
-        open_orders = session.get_open_orders(category="linear", symbol=cfg.ticker)["result"]["list"]
-        positions = session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
-        open_positions = [pos for pos in positions if float(pos["size"])]
         
-        for pos in open_positions:
-            pos_side = 1 if pos["side"] == "Buy" else -1
-            sl = float(pos["stopLoss"])
-            sl = sl + pos_side*cfg.trailing_stop_rate*abs(h.Open[-1] - sl)
-            try:
-                resp = session.set_trading_stop(
-                    category="linear",
-                    symbol=cfg.ticker,
-                    stopLoss=sl,
-                    slTriggerB="IndexPrice",
-                    positionIdx=0,
-                )
-                logger.debug(resp)
-            except Exception as ex:
-                print(ex)
-        
-        if len(open_orders) == 0 and len(open_positions) == 0:
-            texp = exp.update(h)
-            if cfg.save_plots:
-                try:
-                    hist2plot = pd.DataFrame(h)
-                    hist2plot.index = pd.to_datetime(hist2plot.Date)
-                    lines2plot = deepcopy(exp.lines)
-                    for line in lines2plot:
-                        for i, point in enumerate(line):
-                            y = point[1]
-                            try:
-                                y = y.item()
-                            except:
-                                pass
-                            line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)
-                            
+        if cfg.save_plots:
+            if open_position is None and exp.order_sent:
+                try:     
+                    last_row = pd.DataFrame(h).iloc[-2:]
+                    last_row.index = pd.to_datetime(last_row.Date)
+                    hist2plot = pd.concat([hist2plot, last_row])                    
+                    lines2plot[-2][-1] = (pd.to_datetime(hist2plot.iloc[-1].Date), lines2plot[-2][-1][-1])
+                    lines2plot[-1].append((pd.to_datetime(hist2plot.iloc[-1].Date), sl))
                     fig = mpf.plot(hist2plot, 
                         type='candle', 
                         block=False,
                         alines=dict(alines=lines2plot),
                         savefig=save_path / f"fig-{str(t).split('.')[0]}.png")
-                    del fig        
+                    del fig    
+                    hist2plot = None    
                 except Exception as ex:
                     print(ex)
                     print(hist2plot.Id)  
-                    print(point[0])  
-        else:
-            exp.reset_state()
-            
+                    print(point[0])        
+        
+        texp = exp.update(h, open_position)
 
         
     
