@@ -7,7 +7,22 @@ import numpy as np
 from torchinfo import summary
 from dataloading import CustomImageDataset
 from sklearn.metrics import roc_auc_score
+from torch.utils.data import Dataset
 import numpy as np
+
+
+class CustomImageDataset(Dataset):
+    def __init__(self, X, y):
+        self.img_labels = y
+        self.imgs = X
+
+    def __len__(self):
+        return len(self.img_labels)
+
+    def __getitem__(self, idx):
+        image = self.imgs[idx]
+        label = self.img_labels[idx]
+        return image, label
 
 
 class Net(nn.Module):

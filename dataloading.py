@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from torch.utils.data import Dataset
 from easydict import EasyDict
 from pathlib import Path
 from time import perf_counter
@@ -74,19 +73,6 @@ def get_data(X, y, test_split=0.25, n1_split=0, n2_split=1, period2process=0):
     # y_test = np.eye(3)[np.argmax(y_test, 1).reshape(-1)].astype(np.float32)
     
     return X_train, X_test, y_train, y_test, profs_train, profs_test, periods_test, (str(odates_set[di0]), str(odates_set[di1]))
-
-class CustomImageDataset(Dataset):
-    def __init__(self, X, y):
-        self.img_labels = y
-        self.imgs = X
-
-    def __len__(self):
-        return len(self.img_labels)
-
-    def __getitem__(self, idx):
-        image = self.imgs[idx]
-        label = self.img_labels[idx]
-        return image, label
     
 
 class DataParser():
