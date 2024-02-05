@@ -84,7 +84,7 @@ if __name__ == "__main__":
         save_path.mkdir()
     
     get_rounded_time = lambda tmessage: int(int(tmessage["timeSecond"])/60/int(cfg.period[1:]))
-    hist2plot = None  
+    hist2plot, lines2plot = None, None
     while True:
         t = t0 = get_rounded_time(session.get_server_time()["result"])
         while t == t0:
@@ -141,7 +141,7 @@ if __name__ == "__main__":
         h = get_bybit_hist(message["result"], cfg.hist_buffer_size)
         
         if cfg.save_plots:
-            if open_position is None and exp.order_sent:
+            if open_position is None and exp.order_sent and lines2plot:
                 try:     
                     last_row = pd.DataFrame(h).iloc[-2:]
                     last_row.index = pd.to_datetime(last_row.Date)
@@ -157,8 +157,6 @@ if __name__ == "__main__":
                     hist2plot = None    
                 except Exception as ex:
                     print(ex)
-                    print(hist2plot.Id)  
-                    print(point[0])        
         
         texp = exp.update(h, open_position)
 

@@ -26,7 +26,7 @@ body_classifiers = EasyDict(
     tunnel = EasyDict( 
         func=ClsTunnel,
         params=EasyDict(
-            ncross=Param(7, [15, 17, 20, 24])
+            ncross=Param(17, [15, 17, 20, 24])
             )
         ) 
 )
@@ -62,7 +62,7 @@ config = EasyDict(
     trailing_stop_rate=Param(0.007, [0.005, 0.006, 0.007, 0.008]),
     trailing_stop_type=Param(1, [1]),
     body_classifier=Param(body_classifiers["dummy"], [body_classifiers[k] for k in ["tunnel"]]),
-    stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_dynamic"]]),
+    stops_processor=Param(stops_processors["stops_dynamic"], [stops_processors[k] for k in ["stops_dynamic"]]),
     wait_entry_point=Param(999, [999]),
     hist_buffer_size=Param(64, [64]),
     tstart=Param(0, [0]),
