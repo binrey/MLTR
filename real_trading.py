@@ -1,13 +1,9 @@
 from pathlib import Path
 from shutil import rmtree
-from time import perf_counter, sleep
-import matplotlib.pyplot as plt
+from time import sleep
 import mplfinance as mpf
 import pandas as pd
-from utils import Position
 from loguru import logger
-from tqdm import tqdm
-from dataloading import MovingWindow, DataParser
 pd.options.mode.chained_assignment = None
 from experts import ByBitExpert, PyConfig
 from datetime import datetime
@@ -15,6 +11,8 @@ import numpy as np
 import pandas as pd
 from easydict import EasyDict
 from copy import deepcopy
+import telebot
+from PIL import Image
 
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen
@@ -56,7 +54,29 @@ def trailing_sl(cfg, pos):
         print(ex)
     return sl
                 
+             
+class Telebot:
+    def __init__(self, token) -> None:
+        self.bot = telebot.TeleBot(token)
+        
+    def send_image(self, img_path):
+        img = Image.open(img_path)
+        self.bot.send_photo(480902846, img)
                 
+                
+def plot_fig(hist2plot, lines2plot, save_path, prefix, t):
+    global telebot
+    save_path = save_path / f"{prefix}-{str(t).split('.')[0]}.png"
+    fig = mpf.plot(hist2plot, 
+        type='candle', 
+        block=False,
+        alines=dict(alines=lines2plot),
+        savefig=save_path
+    )
+    del fig
+    telebot.send_image(save_path)
+      
+    
 if __name__ == "__main__":
     import sys
     from pybit.unified_trading import HTTP
@@ -68,11 +88,14 @@ if __name__ == "__main__":
     cfg.save_plots = True
     cfg.lot = 0.01 if cfg.ticker == "ETHUSDT" else 0.001
     
+    api_key, api_secret, bot_token = Path("./configs/api.yaml").read_text().splitlines()
+    
+    telebot = Telebot(bot_token)
 
     session = HTTP(
         testnet=False,
-        api_key="aA2DKjelcik0WbJyxI",
-        api_secret="hIhnPUEBVmDII1FfeYEicTljZjwrUHW8pTm8",
+        api_key=api_key,
+        api_secret=api_secret,
     )
     
     exp = ByBitExpert(cfg, session)
@@ -122,9 +145,11 @@ if __name__ == "__main__":
                                 pass
                             line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)    
                     open_time = pd.to_datetime(hist2plot.iloc[-1].Date)
-                    lines2plot.append([(open_time, float(open_position["avgPrice"])), (None, float(open_position["avgPrice"]))])
-                    lines2plot.append([(open_time, float(open_position["stopLoss"]))])
+                    lines2plot.append([(open_time, float(open_position["avgPrice"])), (open_time, float(open_position["avgPrice"]))])
+                    lines2plot.append([(open_time, float(open_position["stopLoss"])), (open_time, float(open_position["stopLoss"]))])
+                    plot_fig(hist2plot, lines2plot, save_path, "open", t)
                     hist2plot = hist2plot.iloc[:-1]
+                    
                     
             if open_position is not None:
                 sl = trailing_sl(cfg, open_position)
@@ -144,12 +169,7 @@ if __name__ == "__main__":
                     hist2plot = pd.concat([hist2plot, last_row])                    
                     lines2plot[-2][-1] = (pd.to_datetime(hist2plot.iloc[-1].Date), lines2plot[-2][-1][-1])
                     lines2plot[-1].append((pd.to_datetime(hist2plot.iloc[-1].Date), sl))
-                    fig = mpf.plot(hist2plot, 
-                        type='candle', 
-                        block=False,
-                        alines=dict(alines=lines2plot),
-                        savefig=save_path / f"fig-{str(t).split('.')[0]}.png")
-                    del fig    
+                    plot_fig(hist2plot, lines2plot, save_path, "close", t)
                     hist2plot = None    
             
             texp = exp.update(h, open_position)
