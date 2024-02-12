@@ -155,7 +155,7 @@ class ByBitExpert(ExpertFormation):
                 )
             logger.debug(resp)
         except Exception as ex:
-            print(ex)
+            logger.error(ex)
         
         
 class ClsTrend(ExtensionBase):
@@ -310,8 +310,8 @@ class ClsDummy(ExtensionBase):
         
     def __call__(self, common, h) -> bool:
         if h.Low[-2] < h.Open[-1] < h.High[-2]:
-            common.lprice = h.Close[-1] #max(h.High[-2], h.Low[-2])
-            common.sprice = h.Close[-1] #min(h.High[-2], h.Low[-2])
+            common.lprice = h.Close[-2] #max(h.High[-2], h.Low[-2])
+            common.sprice = h.Close[-2] #min(h.High[-2], h.Low[-2])
             common.sl = {1: common.sprice, -1: common.lprice}  
             common.lines = [[(h.Id[-5], common.lprice), (h.Id[-1], common.lprice)], [(h.Id[-5], common.sprice), (h.Id[-1], common.sprice)]]
             return True

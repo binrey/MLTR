@@ -9,5 +9,6 @@ optimization/data/
 *.pt
 *.pth
 *.jpg
+*.txt
 
 .DS_Store
