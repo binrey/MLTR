@@ -30,7 +30,7 @@ def get_bybit_hist(mresult, size):
         Volume=np.zeros(size, dtype=np.int64)
         )    
 
-    input = np.array(mresult["list"], dtype=np.float32)[::-1]
+    input = np.array(mresult["list"], dtype=np.float64)[::-1]
     data.Date = input[:, 0].astype(int)*1000000
     data.Id = input[:, 0].astype(int)
     data.Open = input[:, 1]
@@ -88,9 +88,9 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
         if side in ["Buy", "Sell"]:
             side = 1 if side == "Buy" else -1
             x = hist2plot.index.get_loc(t)
-            if type(x) is slice:
-                x = x.start
-            y = hist2plot.loc[t].Open[0]
+            # if type(x) is slice:
+            #     x = x.start
+            y = hist2plot.loc[t].Open
             axlist[0].annotate("", (x, y*(1+0.001*side)), fontsize=20, xytext=(x, y),
                         color="black", 
                         arrowprops=dict(
@@ -183,10 +183,13 @@ if __name__ == "__main__":
                         for i, point in enumerate(line):
                             y = point[1]
                             try:
-                                y = y.item()
+                                y = y.item() #  If y is 1D numpy array
                             except:
                                 pass
-                            line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)    
+                            x = point[0]
+                            x = max(hist2plot.Id[0], x)
+                            x = min(hist2plot.Id[-1], x)
+                            line[i] = (hist2plot.index[hist2plot.Id==x][0], y)    
                     open_time = pd.to_datetime(hist2plot.iloc[-1].Date)
                     side = open_position["side"]
                     lines2plot.append([(open_time, float(open_position["avgPrice"])), (open_time, float(open_position["avgPrice"]))])
