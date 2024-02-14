@@ -31,8 +31,8 @@ def get_bybit_hist(mresult, size):
         )    
 
     input = np.array(mresult["list"], dtype=np.float64)[::-1]
-    data.Date = input[:, 0].astype(int)*1000000
-    data.Id = input[:, 0].astype(int)
+    data.Id = input[:, 0].astype(np.int64)
+    data.Date = data.Id*1000000
     data.Open = input[:, 1]
     data.High = input[:, 2]
     data.Low  = input[:, 3]
@@ -63,8 +63,11 @@ class Telebot:
         self.bot = telebot.TeleBot(token)
         
     def send_image(self, img_path):
-        img = Image.open(img_path)
-        self.bot.send_photo(480902846, img)
+        try:
+            img = Image.open(img_path)
+            self.bot.send_photo(480902846, img)
+        except Exception as ex:
+            self.bot.send_message(message.chat.id, ex)
                 
                 
 def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=None, send2telegram=False):
@@ -113,7 +116,7 @@ def log_position(t, hist2plot, lines2plot, save_path):
          "hist": hist2plot,
          "lines": lines2plot
          }
-    save_path = save_path / f"{str(t).split('.')[0]}.pickle".replace(":", "-")
+    save_path = save_path / f"{str(t).split('.')[0]}.pkl".replace(":", "-")
     pickle.dump(d, open(save_path, "wb"))
     logger.info(f"save logs to {save_path}")
     
