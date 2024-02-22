@@ -206,6 +206,7 @@ if __name__ == "__main__":
                              "open", 
                              open_time, 
                              side=side, 
+                             ticker=cfg.ticker,
                              send2telegram=True)
                     hist2plot = hist2plot.iloc[:-1]
                     
