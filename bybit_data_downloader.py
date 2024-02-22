@@ -24,9 +24,6 @@ ver = '1.3:02/05/23'
 # Define the base URL
 base_url = 'https://public.bybit.com/kline_for_metatrader4/'
 
-# Select the start date
-start_date = '2024-02-01'
-
 # Set the list of coins
 coin = "BTCUSDT"
 minutes_period = 15

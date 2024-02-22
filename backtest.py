@@ -91,6 +91,9 @@ def backtest(cfg):
     t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0
     for t in tqdm(range(tstart, tend), "back test"):
         h, dt = mw(t)
+        # TODO
+        if h.Date[-1].astype(np.datetime64) < np.array("2024-02-15T00:30:00", dtype=np.datetime64):
+            continue
         tdata += dt
         texp += exp.update(h, broker.active_position)
         if len(exp.orders):
@@ -126,7 +129,7 @@ def backtest(cfg):
                             type='candle', 
                             block=False,
                             alines=dict(alines=lines2plot, colors=colors, linewidths=widths),
-                            savefig=save_path / f"fig-{str(closed_pos.open_date).split('.')[0]}.png")
+                            savefig=save_path / f"fig-{str(closed_pos.open_date).split('.')[0]}.png",)
                 del fig
     
     ttotal = perf_counter() - t0

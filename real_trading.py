@@ -61,19 +61,21 @@ def trailing_sl(cfg, pos):
 class Telebot:
     def __init__(self, token) -> None:
         self.bot = telebot.TeleBot(token)
-        
-    def send_image(self, img_path):
+        self.chat_id = 480902846
+    def send_image(self, img_path, caption=None):
         try:
             img = Image.open(img_path)
-            self.bot.send_photo(480902846, img)
+            if caption is not None:
+                self.bot.send_message(self.chat_id, caption)
+            self.bot.send_photo(self.chat_id, img)
         except Exception as ex:
-            self.bot.send_message(message.chat.id, ex)
+            self.bot.send_message(self.chat_id, ex)
                 
                 
-def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=None, send2telegram=False):
+def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=None, ticker="X", send2telegram=False):
     # try:
     if True:
-        global telebot
+        global my_telebot
         mystyle=mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
         kwargs = dict(
             type='candle', 
@@ -83,18 +85,19 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
             figscale=1.5,
             style=mystyle,
             datetime_format='%m-%d %H:%M',
+            title=f"{t}-{ticker}-{side}",
             returnfig=True
         )
 
         fig, axlist = mpf.plot(data=hist2plot, **kwargs)
         
         if side in ["Buy", "Sell"]:
-            side = 1 if side == "Buy" else -1
+            side_int = 1 if side == "Buy" else -1
             x = hist2plot.index.get_loc(t)
             # if type(x) is slice:
             #     x = x.start
             y = hist2plot.loc[t].Open
-            axlist[0].annotate("", (x, y*(1+0.001*side)), fontsize=20, xytext=(x, y),
+            axlist[0].annotate("", (x, y*(1+0.001*side_int)), fontsize=20, xytext=(x, y),
                         color="black", 
                         arrowprops=dict(
                             arrowstyle='->',
@@ -105,7 +108,7 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
             save_path = save_path / f"{prefix}-{str(t).split('.')[0]}.png".replace(":", "-")    
             fig.savefig(save_path, bbox_inches='tight', pad_inches=0.2)  
         if send2telegram:
-            telebot.send_image(save_path)
+            my_telebot.send_image(save_path)
     # except Exception as ex:
     #     logger.error(ex)
     # return fig
@@ -130,11 +133,11 @@ if __name__ == "__main__":
     cfg = PyConfig().test()
     cfg.ticker = sys.argv[1]
     cfg.save_plots = True
-    cfg.lot = 0.01 if cfg.ticker == "ETHUSDT" else 0.001
+    cfg.lot = 0.02 if cfg.ticker == "ETHUSDT" else 0.001
     
     api_key, api_secret, bot_token = Path("./configs/api.yaml").read_text().splitlines()
     
-    telebot = Telebot(bot_token)
+    my_telebot = Telebot(bot_token)
 
     session = HTTP(
         testnet=False,
@@ -198,7 +201,10 @@ if __name__ == "__main__":
                     lines2plot.append([(open_time, float(open_position["avgPrice"])), (open_time, float(open_position["avgPrice"]))])
                     lines2plot.append([(open_time, float(open_position["stopLoss"])), (open_time, float(open_position["stopLoss"]))])
                     log_position(open_time, hist2plot, lines2plot, save_path)
-                    plot_fig(hist2plot, lines2plot, save_path, "open", open_time, 
+                    plot_fig(hist2plot, lines2plot, 
+                             save_path, 
+                             "open", 
+                             open_time, 
                              side=side, 
                              send2telegram=True)
                     hist2plot = hist2plot.iloc[:-1]
@@ -225,6 +231,7 @@ if __name__ == "__main__":
                     log_position(open_time, hist2plot, lines2plot, save_path)
                     plot_fig(hist2plot, lines2plot, save_path, "close", open_time, 
                                 side=side,
+                                ticker=cfg.ticker,
                                 send2telegram=True)
                     hist2plot = None    
             
