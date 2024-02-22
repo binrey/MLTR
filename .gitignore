@@ -10,5 +10,6 @@ optimization/data/
 *.pth
 *.jpg
 *.txt
+*.pkl
 
 .DS_Store
