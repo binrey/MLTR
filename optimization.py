@@ -158,9 +158,5 @@ class Optimizer:
                   
 if __name__ == "__main__":  
       optim_cfg = PyConfig().optim()
-      for period in ["M15"]:
-            optim_cfg.period = [period]
-            opt = Optimizer()
-            opt.optimize(optim_cfg, run_backtests=True)
-        
-        
+      opt = Optimizer()
+      opt.optimize(optim_cfg, run_backtests=True)

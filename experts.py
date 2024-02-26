@@ -5,6 +5,8 @@ import numpy as np
 import yaml
 from easydict import EasyDict
 from loguru import logger
+from pathlib import Path
+import pandas as pd
 
 from indicators import ZigZag, ZigZag2, ZigZagOpt
 from utils import Order
@@ -317,6 +319,30 @@ class ClsDummy(ExtensionBase):
             return True
         return False
     
+
+class ClsCustom(ExtensionBase):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(ClsCustom, self).__init__(cfg, name="custom")
+        folder = "./data/andrey_data_train/tsla_results_240114"
+        self.signals = {}
+        for fname in sorted(Path(folder).rglob("*.xlsx")):
+            if "true" in fname.parent.name:
+                d = str(fname.stem).split("___")[1]
+                side = -1 if "min" in fname.parent.name else 1
+                self.signals[np.array(d, dtype='datetime64[D]').item()] = side
+        
+    def __call__(self, common, h) -> bool:
+        side = self.signals.get(h.Date[-1].astype("datetime64[D]").item(), 0)
+        if side != 0:
+            if side == 1:
+                common.lprice = h.Close[-1] #max(h.High[-2], h.Low[-2])
+            if side == -1:
+                common.sprice = h.Close[-1] #min(h.High[-2], h.Low[-2])
+            return True
+            
+        return False
+
 
 class StopsFixed(ExtensionBase):
     def __init__(self, cfg):

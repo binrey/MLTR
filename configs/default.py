@@ -28,6 +28,12 @@ body_classifiers = EasyDict(
         params=EasyDict(
             ncross=Param(17, [15, 17, 20, 24])
             )
+        ),
+    custom = EasyDict( 
+        func=ClsCustom,
+        params=EasyDict(
+            ncross=Param(0, [0])
+            )
         ) 
 )
 
@@ -35,8 +41,8 @@ stops_processors = EasyDict(
     stops_fixed = EasyDict(
         func=StopsFixed,
         params=EasyDict(
-            tp=Param(None, [None]), 
-            sl=Param(0.2, [1, 2, 3, 5])
+            tp=Param(30, [2, 4, 8, 16]), 
+            sl=Param(10, [2, 4, 8, 16])
             )
         ),
     stops_dynamic = EasyDict(
@@ -56,20 +62,20 @@ forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
 
 config = EasyDict(
     lot=Param(0.01, [0.01]),
-    date_start=Param("2024-02-01", ["2017-09-01"]),
-    date_end=Param("2024-03-01", ["2024-01-01"]),
+    date_start=Param("2010-04-01", ["2010-01-01"]),
+    date_end=Param("2024-03-01", ["2024-03-01"]),
     no_trading_days=Param(set(), [set()]),
-    trailing_stop_rate=Param(0.007, [0.005, 0.006, 0.007, 0.008]),
+    trailing_stop_rate=Param(0., [0.]),
     trailing_stop_type=Param(1, [1]),
-    body_classifier=Param(body_classifiers["tunnel"], [body_classifiers[k] for k in ["tunnel"]]),
-    stops_processor=Param(stops_processors["stops_dynamic"], [stops_processors[k] for k in ["stops_dynamic"]]),
+    body_classifier=Param(body_classifiers["custom"], [body_classifiers[k] for k in ["custom"]]),
+    stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_fixed"]]),
     wait_entry_point=Param(999, [999]),
-    hist_buffer_size=Param(64, [64]),
+    hist_buffer_size=Param(256, [32]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("M15", ["M15"]),
-    ticker=Param("BTCUSDT-test", ["BTCUSDT", "ETHUSDT"]),
-    data_type=Param("metatrader", ["metatrader"]),
+    period=Param("D", ["D"]),
+    ticker=Param("TSLA", ["TSLA"]),
+    data_type=Param("yahoo", ["yahoo"]),
     save_plots=Param(True, [False]),
     run_model_device=Param(None, [None])
 )

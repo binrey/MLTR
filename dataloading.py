@@ -94,14 +94,14 @@ class DataParser():
     
     def _trim_by_date(self, hist):
         if self.cfg.date_start is not None:
-            date_start = pd.to_datetime(self.cfg.date_start)
+            date_start = pd.to_datetime(self.cfg.date_start, utc=True)
             for i, d in enumerate(hist.Date):
                 if d >= date_start:
                     break
             hist = hist.iloc[i:]   
             
         if self.cfg.date_end is not None:
-            date_end = pd.to_datetime(self.cfg.date_end)
+            date_end = pd.to_datetime(self.cfg.date_end, utc=True)
             for i, d in enumerate(hist.Date):
                 if d >= date_end:
                     break
@@ -140,13 +140,14 @@ class DataParser():
         hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
         return hist, hist_dict
     
-    @staticmethod
-    def yahoo(data_file):
+    def yahoo(self, data_file):
         hist = pd.read_csv(data_file)
         hist["Date"] = pd.to_datetime(hist.Date, utc=True)
-        hist.set_index("Date", inplace=True, drop=True)
+        hist = self._trim_by_date(hist)
         hist["Id"] = list(range(hist.shape[0]))
-        return hist
+        hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
+        hist.set_index("Date", inplace=True, drop=True)
+        return hist, hist_dict
         
     def bybit(self, data_file):
         pd.options.mode.chained_assignment = None

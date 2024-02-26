@@ -12,6 +12,7 @@ from dataloading import MovingWindow, DataParser
 pd.options.mode.chained_assignment = None
 from experts import BacktestExpert, PyConfig
 from utils import Broker
+from real_trading import plot_fig
 logger.remove()
 
 # Если проблемы с отрисовкой графиков
@@ -92,8 +93,8 @@ def backtest(cfg):
     for t in tqdm(range(tstart, tend), "back test"):
         h, dt = mw(t)
         # TODO
-        if h.Date[-1].astype(np.datetime64) < np.array("2024-02-15T00:30:00", dtype=np.datetime64):
-            continue
+        # if h.Date[-1].astype(np.datetime64) < np.array("2024-02-15T00:30:00", dtype=np.datetime64):
+        #     continue
         tdata += dt
         texp += exp.update(h, broker.active_position)
         if len(exp.orders):
@@ -124,13 +125,19 @@ def backtest(cfg):
                         except:
                             pass
                         line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)
-                
-                fig = mpf.plot(hist2plot, 
-                            type='candle', 
-                            block=False,
-                            alines=dict(alines=lines2plot, colors=colors, linewidths=widths),
-                            savefig=save_path / f"fig-{str(closed_pos.open_date).split('.')[0]}.png",)
-                del fig
+                plot_fig(hist2plot=hist2plot,
+                         lines2plot=lines2plot,
+                         save_path=save_path,
+                         prefix=cfg.ticker,
+                         t=pd.to_datetime(closed_pos.open_date, utc=True),
+                         side="Buy" if closed_pos.dir > 0 else "Sell",
+                         ticker=cfg.ticker)
+                # fig = mpf.plot(hist2plot, 
+                #             type='candle', 
+                #             block=False,
+                #             alines=dict(alines=lines2plot, colors=colors, linewidths=widths),
+                #             savefig=save_path / f"fig-{str(closed_pos.open_date).split('.')[0]}.png",)
+                # del fig
     
     ttotal = perf_counter() - t0
     backtest_results = BackTestResults(broker, cfg.date_start, cfg.date_end)

@@ -85,7 +85,7 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
             figscale=1.5,
             style=mystyle,
             datetime_format='%m-%d %H:%M',
-            title=f"{t}-{ticker}-{side}",
+            title=f"{np.array(t).astype('datetime64[s]')}-{ticker}-{side}",
             returnfig=True
         )
 
@@ -97,7 +97,8 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
             # if type(x) is slice:
             #     x = x.start
             y = hist2plot.loc[t].Open
-            axlist[0].annotate("", (x, y*(1+0.001*side_int)), fontsize=20, xytext=(x, y),
+            arrow_size = (hist2plot.iloc[-10:].High - hist2plot.iloc[-10:].Low).mean()
+            axlist[0].annotate("", (x, y + arrow_size*side_int), fontsize=20, xytext=(x, y),
                         color="black", 
                         arrowprops=dict(
                             arrowstyle='->',
@@ -105,7 +106,7 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
                             edgecolor='b'))
             
         if save_path is not None:
-            save_path = save_path / f"{prefix}-{str(t).split('.')[0]}.png".replace(":", "-")    
+            save_path = save_path / f"{prefix}-{str(np.array(t).astype('datetime64[s]')).split('.')[0]}.png".replace(":", "-")    
             fig.savefig(save_path, bbox_inches='tight', pad_inches=0.2)  
         if send2telegram:
             my_telebot.send_image(save_path)
