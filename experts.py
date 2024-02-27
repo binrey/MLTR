@@ -324,21 +324,35 @@ class ClsCustom(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsCustom, self).__init__(cfg, name="custom")
-        folder = "./data/andrey_data_train/tsla_results_240114"
-        self.signals = {}
+        folder = "./data/handmade/tsla_results_240114"
+        self.signals, self.props = {}, {}
         for fname in sorted(Path(folder).rglob("*.xlsx")):
             if "true" in fname.parent.name:
                 d = str(fname.stem).split("___")[1]
                 side = -1 if "min" in fname.parent.name else 1
-                self.signals[np.array(d, dtype='datetime64[D]').item()] = side
+                k = np.array(d, dtype='datetime64[D]').item()
+                self.signals[k] = side
+                
+                df = pd.read_excel(fname)
+                self.props[k] = []
+                for i in range(df.shape[0]):
+                    row = df.iloc[i]
+                    x = np.array(row.Date, dtype="datetime64[D]")
+                    y = {"real_peak_max": row.High,
+                         "real_peak_min": row.Low}.get(row.Analyze, row.Close)
+                    self.props[k] += [(x, y)]
         
     def __call__(self, common, h) -> bool:
-        side = self.signals.get(h.Date[-1].astype("datetime64[D]").item(), 0)
+        t = h.Date[-1].astype("datetime64[D]").item()
+        side = self.signals.get(t, 0)
         if side != 0:
             if side == 1:
-                common.lprice = h.Close[-1] #max(h.High[-2], h.Low[-2])
+                common.lprice = h.Open[-1] #max(h.High[-2], h.Low[-2])
             if side == -1:
-                common.sprice = h.Close[-1] #min(h.High[-2], h.Low[-2])
+                common.sprice = h.Open[-1] #min(h.High[-2], h.Low[-2])
+            common.lines = [[]]    
+            for pt in self.props[t]:
+                common.lines[0].append((h.Id[h.Date.astype("datetime64[D]") == pt[0]][0], pt[1]))
             return True
             
         return False
