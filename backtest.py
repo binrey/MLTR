@@ -115,7 +115,7 @@ def backtest(cfg):
                 
                 t1plot = lines2plot[-1][-1][0]
                 t0plot = min([e[0] for e in lines2plot[0]]) 
-                dbars = max(0, 128- (t1plot - t0plot))
+                dbars = max(0, 128 - (t1plot - t0plot))
                 hist2plot = hist_pd.iloc[t0plot - dbars:lines2plot[-1][-1][0]+1]
                 for line in lines2plot:
                     for i, point in enumerate(line):

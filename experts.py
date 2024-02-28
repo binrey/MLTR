@@ -84,13 +84,13 @@ class ExpertFormation(ExpertBase):
         
         self.order_dir = 0
         if self.lprice:
-            if h.Open[-1] >= self.lprice and h.Close[-2] > self.lprice:
+            if h.Open[-1] >= self.lprice or h.Close[-2] > self.lprice:
                 self.order_dir = 1
             if self.cprice and h.Open[-1] < self.cprice:
                 self.reset_state()
                 return
         if self.sprice:
-            if h.Open[-1] <= self.sprice and h.Close[-2] < self.sprice:
+            if h.Open[-1] <= self.sprice or h.Close[-2] < self.sprice:
                 self.order_dir = -1
             if self.cprice and h.Open[-1] > self.cprice:
                 self.reset_state()
@@ -324,12 +324,12 @@ class ClsCustom(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsCustom, self).__init__(cfg, name="custom")
-        folder = "./data/handmade/tsla_results_240114"
+        folder = "./data/andrey_data_valid/googl_results_240218"
         self.signals, self.props = {}, {}
         for fname in sorted(Path(folder).rglob("*.xlsx")):
             if "true" in fname.parent.name:
                 d = str(fname.stem).split("___")[1]
-                side = -1 if "min" in fname.parent.name else 1
+                side = 1 if "min" in fname.parent.name else -1
                 k = np.array(d, dtype='datetime64[D]').item()
                 self.signals[k] = side
                 
@@ -351,8 +351,12 @@ class ClsCustom(ExtensionBase):
             if side == -1:
                 common.sprice = h.Open[-1] #min(h.High[-2], h.Low[-2])
             common.lines = [[]]    
-            for pt in self.props[t]:
+            for i, pt in enumerate(self.props[t]):
                 common.lines[0].append((h.Id[h.Date.astype("datetime64[D]") == pt[0]][0], pt[1]))
+                if i == 3:
+                    common.sl = {1: pt[1], -1: pt[1]} 
+                    common.tp = {1: h.Close[-1] + abs(h.Close[-1] - pt[1])*3, 
+                                 -1: h.Close[-1] - abs(h.Close[-1] - pt[1])*3} 
             return True
             
         return False
