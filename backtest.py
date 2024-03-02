@@ -24,13 +24,16 @@ class BackTestResults:
         self.profits = backtest_broker.profits
         self.balance = self.profits.cumsum()
         self.ndeals = len(self.profits)
+        self.durations = np.array([pos.duration for pos in backtest_broker.positions])
         self.dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
         self.final_balance = self.balance[-1]
         self.daily_balance = self.convert_hist(self.profits, self.dates, date_start, date_end)
-        self.daily_bstair, self.metrics = self.calc_metrics(self.daily_balance)
+        self.daily_bstair, self.metrics = self._calc_metrics(self.daily_balance)
+        self.metrics.update({"pos_mean_duration": self.durations.mean(),
+                             "mean_pos_result": self.profits.mean()})
 
     @staticmethod
-    def calc_metrics(ts):
+    def _calc_metrics(ts):
         ymax = ts[0]
         twait = 0
         twaits = []
@@ -132,25 +135,23 @@ def backtest(cfg):
                          t=pd.to_datetime(closed_pos.open_date, utc=True),
                          side="Buy" if closed_pos.dir > 0 else "Sell",
                          ticker=cfg.ticker)
-                # fig = mpf.plot(hist2plot, 
-                #             type='candle', 
-                #             block=False,
-                #             alines=dict(alines=lines2plot, colors=colors, linewidths=widths),
-                #             savefig=save_path / f"fig-{str(closed_pos.open_date).split('.')[0]}.png",)
-                # del fig
+
     
     ttotal = perf_counter() - t0
     backtest_results = BackTestResults(broker, cfg.date_start, cfg.date_end)
-    sformat = "{:>30}: {:>3.0f} %"
+    sformat = lambda type: {1:"{:>30}: {:>4.0f}", 2: "{:>30}: {:.2f}"}.get(type)
     logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}")
-    logger.info("{:>30}: {:.1f} sec".format("total backtest", ttotal))
-    logger.info(sformat.format("expert updates", texp/ttotal*100))
-    logger.info(sformat.format("broker updates", tbrok/ttotal*100))
-    logger.info(sformat.format("data loadings", tdata/ttotal*100))
+    logger.info(sformat(2).format("total backtest", ttotal) + " sec")
+    logger.info(sformat(1).format("expert updates", texp/ttotal*100) + " %")
+    logger.info(sformat(1).format("broker updates", tbrok/ttotal*100) + " %")
+    logger.info(sformat(1).format("data loadings", tdata/ttotal*100) + " %")
     logger.info("-"*30)
-    logger.info(sformat.format("FINAL PROFIT", backtest_results.final_balance) + f" ({backtest_results.ndeals} deals)") 
-    logger.info(sformat.format("RECOVRY FACTOR", backtest_results.metrics["linearity"])[:-2]) 
-    logger.info(sformat.format("MAXWAIT", backtest_results.metrics["maxwait"])[:-2]+"\n") 
+    logger.info(sformat(1).format("FINAL PROFIT", backtest_results.final_balance) + f" %  ({backtest_results.ndeals} deals)") 
+    logger.info(sformat(2).format("MEAN POS. RESULT", backtest_results.metrics["mean_pos_result"]) + " %")
+    logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.metrics["pos_mean_duration"]))            
+    logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["linearity"])) 
+    logger.info(sformat(1).format("MAXWAIT", backtest_results.metrics["maxwait"])+"\n")
+    
     # import pickle
     # pickle.dump((cfg, broker), open(str(Path("backtests") / f"btest{0:003.0f}.pickle"), "wb"))
     return backtest_results

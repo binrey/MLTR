@@ -48,7 +48,7 @@ stops_processors = EasyDict(
     stops_dynamic = EasyDict(
         func=StopsDynamic,
         params=EasyDict(
-            tp_active=Param(True, [False]),
+            tp_active=Param(False, [False]),
             sl_active=Param(True, [True])
             )
         )    
@@ -65,17 +65,17 @@ config = EasyDict(
     date_start=Param("2010-04-01", ["2010-01-01"]),
     date_end=Param("2024-03-01", ["2024-03-01"]),
     no_trading_days=Param(set(), [set()]),
-    trailing_stop_rate=Param(0.0, [0.]),
+    trailing_stop_rate=Param(0.007, [0.]),
     trailing_stop_type=Param(1, [1]),
-    body_classifier=Param(body_classifiers["custom"], [body_classifiers[k] for k in ["custom"]]),
+    body_classifier=Param(body_classifiers["tunnel"], [body_classifiers[k] for k in ["custom"]]),
     stops_processor=Param(stops_processors["stops_dynamic"], [stops_processors[k] for k in ["stops_fixed"]]),
     wait_entry_point=Param(999, [999]),
-    hist_buffer_size=Param(500, [32]),
+    hist_buffer_size=Param(64, [32]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("D", ["D"]),
-    ticker=Param("GOOGL", ["TSLA"]),
-    data_type=Param("yahoo", ["yahoo"]),
-    save_plots=Param(True, [False]),
+    period=Param("M15", ["D"]),
+    ticker=Param("ETH", ["TSLA"]),
+    data_type=Param("metatrader", ["yahoo"]),
+    save_plots=Param(False, [False]),
     run_model_device=Param(None, [None])
 )

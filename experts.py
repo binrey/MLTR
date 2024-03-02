@@ -324,12 +324,12 @@ class ClsCustom(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsCustom, self).__init__(cfg, name="custom")
-        folder = "./data/andrey_data_valid/googl_results_240218"
+        folder = "./data/handmade_train/aapl_results_240105"
         self.signals, self.props = {}, {}
         for fname in sorted(Path(folder).rglob("*.xlsx")):
             if "true" in fname.parent.name:
                 d = str(fname.stem).split("___")[1]
-                side = 1 if "min" in fname.parent.name else -1
+                side = -1 if "min" in fname.parent.name else 1
                 k = np.array(d, dtype='datetime64[D]').item()
                 self.signals[k] = side
                 
@@ -353,7 +353,7 @@ class ClsCustom(ExtensionBase):
             common.lines = [[]]    
             for i, pt in enumerate(self.props[t]):
                 common.lines[0].append((h.Id[h.Date.astype("datetime64[D]") == pt[0]][0], pt[1]))
-                if i == 3:
+                if i == 2:
                     common.sl = {1: pt[1], -1: pt[1]} 
                     common.tp = {1: h.Close[-1] + abs(h.Close[-1] - pt[1])*3, 
                                  -1: h.Close[-1] - abs(h.Close[-1] - pt[1])*3} 
