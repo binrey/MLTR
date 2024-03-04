@@ -77,8 +77,10 @@ class Optimizer:
                               opt_summary[k].append(str(v.func.name))
                         else:
                               opt_summary[k].append(v)
-                              
+            # Remove lines with attributes consists of one elment (except ticker field)                
             for k in list(opt_summary.keys()):
+                  if k == "ticker":
+                        continue
                   if len(set(opt_summary[k])) == 1:
                         opt_summary.pop(k)
                         
@@ -108,25 +110,25 @@ class Optimizer:
             opt_res = pd.DataFrame(opt_res)
             opt_res = opt_res.groupby(by="param_set").sum()
 
-            linearity, maxwait, balances_av = [], [], {}
+            recovery, maxwait, balances_av = [], [], {}
             for i in range(opt_res.shape[0]):
                   sum_daily_balance = 0
                   test_ids = list(map(int, opt_res.test_ids.iloc[i].split(".")[1:]))
                   for test_id in test_ids:
                         sum_daily_balance += btests[test_id].daily_balance
                   balance_av = sum_daily_balance/len(test_ids)
-                  bstair_av, metrics = BackTestResults.calc_metrics(balance_av)
-                  linearity.append(metrics["linearity"])
+                  bstair_av, metrics = BackTestResults._calc_metrics(balance_av)
+                  recovery.append(metrics["recovery"])
                   maxwait.append(metrics["maxwait"])
                   opt_res["final_balance"].iloc[i] = balance_av[-1]
                   balances_av[opt_res.index[i]] = balance_av
-            opt_res["linearity"] = linearity
+            opt_res["recovery"] = recovery
             opt_res["maxwait"] = maxwait
             opt_res["ndeals"] = np.int64(opt_res["ndeals"].values/len(test_ids))
             
             opt_res = opt_res[opt_res.ndeals<2500]
             
-            sortby = "linearity" #"linearity" #"final_balance" #
+            sortby = "recovery" #"recovery" #"final_balance" #
             opt_res.sort_values(by=[sortby], ascending=False, inplace=True)
             logger.info(f"\n{opt_res}\n\n")
 
@@ -136,7 +138,7 @@ class Optimizer:
             for test_id in range(min(opt_res.shape[0], 5)):
                   plt.plot(balances_av[opt_res.index[test_id]], linewidth=2 if test_id==0 else 1)
                   row = opt_res.iloc[test_id]
-                  legend.append(f"{opt_res.index[test_id]}: bal={row.final_balance:.0f} ({row.ndeals}) lin={row.linearity:.2f} mwait={row.maxwait:.0f}")
+                  legend.append(f"{opt_res.index[test_id]}: bal={row.final_balance:.0f} ({row.ndeals}) lin={row.recovery:.2f} mwait={row.maxwait:.0f}")
             plt.legend(legend) 
             plt.grid("on")      
             plt.subplot(2, 1, 2)
@@ -145,9 +147,9 @@ class Optimizer:
             legend = []
             for test_id in test_ids:
                   row = opt_res.iloc[i]
-                  _, metrics = BackTestResults.calc_metrics(btests[test_id].daily_balance)
+                  _, metrics = BackTestResults._calc_metrics(btests[test_id].daily_balance)
                   plt.plot(btests[test_id].daily_balance)
-                  legend.append(f"{btests[test_id].cfg.ticker} bal={btests[test_id].final_balance:.0f} ({btests[test_id].ndeals}) lin={metrics['linearity']:.2f} mwait={metrics['maxwait']:.0f}")
+                  legend.append(f"{btests[test_id].cfg.ticker} bal={btests[test_id].final_balance:.0f} ({btests[test_id].ndeals}) lin={metrics['recovery']:.2f} mwait={metrics['maxwait']:.0f}")
             plt.plot(balances_av[opt_res.index[i]], linewidth=3, color="black")
             plt.legend(legend) 
             plt.grid("on")        

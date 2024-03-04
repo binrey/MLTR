@@ -56,7 +56,7 @@ class BackTestResults:
         lin_err = sum(np.abs(ts - np.arange(0, ts[-1], ts[-1]/len(ts))[:len(ts)]))
         lin_err /= len(ts)*ts[-1]
         metrics = {"maxwait": twaits.max(),#[-5:].mean(), 
-                   "linearity": ts[-1]/max_loss, 
+                   "recovery": ts[-1]/max_loss, 
                    "loss_max": max_loss}
         return h, metrics
 
@@ -118,7 +118,7 @@ def backtest(cfg):
                 
                 t1plot = lines2plot[-1][-1][0]
                 t0plot = min([e[0] for e in lines2plot[0]]) 
-                dbars = max(0, 128 - (t1plot - t0plot))
+                dbars = max(0, 64 - (t1plot - t0plot))
                 hist2plot = hist_pd.iloc[t0plot - dbars:lines2plot[-1][-1][0]+1]
                 for line in lines2plot:
                     for i, point in enumerate(line):
@@ -140,7 +140,7 @@ def backtest(cfg):
     ttotal = perf_counter() - t0
     backtest_results = BackTestResults(broker, cfg.date_start, cfg.date_end)
     sformat = lambda type: {1:"{:>30}: {:>4.0f}", 2: "{:>30}: {:.2f}"}.get(type)
-    logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}")
+    logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate_long}")
     logger.info(sformat(2).format("total backtest", ttotal) + " sec")
     logger.info(sformat(1).format("expert updates", texp/ttotal*100) + " %")
     logger.info(sformat(1).format("broker updates", tbrok/ttotal*100) + " %")
@@ -149,7 +149,7 @@ def backtest(cfg):
     logger.info(sformat(1).format("FINAL PROFIT", backtest_results.final_balance) + f" %  ({backtest_results.ndeals} deals)") 
     logger.info(sformat(2).format("MEAN POS. RESULT", backtest_results.metrics["mean_pos_result"]) + " %")
     logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.metrics["pos_mean_duration"]))            
-    logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["linearity"])) 
+    logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["recovery"])) 
     logger.info(sformat(1).format("MAXWAIT", backtest_results.metrics["maxwait"])+"\n")
     
     # import pickle
