@@ -30,7 +30,7 @@ class Order:
 
     @property
     def id(self):
-        return f"{self.str_dir}-{self.open_indx}-{self.price:.2f}"
+        return f"{self.open_indx}-{self.str_dir}-{self.price:.2f}"
     
     @property
     def lines(self):
@@ -49,12 +49,16 @@ class Order:
         
 
 class Position:
-    def __init__(self, price, date, indx, ticker="NoName", period="M5"):
+    def __init__(self, price, date, indx, ticker="NoName", period="M5", sl=None):
         self.ticker = ticker
         self.period = period
         self.open_price = abs(price)
         self.open_date = date
         self.open_indx = indx
+        self.sl = sl
+        self.open_risk = np.nan
+        if self.sl is not None:
+            self.open_risk = abs(self.open_price - self.sl)/self.open_price*100
         self.dir = np.sign(price)
         self.close_price = None
         self.close_date = None
@@ -74,7 +78,7 @@ class Position:
     
     @property
     def id(self):
-        return f"{self.str_dir}-{self.open_indx}-{self.open_price:.2f}"
+        return f"{self.open_indx}-{self.str_dir}-{self.open_price:.2f}"
     
     def close(self, price, date, indx):
         self.close_price = abs(price)
@@ -139,7 +143,12 @@ class Broker:
                 self.close_orders(triggered_id, i)
                 # triggered_id = triggered_date#.Id[np.where(h.index == triggered_date)[0].item()]
                 if self.active_position is None:
-                    self.active_position = Position(triggered_price, triggered_date, triggered_id, self.cfg.ticker, self.cfg.period)
+                    sl = None
+                    for order in self.active_orders:
+                        if order.dir*triggered_price < 0:
+                            if (triggered_price > 0 and order.price < triggered_price) or (triggered_price < 0 and order.price > abs(triggered_price)):
+                                sl = order.price
+                    self.active_position = Position(triggered_price, triggered_date, triggered_id, self.cfg.ticker, self.cfg.period, sl)
                 else:
                     if self.active_position.dir*triggered_price < 0:
                         self.active_position.close(triggered_price, triggered_date, triggered_id)
@@ -158,8 +167,8 @@ class Broker:
     def trailing_stop(self, h):
         date, p = h.Id[-1], h.Close[-1]
         position = self.active_position
-        # if position is None or self.cfg.trailing_stop_rate == 0:
-        #     return
+        if position is None or (self.cfg.trailing_stop_rate_long == 0 and self.cfg.trailing_stop_rate_shrt == 0) :
+            return
         for order in self.active_orders:
             if date == order.open_date:
                 self.best_profit = 0

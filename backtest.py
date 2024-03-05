@@ -25,12 +25,15 @@ class BackTestResults:
         self.balance = self.profits.cumsum()
         self.ndeals = len(self.profits)
         self.durations = np.array([pos.duration for pos in backtest_broker.positions])
+        self.open_risks = np.array([pos.open_risk for pos in backtest_broker.positions])
         self.dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
         self.final_balance = self.balance[-1]
         self.daily_balance = self.convert_hist(self.profits, self.dates, date_start, date_end)
         self.daily_bstair, self.metrics = self._calc_metrics(self.daily_balance)
-        self.metrics.update({"pos_mean_duration": self.durations.mean(),
-                             "mean_pos_result": self.profits.mean()})
+        self.metrics.update({"mean_pos_duration": self.durations.mean(),
+                             "mean_pos_result": self.profits.mean(),
+                             "mean_open_risk": np.nanmean(self.open_risks)
+                             })
 
     @staticmethod
     def _calc_metrics(ts):
@@ -139,7 +142,7 @@ def backtest(cfg):
     
     ttotal = perf_counter() - t0
     backtest_results = BackTestResults(broker, cfg.date_start, cfg.date_end)
-    sformat = lambda type: {1:"{:>30}: {:>4.0f}", 2: "{:>30}: {:.2f}"}.get(type)
+    sformat = lambda type: {1:"{:>30}: {:>5.0f}", 2: "{:>30}: {:5.2f}"}.get(type)
     logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate_long}")
     logger.info(sformat(2).format("total backtest", ttotal) + " sec")
     logger.info(sformat(1).format("expert updates", texp/ttotal*100) + " %")
@@ -148,7 +151,8 @@ def backtest(cfg):
     logger.info("-"*30)
     logger.info(sformat(1).format("FINAL PROFIT", backtest_results.final_balance) + f" %  ({backtest_results.ndeals} deals)") 
     logger.info(sformat(2).format("MEAN POS. RESULT", backtest_results.metrics["mean_pos_result"]) + " %")
-    logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.metrics["pos_mean_duration"]))            
+    logger.info(sformat(2).format("MEAN ONOPEN RISK", backtest_results.metrics["mean_open_risk"]) + " %")
+    logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.metrics["mean_pos_duration"]))            
     logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["recovery"])) 
     logger.info(sformat(1).format("MAXWAIT", backtest_results.metrics["maxwait"])+"\n")
     
