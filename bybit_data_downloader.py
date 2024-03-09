@@ -16,18 +16,17 @@ import gzip
 import time
 import requests
 from bs4 import BeautifulSoup
+import pandas as pd
+from pathlib import Path
 
-
-# Set the file version
-ver = '1.3:02/05/23'
 
 # Define the base URL
 base_url = 'https://public.bybit.com/kline_for_metatrader4/'
-
+headers={"User-Agent": "Mozilla/5.0 (X11; CrOS x86_64 12871.102.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.141 Safari/537.36"}
 # Set the list of coins
 coin = "BTCUSDT"
 minutes_period = 15
-year = 2024
+year = 2000
 
 # Create a function to download the files
 def download_file(url, local_path):
@@ -41,17 +40,37 @@ def file_exists(local_path):
     return os.path.exists(local_path)
 
 
+def stack_csv_files(directory):
+    # Get list of CSV files in the directory
+    csv_files = sorted([file for file in os.listdir(directory) if file.endswith('.csv')])
+
+    # Create an empty DataFrame to store the stacked data
+    stacked_data = pd.DataFrame()
+
+    # Iterate through each CSV file and stack the data
+    for file in csv_files:
+        data = pd.read_csv(os.path.join(directory, file), header=None)
+        stacked_data = pd.concat([stacked_data, data], ignore_index=True)
+        print(file, data.shape, "->", stacked_data.shape)
+
+    stacked_data.columns = ["<DATE>", "<OPEN>", "<HIGH>", "<LOW>", "<CLOSE>", "<VOL>"]
+    # Save the stacked data to a new CSV file
+    stacked_data.to_csv(os.path.join(Path(directory).parent.parent, 
+                                     "_".join(csv_files[0].split("_")[:2] + [csv_files[0].split("_")[2], csv_files[-1].split("_")[2]]) + ".csv"), index=False)
+    print('CSV files stacked successfully!')   
+   
+     
 # Make a GET request to the base URL and parse the HTML
-response = requests.get(base_url)
+response = requests.get(base_url, headers=headers)
 soup = BeautifulSoup(response.text, 'html.parser')
 
 # Find all the links on the page
 links = soup.find_all('a')
 
 # Loop through all the links
-for link in links:
+for coin_link in links:
     # Get the href attribute of the link
-    href = link.get('href')    
+    href = coin_link.get('href')    
     if not coin in href:
         continue
     # Check if the href attribute is a directory
@@ -63,18 +82,16 @@ for link in links:
     if not os.path.exists(dir_name):
         os.mkdir(dir_name)
     dir_url = base_url + href
-    dir_response = requests.get(dir_url)
+    dir_response = requests.get(dir_url, headers=headers)
     dir_soup = BeautifulSoup(dir_response.text, 'html.parser')   
     links = dir_soup.find_all('a')    
     for link in links:
-        href = link.get('href')   
-        if str(year) not in href:
-            continue  
+        href = link.get('href')    
         if not href.endswith('/'):
             continue  
         # Make a GET request to the directory URL and parse the HTML
-        dir_url = dir_url + href
-        dir_response = requests.get(dir_url)
+        year_url = dir_url + href
+        dir_response = requests.get(year_url, headers=headers)
         dir_soup = BeautifulSoup(dir_response.text, 'html.parser')
         # Find all the CSV files in the directory
         csv_links = dir_soup.find_all(href=re.compile('.csv.gz$'))
@@ -87,7 +104,7 @@ for link in links:
             # Extract the date from the CSV file name
             csv_date = re.findall(r'\d{4}-\d{2}-\d{2}', csv_name)[0]
             # Construct the full URL of the CSV file
-            csv_url = dir_url + csv_name
+            csv_url = year_url + csv_name
             # Construct the local path of the extracted file
             extracted_path = os.path.join(dir_name, csv_name[:-3])
             # Check if the extracted file exists locally
@@ -100,7 +117,7 @@ for link in links:
                 if not file_exists(archive_path):
                     download_file(csv_url, archive_path)
                     print('Downloaded:', archive_path)
-                    time.sleep(0.1)
+                    time.sleep(5)
                 # Check if the file is a gzip archive
                 if csv_name.endswith('.gz'):
                     # Open the gzip archive and extract the contents
@@ -115,3 +132,6 @@ for link in links:
                     # Rename the file to remove the .csv extension
                     os.rename(archive_path, extracted_path)
                     print('Renamed:', archive_path, 'to', extracted_path)
+                    
+                    
+stack_csv_files(dir_name)  

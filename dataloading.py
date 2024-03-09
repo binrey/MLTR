@@ -108,6 +108,21 @@ class DataParser():
             hist = hist.iloc[:i]   
         return hist           
         
+    def bybit(self, data_file):
+        pd.options.mode.chained_assignment = None
+        hist = pd.read_csv(data_file, sep=",")
+        # hist.columns = map(lambda x:x[1:-1], hist.columns)
+        # hist.columns = map(str.capitalize, hist.columns)
+        hist["Date"] = pd.to_datetime(hist.Date.values, utc=True)
+        hist = self._trim_by_date(hist)
+        columns = list(hist.columns)
+        hist.columns = columns
+        hist["Id"] = list(range(hist.shape[0]))
+        hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
+        # hist_dict["Date"] = hist["Date"].values
+        hist.set_index("Date", inplace=True, drop=True)
+        return hist, hist_dict        
+        
     def metatrader(self, data_file):
         pd.options.mode.chained_assignment = None
         hist = pd.read_csv(data_file, sep="\t")
@@ -149,16 +164,6 @@ class DataParser():
         hist.set_index("Date", inplace=True, drop=True)
         return hist, hist_dict
         
-    def bybit(self, data_file):
-        pd.options.mode.chained_assignment = None
-        hist = pd.read_csv(data_file, sep=",")
-        hist.columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
-        hist["Date"] = pd.to_datetime(hist.Date.values)
-        hist = self._trim_by_date(hist)
-        hist["Id"] = list(range(hist.shape[0]))
-        hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
-        hist.set_index("Date", inplace=True, drop=True)
-        return hist, hist_dict
 
 def collect_train_data(dir, fsize=64, glob="*.pickle"):
     cfgs, btests = [], []
