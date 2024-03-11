@@ -115,7 +115,7 @@ class Optimizer:
                   sum_daily_balance = 0
                   test_ids = list(map(int, opt_res.test_ids.iloc[i].split(".")[1:]))
                   for test_id in test_ids:
-                        sum_daily_balance += btests[test_id].daily_balance
+                        sum_daily_balance += btests[test_id].daily_balance["balance"]
                   balance_av = sum_daily_balance/len(test_ids)
                   bstair_av, metrics = BackTestResults._calc_metrics(balance_av)
                   recovery.append(metrics["recovery"])
@@ -136,7 +136,7 @@ class Optimizer:
             plt.subplot(2, 1, 1)
             legend = []
             for test_id in range(min(opt_res.shape[0], 5)):
-                  plt.plot(balances_av[opt_res.index[test_id]], linewidth=2 if test_id==0 else 1)
+                  plt.plot(btests[0].daily_balance["days"], balances_av[opt_res.index[test_id]], linewidth=2 if test_id==0 else 1)
                   row = opt_res.iloc[test_id]
                   legend.append(f"{opt_res.index[test_id]}: bal={row.final_balance:.0f} ({row.ndeals}) lin={row.recovery:.2f} mwait={row.maxwait:.0f}")
             plt.legend(legend) 
@@ -147,10 +147,10 @@ class Optimizer:
             legend = []
             for test_id in test_ids:
                   row = opt_res.iloc[i]
-                  _, metrics = BackTestResults._calc_metrics(btests[test_id].daily_balance)
-                  plt.plot(btests[test_id].daily_balance)
+                  _, metrics = BackTestResults._calc_metrics(btests[test_id].daily_balance["balance"])
+                  plt.plot(btests[test_id].daily_balance["days"], btests[test_id].daily_balance["balance"])
                   legend.append(f"{btests[test_id].cfg.ticker} bal={btests[test_id].final_balance:.0f} ({btests[test_id].ndeals}) lin={metrics['recovery']:.2f} mwait={metrics['maxwait']:.0f}")
-            plt.plot(balances_av[opt_res.index[i]], linewidth=3, color="black")
+            plt.plot(btests[0].daily_balance["days"], balances_av[opt_res.index[i]], linewidth=3, color="black")
             plt.legend(legend) 
             plt.grid("on")        
             plt.tight_layout()

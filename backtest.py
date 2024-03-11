@@ -29,7 +29,7 @@ class BackTestResults:
         self.dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
         self.final_balance = self.balance[-1]
         self.daily_balance = self.convert_hist(self.profits, self.dates, date_start, date_end)
-        self.daily_bstair, self.metrics = self._calc_metrics(self.daily_balance)
+        self.daily_bstair, self.metrics = self._calc_metrics(self.daily_balance["balance"])
         self.metrics.update({"mean_pos_duration": self.durations.mean(),
                              "mean_pos_result": self.profits.mean(),
                              "mean_open_risk": np.nanmean(self.open_risks)
@@ -77,10 +77,14 @@ class BackTestResults:
             day_profs = [balance[-1]] + [b for b, sd in zip(profit, dates) if sd == d]
             # If there are records for currend day, store latest of them, else fill days with no records with latest sored record
             balance.append(day_profs[-1])
+        if len(balance) - len(target_dates) == 1:
+            target_dates = [target_dates[0]] + target_dates
+        if len(target_dates) + len(balance) == 1:
+            balance = balance + [balance[-1]] 
         res = np.array(balance)
         if unbias:
             res = res - profit[0]
-        return res
+        return {"days": target_dates, "balance": res}
 
 
 def backtest(cfg):

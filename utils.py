@@ -177,6 +177,6 @@ class Broker:
                 self.add_profit = 0
                 continue
             t = h.Id[-1] - order.open_indx
-            sl_rate = self.cfg.trailing_stop_rate_long if position.dir > 0 else self.cfg.trailing_stop_rate_shrt
+            sl_rate = self.cfg.trailing_stop_rate_long# if position.dir > 0 else self.cfg.trailing_stop_rate_shrt
             dp = h.Open[-1] - order.price
             order.change(date, order.price + sl_rate * dp)

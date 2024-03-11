@@ -274,12 +274,12 @@ class ClsTunnel(ExtensionBase):
         return is_fig
 
 
-class ClsTriangleSimp(ExtensionBase):
+class ClsTriangle(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
-        super(ClsTriangleSimp, self).__init__(cfg, name="trngl_simp")
-#        self.zigzag = ZigZagOpt(max_drop=0.1)
-        self.zigzag = ZigZag2()
+        super(ClsTriangle, self).__init__(cfg, name="trngl_simp")
+        self.zigzag = ZigZagOpt(max_drop=0.1)
+        #self.zigzag = ZigZag2()
         
     def __call__(self, common, h) -> bool:
         ids, values, types = self.zigzag.update(h)        
@@ -300,8 +300,12 @@ class ClsTriangleSimp(ExtensionBase):
         if is_fig:
             i = self.cfg.npairs*2 + 1
             common.lines = [[(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]]
-            common.lprice = max(common.lines[0][-1][1], common.lines[0][-2][1])
-            common.sprice = min(common.lines[0][-1][1], common.lines[0][-2][1]) 
+            common.lprice = max(common.lines[0][-3][1], common.lines[0][-2][1])
+            common.sprice = min(common.lines[0][-3][1], common.lines[0][-2][1]) 
+            common.sl = {1: min(common.lines[0][-3][1], common.lines[0][-4][1]), 
+                        -1: max(common.lines[0][-3][1], common.lines[0][-4][1])} 
+            common.tp = {1: common.lprice + abs(common.lprice - common.sl[1])*5, 
+                        -1: common.sprice - abs(common.sprice - common.sl[-1])*5} 
         return is_fig
 
 
