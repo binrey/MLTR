@@ -170,7 +170,7 @@ if __name__ == "__main__":
     import sys
     logger.remove()
     logger.add(sys.stderr, level="INFO")
-    cfg = PyConfig().test(sys.argv[1])
+    cfg = PyConfig(sys.argv[1]).test()
     btest_results = backtest(cfg)
     plt.subplots(figsize=(15, 8))
     plt.plot(btest_results.dates, btest_results.balance, linewidth=2, alpha=0.6)

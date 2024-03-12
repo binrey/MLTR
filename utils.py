@@ -3,14 +3,16 @@ from easydict import EasyDict
 from copy import deepcopy
 
 class PyConfig():
-    def test(self, config_file):
-        # from configs.default import config
+    def __init__(self, config_file) -> None:
         # Create a spec object
         spec = importlib.util.spec_from_file_location("config", f"configs/{config_file}")
         # Load the module from the spec
         config_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(config_module)
-        cfg = config_module.config
+        self.cfg = config_module.config
+        
+    def test(self):
+        cfg = deepcopy(self.cfg)
         for k, v in cfg.items():
             v = v.test
             if type(v) is EasyDict and "func" in v.keys():
@@ -21,8 +23,7 @@ class PyConfig():
         return cfg
 
     def optim(self):
-        from configs.trngl_america import config
-        cfg = deepcopy(config)
+        cfg = deepcopy(self.cfg)
         for k, vlist in cfg.items():
             vlist_new = []
             for v in vlist.optim:

@@ -1,19 +1,19 @@
-import sys
+import itertools
+import multiprocessing
+import pickle
+from multiprocessing import Pool
+from pathlib import Path
+from shutil import rmtree
+from time import time
+
+import numpy as np
+import pandas as pd
 from easydict import EasyDict
 from loguru import logger
-import pandas as pd
-from backtest import backtest
-from experts import PyConfig
-import pickle
-from pathlib import Path
-import multiprocessing
-from multiprocessing import Process, Queue, Pool
-import itertools
-from time import time
-from shutil import rmtree
 from matplotlib import pyplot as plt
-from backtest import BackTestResults
-import numpy as np
+
+from backtest import BackTestResults, backtest
+from utils import PyConfig
 
 
 class Optimizer:
@@ -159,6 +159,7 @@ class Optimizer:
                
                   
 if __name__ == "__main__":  
-      optim_cfg = PyConfig().optim()
+      import sys
+      optim_cfg = PyConfig(sys.argv[1]).optim()
       opt = Optimizer()
       opt.optimize(optim_cfg, run_backtests=True)

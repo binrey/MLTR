@@ -58,7 +58,7 @@ stops_processors = EasyDict(
 
 config = EasyDict(
     lot=Param(0.01, [0.01]),
-    date_start=Param("2010-04-01", ["2010-01-01"]),
+    date_start=Param("2017-08-01", ["2017-08-01"]),
     date_end=Param("2024-03-01", ["2024-03-01"]),
     no_trading_days=Param(set(), [set()]),
     trailing_stop_rate=Param(0.007, [0.005, 0.007, 0.009, 0.013]),
