@@ -148,7 +148,7 @@ def backtest(cfg):
     ttotal = perf_counter() - t0
     backtest_results = BackTestResults(broker, cfg.date_start, cfg.date_end)
     sformat = lambda type: {1:"{:>30}: {:>5.0f}", 2: "{:>30}: {:5.2f}"}.get(type)
-    logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate_long}")
+    logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}")
     logger.info(sformat(2).format("total backtest", ttotal) + " sec")
     logger.info(sformat(1).format("expert updates", texp/ttotal*100) + " %")
     logger.info(sformat(1).format("broker updates", tbrok/ttotal*100) + " %")
@@ -170,7 +170,7 @@ if __name__ == "__main__":
     import sys
     logger.remove()
     logger.add(sys.stderr, level="INFO")
-    cfg = PyConfig().test("tunnel_crypto.py")
+    cfg = PyConfig().test(sys.argv[1])
     btest_results = backtest(cfg)
     plt.subplots(figsize=(15, 8))
     plt.plot(btest_results.dates, btest_results.balance, linewidth=2, alpha=0.6)

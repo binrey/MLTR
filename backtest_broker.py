@@ -167,7 +167,7 @@ class Broker:
     def trailing_stop(self, h):
         date, p = h.Id[-1], h.Close[-1]
         position = self.active_position
-        if position is None or (self.cfg.trailing_stop_rate_long == 0 and self.cfg.trailing_stop_rate_shrt == 0) :
+        if position is None or self.cfg.trailing_stop_rate == 0:
             return
         for order in self.active_orders:
             if date == order.open_date:
@@ -177,6 +177,6 @@ class Broker:
                 self.add_profit = 0
                 continue
             t = h.Id[-1] - order.open_indx
-            sl_rate = self.cfg.trailing_stop_rate_long# if position.dir > 0 else self.cfg.trailing_stop_rate_shrt
+            sl_rate = self.cfg.trailing_stop_rate
             dp = h.Open[-1] - order.price
             order.change(date, order.price + sl_rate * dp)
