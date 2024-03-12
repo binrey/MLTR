@@ -10,8 +10,9 @@ from loguru import logger
 from tqdm import tqdm
 from dataloading import MovingWindow, DataParser
 pd.options.mode.chained_assignment = None
-from experts import BacktestExpert, PyConfig
-from utils import Broker
+from utils import PyConfig
+from backtest_broker import Broker
+from experts import BacktestExpert
 from real_trading import plot_fig
 logger.remove()
 
@@ -169,7 +170,7 @@ if __name__ == "__main__":
     import sys
     logger.remove()
     logger.add(sys.stderr, level="INFO")
-    cfg = PyConfig().test()
+    cfg = PyConfig().test("tunnel_crypto.py")
     btest_results = backtest(cfg)
     plt.subplots(figsize=(15, 8))
     plt.plot(btest_results.dates, btest_results.balance, linewidth=2, alpha=0.6)

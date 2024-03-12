@@ -5,7 +5,8 @@ import mplfinance as mpf
 import pandas as pd
 from loguru import logger
 pd.options.mode.chained_assignment = None
-from experts import ByBitExpert, PyConfig
+from experts import ByBitExpert
+from utils import PyConfig
 from datetime import datetime
 import numpy as np
 import pandas as pd
