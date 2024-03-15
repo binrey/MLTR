@@ -164,8 +164,8 @@ class ClsTrend(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsTrend, self).__init__(cfg, name="trend")
-        self.zigzag = ZigZagOpt(max_drop=self.cfg.maxdrop)
-        #self.zigzag = ZigZag2()
+        # self.zigzag = ZigZagOpt(max_drop=self.cfg.maxdrop)
+        self.zigzag = ZigZag2()
         
     def __call__(self, common, h) -> bool:
         ids, values, types = self.zigzag.update(h)
@@ -191,11 +191,10 @@ class ClsTrend(ExtensionBase):
                 trend_type = types[-2]                        
     
         if is_fig:
-            # if trend_type<0:
-            #     return False
+            
             i = self.cfg.npairs*2 + 1
+            common.sl = {1: h.Low[-i:].min(), -1: h.High[-i:].max()} 
             common.lines = [[(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]]
-            # self.get_trend(h[:-self.body_length+2])
             common.lprice = max(common.lines[0][-1][1], common.lines[0][-2][1]) if trend_type > 0 else None
             common.sprice = min(common.lines[0][-1][1], common.lines[0][-2][1]) if trend_type < 0 else None
             common.cprice = common.lines[0][-2][1]

@@ -23,10 +23,10 @@ from pathlib import Path
 # Define the base URL
 base_url = 'https://public.bybit.com/kline_for_metatrader4/'
 headers={"User-Agent": "Mozilla/5.0 (X11; CrOS x86_64 12871.102.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.141 Safari/537.36"}
-# Set the list of coins
 coin = "BTCUSDT"
 minutes_period = 15
 year = 2000
+dir_name = f"data/bybit/M{minutes_period}/RAW/{coin}/"
 
 # Create a function to download the files
 def download_file(url, local_path):
@@ -53,7 +53,7 @@ def stack_csv_files(directory):
         stacked_data = pd.concat([stacked_data, data], ignore_index=True)
         print(file, data.shape, "->", stacked_data.shape)
 
-    stacked_data.columns = ["<DATE>", "<OPEN>", "<HIGH>", "<LOW>", "<CLOSE>", "<VOL>"]
+    stacked_data.columns = ["Date", "Open", "High", "Low", "Close", "Volume"]
     # Save the stacked data to a new CSV file
     stacked_data.to_csv(os.path.join(Path(directory).parent.parent, 
                                      "_".join(csv_files[0].split("_")[:2] + [csv_files[0].split("_")[2], csv_files[-1].split("_")[2]]) + ".csv"), index=False)
@@ -77,7 +77,7 @@ for coin_link in links:
     if not href.endswith('/'):
         continue
     # Get the directory name
-    dir_name = href[:-1]
+    # dir_name = href[:-1]
     # Create the directory locally if it doesn't exist
     if not os.path.exists(dir_name):
         os.mkdir(dir_name)

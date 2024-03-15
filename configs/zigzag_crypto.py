@@ -19,8 +19,8 @@ body_classifiers = EasyDict(
         ),
     trend = EasyDict( 
         func=ClsTrend,
-        params=EasyDict(npairs=Param(2, [2, 3]),
-            maxdrop=Param(0.18, [0.01, 0.02, 0.04])
+        params=EasyDict(npairs=Param(2, [2]),
+            maxdrop=Param(0.18, [0.01])
             )
         ),    
     tunnel = EasyDict( 
@@ -41,8 +41,8 @@ stops_processors = EasyDict(
     stops_fixed = EasyDict(
         func=StopsFixed,
         params=EasyDict(
-            tp=Param(30, [2, 4, 8, 16]), 
-            sl=Param(10, [2, 4, 8, 16])
+            tp=Param(None, [None]), 
+            sl=Param(10, [0.25, 0.5, 1, 1.5])
             )
         ),
     stops_dynamic = EasyDict(
@@ -61,12 +61,12 @@ config = EasyDict(
     date_start=Param("2017-08-01", ["2017-08-01"]),
     date_end=Param("2024-03-01", ["2024-03-01"]),
     no_trading_days=Param(set(), [set()]),
-    trailing_stop_rate=Param(0.007, [0.004, 0.006, 0.008, 0.010, 0.012]),
+    trailing_stop_rate=Param(0.007, [0.002, 0.003, 0.004, 0.005, 0.006, 0.007]),
     trailing_stop_type=Param(1, [1]),
-    body_classifier=Param(body_classifiers["tunnel"], [body_classifiers[k] for k in ["tunnel"]]),
-    stops_processor=Param(stops_processors["stops_dynamic"], [stops_processors[k] for k in ["stops_dynamic"]]),
+    body_classifier=Param(body_classifiers["trend"], [body_classifiers[k] for k in ["trend"]]),
+    stops_processor=Param(stops_processors["stops_fixed"], [stops_processors[k] for k in ["stops_fixed"]]),
     wait_entry_point=Param(999, [999]),
-    hist_buffer_size=Param(64, [64]),
+    hist_buffer_size=Param(32, [32]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
     period=Param("M15", ["M15"]),
