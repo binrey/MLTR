@@ -1,60 +1,5 @@
-from easydict import EasyDict
+from configs.library import *
 
-from experts import *
-
-class Param:
-    def __init__(self, test, optim):
-        self.test = test
-        self.optim = optim
-        
-
-body_classifiers = EasyDict(
-    dummy = EasyDict( 
-        func=ClsDummy,
-        params=EasyDict()
-            ),
-    trngl_simp = EasyDict(
-        func=ClsTriangle,
-        params=EasyDict(npairs=Param(3, [3]))
-        ),
-    trend = EasyDict( 
-        func=ClsTrend,
-        params=EasyDict(npairs=Param(2, [2, 3]),
-            maxdrop=Param(0.18, [0.01, 0.02, 0.04])
-            )
-        ),    
-    tunnel = EasyDict( 
-        func=ClsTunnel,
-        params=EasyDict(
-            ncross=Param(17, [10, 15, 20, 25, 30, 35, 40])
-            )
-        ),
-    custom = EasyDict( 
-        func=ClsCustom,
-        params=EasyDict(
-            ncross=Param(0, [0])
-            )
-        ) 
-)
-
-stops_processors = EasyDict(
-    stops_fixed = EasyDict(
-        func=StopsFixed,
-        params=EasyDict(
-            tp=Param(30, [2, 4, 8, 16]), 
-            sl=Param(10, [2, 4, 8, 16])
-            )
-        ),
-    stops_dynamic = EasyDict(
-        func=StopsDynamic,
-        params=EasyDict(
-            tp_active=Param(False, [False]),
-            sl_active=Param(True, [True])
-            )
-        )    
-)
-# ----------------------------------------------------------------
-# Configuration
 
 config = EasyDict(
     lot=Param(0.01, [0.01]),
@@ -70,7 +15,7 @@ config = EasyDict(
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
     period=Param("M15", ["M15"]),
-    ticker=Param("BTCUSDT", ["BTCUSDT"]),
+    ticker=Param("BTCUSDT", ["BTCUSDT", "ETHUSDT"]),
     data_type=Param("bybit", ["bybit"]),
     save_plots=Param(False, [False]),
     run_model_device=Param(None, [None])
