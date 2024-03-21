@@ -40,23 +40,6 @@ def get_bybit_hist(mresult, size):
     data.Close= input[:, 4]
     data.Volume = input[:, 5]
     return data
-    
-    
-def trailing_sl(cfg, pos):
-    sl = float(pos["stopLoss"])
-    try:
-        sl = sl + cfg.trailing_stop_rate*(h.Open[-1] - sl)
-        resp = session.set_trading_stop(
-            category="linear",
-            symbol=cfg.ticker,
-            stopLoss=sl,
-            slTriggerB="IndexPrice",
-            positionIdx=0,
-        )
-        logger.debug(resp)
-    except Exception as ex:
-        print(ex)
-    return sl
                 
              
 class Telebot:
@@ -130,6 +113,7 @@ class BybitTrading:
     def __init__(self) -> None:
         self.t0 = 0
         self.my_telebot = Telebot(bot_token)
+        self.h = None
     
     def handle_trade_message(self, message):
         try:
@@ -143,14 +127,30 @@ class BybitTrading:
         except (ValueError, AttributeError):
             pass
         
+    def trailing_sl(self, cfg, pos):
+        sl = float(pos["stopLoss"])
+        try:
+            sl = sl + cfg.trailing_stop_rate*(self.h.Open[-1] - sl)
+            resp = self.session.set_trading_stop(
+                category="linear",
+                symbol=cfg.ticker,
+                stopLoss=sl,
+                slTriggerB="IndexPrice",
+                positionIdx=0,
+            )
+            logger.debug(resp)
+        except Exception as ex:
+            print(ex)
+        return sl        
+
     def update(self):
-        session = HTTP(
+        self.session = HTTP(
             testnet=False,
             api_key=api_key,
             api_secret=api_secret,
         )
         
-        exp = ByBitExpert(cfg, session)
+        exp = ByBitExpert(cfg, self.session)
         if cfg.save_plots:
             save_path = Path("real_trading") / f"{cfg.ticker}-{cfg.period}"
             if save_path.exists():
@@ -158,8 +158,8 @@ class BybitTrading:
             save_path.mkdir()
         
         hist2plot, lines2plot, open_time, side = None, None, None, None
-        open_orders = session.get_open_orders(category="linear", symbol=cfg.ticker)["result"]["list"]
-        positions = session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
+        open_orders = self.session.get_open_orders(category="linear", symbol=cfg.ticker)["result"]["list"]
+        positions = self.session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
         open_position = None
         for pos in positions :
             if float(pos["size"]):
@@ -167,14 +167,14 @@ class BybitTrading:
             
         if cfg.save_plots:
             if hist2plot is not None:
-                h = pd.DataFrame(h).iloc[-2:-1]
-                h.index = pd.to_datetime(h.Date)
-                hist2plot = pd.concat([hist2plot, h])
+                self.h = pd.DataFrame(self.h).iloc[-2:-1]
+                self.h.index = pd.to_datetime(self.h.Date)
+                hist2plot = pd.concat([hist2plot, self.h])
                 lines2plot[-1].append((pd.to_datetime(hist2plot.iloc[-1].Date), sl))
                 log_position(open_time, hist2plot, lines2plot, save_path)
                             
             if open_position is not None and hist2plot is None:
-                hist2plot = pd.DataFrame(h)
+                hist2plot = pd.DataFrame(self.h)
                 hist2plot.index = pd.to_datetime(hist2plot.Date)
                 lines2plot = deepcopy(exp.lines)
                 for line in lines2plot:
@@ -206,17 +206,17 @@ class BybitTrading:
         if open_position is not None:
             sl = trailing_sl(cfg, open_position)
             
-        message = session.get_kline(category="linear",
+        message = self.session.get_kline(category="linear",
                         symbol=cfg.ticker,
                         interval=cfg.period[1:],
                         start=0,
                         end=self.time,
                         limit=cfg.hist_buffer_size)
-        h = get_bybit_hist(message["result"], cfg.hist_buffer_size)
+        self.h = get_bybit_hist(message["result"], cfg.hist_buffer_size)
             
         if cfg.save_plots:
             if open_position is None and exp.order_sent and lines2plot: 
-                last_row = pd.DataFrame(h).iloc[-2:]
+                last_row = pd.DataFrame(self.h).iloc[-2:]
                 last_row.index = pd.to_datetime(last_row.Date)
                 hist2plot = pd.concat([hist2plot, last_row])                    
                 lines2plot[-2][-1] = (pd.to_datetime(hist2plot.iloc[-1].Date), lines2plot[-2][-1][-1])
@@ -228,7 +228,7 @@ class BybitTrading:
                             send2telegram=True)
                 hist2plot = None    
         
-        texp = exp.update(h, open_position)
+        texp = exp.update(self.h, open_position)
         
 
     
@@ -239,8 +239,6 @@ if __name__ == "__main__":
     logger.remove()
     logger.add(sys.stderr, level="DEBUG")
     cfg = PyConfig(sys.argv[1]).test()
-    cfg.ticker = sys.argv[2]
-    cfg.lot = sys.argv[3]
     cfg.save_plots = True
     
     api_key, api_secret, bot_token = Path("./configs/api.yaml").read_text().splitlines()
