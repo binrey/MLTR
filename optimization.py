@@ -5,6 +5,7 @@ from multiprocessing import Pool
 from pathlib import Path
 from shutil import rmtree
 from time import time
+import json
 
 import numpy as np
 import pandas as pd
@@ -117,6 +118,7 @@ class Optimizer:
                   top_runs_ids.append(opt_summary_for_ticker.index[0])
                   sum_daily_balance += btests[top_runs_ids[-1]].daily_balance["balance"]
                   logger.info(f"\n{opt_summary_for_ticker.head(10)}\n")
+                  pd.DataFrame(btests[top_runs_ids[-1]].daily_balance).to_csv(f"optimization/{ticker}.{optim_cfg.period[0]}.top_{self.sortby}_sorted.csv", index=False)
                   
             balance_av = sum_daily_balance / len(top_runs_ids)
             bstair_av, metrics = BackTestResults._calc_metrics(balance_av)

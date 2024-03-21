@@ -125,123 +125,136 @@ def log_position(t, hist2plot, lines2plot, save_path):
     pickle.dump(d, open(save_path, "wb"))
     logger.info(f"save logs to {save_path}")
     
+
+class BybitTrading:
+    def __init__(self) -> None:
+        self.t0 = 0
+        self.my_telebot = Telebot(bot_token)
+    
+    def handle_trade_message(self, message):
+        try:
+            data = message.get('data')
+            self.time = int(data[0].get("T"))#/60/int(cfg.period[1:]))
+            time_rounded = int(int(data[0].get("T"))/1000/60/int(cfg.period[1:]))
+            print(f"{datetime.fromtimestamp(int(self.time/1000))} {time_rounded}")
+            if time_rounded > self.t0:
+                self.t0 = time_rounded
+                self.update()
+        except (ValueError, AttributeError):
+            pass
+        
+    def update(self):
+        session = HTTP(
+            testnet=False,
+            api_key=api_key,
+            api_secret=api_secret,
+        )
+        
+        exp = ByBitExpert(cfg, session)
+        if cfg.save_plots:
+            save_path = Path("real_trading") / f"{cfg.ticker}-{cfg.period}"
+            if save_path.exists():
+                rmtree(save_path)
+            save_path.mkdir()
+        
+        hist2plot, lines2plot, open_time, side = None, None, None, None
+        open_orders = session.get_open_orders(category="linear", symbol=cfg.ticker)["result"]["list"]
+        positions = session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
+        open_position = None
+        for pos in positions :
+            if float(pos["size"]):
+                open_position = pos
+            
+        if cfg.save_plots:
+            if hist2plot is not None:
+                h = pd.DataFrame(h).iloc[-2:-1]
+                h.index = pd.to_datetime(h.Date)
+                hist2plot = pd.concat([hist2plot, h])
+                lines2plot[-1].append((pd.to_datetime(hist2plot.iloc[-1].Date), sl))
+                log_position(open_time, hist2plot, lines2plot, save_path)
+                            
+            if open_position is not None and hist2plot is None:
+                hist2plot = pd.DataFrame(h)
+                hist2plot.index = pd.to_datetime(hist2plot.Date)
+                lines2plot = deepcopy(exp.lines)
+                for line in lines2plot:
+                    for i, point in enumerate(line):
+                        y = point[1]
+                        try:
+                            y = y.item() #  If y is 1D numpy array
+                        except:
+                            pass
+                        x = point[0]
+                        x = max(hist2plot.Id[0], x)
+                        x = min(hist2plot.Id[-1], x)
+                        line[i] = (hist2plot.index[hist2plot.Id==x][0], y)    
+                open_time = pd.to_datetime(hist2plot.iloc[-1].Date)
+                side = open_position["side"]
+                lines2plot.append([(open_time, float(open_position["avgPrice"])), (open_time, float(open_position["avgPrice"]))])
+                lines2plot.append([(open_time, float(open_position["stopLoss"])), (open_time, float(open_position["stopLoss"]))])
+                log_position(open_time, hist2plot, lines2plot, save_path)
+                plot_fig(hist2plot, lines2plot, 
+                        save_path, 
+                        "open", 
+                        open_time, 
+                        side=side, 
+                        ticker=cfg.ticker,
+                        send2telegram=True)
+                hist2plot = hist2plot.iloc[:-1]
+                
+                
+        if open_position is not None:
+            sl = trailing_sl(cfg, open_position)
+            
+        message = session.get_kline(category="linear",
+                        symbol=cfg.ticker,
+                        interval=cfg.period[1:],
+                        start=0,
+                        end=self.time,
+                        limit=cfg.hist_buffer_size)
+        h = get_bybit_hist(message["result"], cfg.hist_buffer_size)
+            
+        if cfg.save_plots:
+            if open_position is None and exp.order_sent and lines2plot: 
+                last_row = pd.DataFrame(h).iloc[-2:]
+                last_row.index = pd.to_datetime(last_row.Date)
+                hist2plot = pd.concat([hist2plot, last_row])                    
+                lines2plot[-2][-1] = (pd.to_datetime(hist2plot.iloc[-1].Date), lines2plot[-2][-1][-1])
+                lines2plot[-1].append((pd.to_datetime(hist2plot.iloc[-1].Date), sl))
+                log_position(open_time, hist2plot, lines2plot, save_path)
+                plot_fig(hist2plot, lines2plot, save_path, "close", open_time, 
+                            side=side,
+                            ticker=cfg.ticker,
+                            send2telegram=True)
+                hist2plot = None    
+        
+        texp = exp.update(h, open_position)
+        
+
     
 if __name__ == "__main__":
     import sys
-    from pybit.unified_trading import HTTP
+    from pybit.unified_trading import HTTP, WebSocket
     
     logger.remove()
     logger.add(sys.stderr, level="DEBUG")
-    cfg = PyConfig().test()
-    cfg.ticker = sys.argv[1]
+    cfg = PyConfig(sys.argv[1]).test()
+    cfg.ticker = sys.argv[2]
+    cfg.lot = sys.argv[3]
     cfg.save_plots = True
-    cfg.lot = 0.02 if cfg.ticker == "ETHUSDT" else 0.001
     
     api_key, api_secret, bot_token = Path("./configs/api.yaml").read_text().splitlines()
     
-    my_telebot = Telebot(bot_token)
-
-    session = HTTP(
-        testnet=False,
-        api_key=api_key,
-        api_secret=api_secret,
-    )
-    
-    exp = ByBitExpert(cfg, session)
-    if cfg.save_plots:
-        save_path = Path("real_trading") / f"{cfg.ticker}-{cfg.period}"
-        if save_path.exists():
-            rmtree(save_path)
-        save_path.mkdir()
-    
-    get_rounded_time = lambda tmessage: int(int(tmessage["timeSecond"])/60/int(cfg.period[1:]))
-    hist2plot, lines2plot, open_time, side = None, None, None, None
+    public = WebSocket(channel_type='linear', testnet=False)
+    private = WebSocket(channel_type='private',
+                        api_key=api_key,
+                        api_secret=api_secret, 
+                        testnet=False) 
+    bybit_trading = BybitTrading()
+    public.trade_stream(symbol=cfg.ticker, callback=bybit_trading.handle_trade_message)
     while True:
-        t = t0 = get_rounded_time(session.get_server_time()["result"])
-        while t == t0:
-            sleep(1)
-            try:
-                tmessage = session.get_server_time()["result"]
-                t = get_rounded_time(tmessage)
-                print(datetime.fromtimestamp(int(session.get_server_time()["result"]["timeSecond"])), t0, t)
-            except Exception as ex:
-                print(ex)
-        # try:
-        if True:
-            open_orders = session.get_open_orders(category="linear", symbol=cfg.ticker)["result"]["list"]
-            positions = session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
-            open_position = None
-            for pos in positions :
-                if float(pos["size"]):
-                    open_position = pos
-                
-            if cfg.save_plots:
-                if hist2plot is not None:
-                    h = pd.DataFrame(h).iloc[-2:-1]
-                    h.index = pd.to_datetime(h.Date)
-                    hist2plot = pd.concat([hist2plot, h])
-                    lines2plot[-1].append((pd.to_datetime(hist2plot.iloc[-1].Date), sl))
-                    log_position(open_time, hist2plot, lines2plot, save_path)
-                                
-                if open_position is not None and hist2plot is None:
-                    hist2plot = pd.DataFrame(h)
-                    hist2plot.index = pd.to_datetime(hist2plot.Date)
-                    lines2plot = deepcopy(exp.lines)
-                    for line in lines2plot:
-                        for i, point in enumerate(line):
-                            y = point[1]
-                            try:
-                                y = y.item() #  If y is 1D numpy array
-                            except:
-                                pass
-                            x = point[0]
-                            x = max(hist2plot.Id[0], x)
-                            x = min(hist2plot.Id[-1], x)
-                            line[i] = (hist2plot.index[hist2plot.Id==x][0], y)    
-                    open_time = pd.to_datetime(hist2plot.iloc[-1].Date)
-                    side = open_position["side"]
-                    lines2plot.append([(open_time, float(open_position["avgPrice"])), (open_time, float(open_position["avgPrice"]))])
-                    lines2plot.append([(open_time, float(open_position["stopLoss"])), (open_time, float(open_position["stopLoss"]))])
-                    log_position(open_time, hist2plot, lines2plot, save_path)
-                    plot_fig(hist2plot, lines2plot, 
-                             save_path, 
-                             "open", 
-                             open_time, 
-                             side=side, 
-                             ticker=cfg.ticker,
-                             send2telegram=True)
-                    hist2plot = hist2plot.iloc[:-1]
-                    
-                    
-            if open_position is not None:
-                sl = trailing_sl(cfg, open_position)
-                
-            message = session.get_kline(category="linear",
-                            symbol=cfg.ticker,
-                            interval=cfg.period[1:],
-                            start=0,
-                            end=int(tmessage["timeSecond"])*1000,
-                            limit=cfg.hist_buffer_size)
-            h = get_bybit_hist(message["result"], cfg.hist_buffer_size)
-                  
-            if cfg.save_plots:
-                if open_position is None and exp.order_sent and lines2plot: 
-                    last_row = pd.DataFrame(h).iloc[-2:]
-                    last_row.index = pd.to_datetime(last_row.Date)
-                    hist2plot = pd.concat([hist2plot, last_row])                    
-                    lines2plot[-2][-1] = (pd.to_datetime(hist2plot.iloc[-1].Date), lines2plot[-2][-1][-1])
-                    lines2plot[-1].append((pd.to_datetime(hist2plot.iloc[-1].Date), sl))
-                    log_position(open_time, hist2plot, lines2plot, save_path)
-                    plot_fig(hist2plot, lines2plot, save_path, "close", open_time, 
-                                side=side,
-                                ticker=cfg.ticker,
-                                send2telegram=True)
-                    hist2plot = None    
-            
-            texp = exp.update(h, open_position)
+        sleep(1)
+    
 
-        # except Exception as ex:
-        #     logger.error(ex)
-        #     continue
     
     
