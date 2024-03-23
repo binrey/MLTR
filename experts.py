@@ -314,13 +314,11 @@ class ClsDummy(ExtensionBase):
         super(ClsDummy, self).__init__(cfg, name="dummy")
         
     def __call__(self, common, h) -> bool:
-        if h.Low[-2] < h.Open[-1] < h.High[-2]:
-            common.lprice = h.Close[-2] #max(h.High[-2], h.Low[-2])
-            common.sprice = h.Close[-2] #min(h.High[-2], h.Low[-2])
-            common.sl = {1: common.sprice, -1: common.lprice}  
-            common.lines = [[(h.Id[-5], common.lprice), (h.Id[-1], common.lprice)], [(h.Id[-5], common.sprice), (h.Id[-1], common.sprice)]]
-            return True
-        return False
+        common.lprice = h.Close[-2] #max(h.High[-2], h.Low[-2])
+        common.sprice = h.Close[-2] #min(h.High[-2], h.Low[-2])
+        common.sl = {1: common.sprice, -1: common.lprice}  
+        common.lines = [[(h.Id[-5], common.lprice), (h.Id[-1], common.lprice)], [(h.Id[-5], common.sprice), (h.Id[-1], common.sprice)]]
+        return True
     
 
 class ClsCustom(ExtensionBase):

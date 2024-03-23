@@ -4,8 +4,9 @@ from configs.library import *
 classifier = body_classifiers.tunnel
 classifier.params.ncross = Param(None, [10, 15, 20, 25, 30, 40])
 
-stops_processor = stops_processors.stops_dynamic
-stops_processor.params.sl_active = Param(True, [True])
+stops_processor = stops_processors.stops_fixed
+stops_processor.params.sl = Param(0.5, [None])
+# stops_processor.params.sl_active = Param(True, [True])
 
 config = EasyDict(
     lot=Param(None, [None]),
@@ -23,6 +24,6 @@ config = EasyDict(
     period=Param("M1", ["M15"]),
     ticker=Param(None, ["BTCUSDT", "ETHUSDT"]),
     data_type=Param("bybit", ["bybit"]),
-    save_plots=Param(False, [False]),
+    save_plots=Param(True, [False]),
     run_model_device=Param(None, [None])
 )

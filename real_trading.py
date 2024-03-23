@@ -15,6 +15,7 @@ from copy import deepcopy
 import telebot
 from PIL import Image
 import pickle
+from multiprocessing import Process
 
 
 
@@ -56,47 +57,40 @@ class Telebot:
             self.bot.send_message(self.chat_id, ex)
                 
                 
-def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=None, ticker="X", send2telegram=False):
-    # try:
-    if True:
-        global my_telebot
-        mystyle=mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
-        kwargs = dict(
-            type='candle', 
-            block=False,
-            alines=dict(alines=lines2plot, linewidths=[1]*len(lines2plot)),
-            volume=True,
-            figscale=1.5,
-            style=mystyle,
-            datetime_format='%m-%d %H:%M',
-            title=f"{np.array(t).astype('datetime64[s]')}-{ticker}-{side}",
-            returnfig=True
-        )
+def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=None, ticker="X", telebot=None):
+    mystyle=mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
+    kwargs = dict(
+        type='candle', 
+        block=False,
+        alines=dict(alines=lines2plot, linewidths=[1]*len(lines2plot)),
+        volume=True,
+        figscale=1.5,
+        style=mystyle,
+        datetime_format='%m-%d %H:%M',
+        title=f"{np.array(t).astype('datetime64[s]')}-{ticker}-{side}",
+        returnfig=True
+    )
 
-        fig, axlist = mpf.plot(data=hist2plot, **kwargs)
+    fig, axlist = mpf.plot(data=hist2plot, **kwargs)
+    
+    if side in ["Buy", "Sell"]:
+        side_int = 1 if side == "Buy" else -1
+        x = hist2plot.index.get_loc(t)
+        # if type(x) is slice:
+        #     x = x.start
+        y = hist2plot.loc[t].Open
+        arrow_size = (hist2plot.iloc[-10:].High - hist2plot.iloc[-10:].Low).mean()
+        axlist[0].annotate("", (x, y + arrow_size*side_int), fontsize=20, xytext=(x, y),
+                    color="black", 
+                    arrowprops=dict(
+                        arrowstyle='->',
+                        facecolor='b',
+                        edgecolor='b'))
         
-        if side in ["Buy", "Sell"]:
-            side_int = 1 if side == "Buy" else -1
-            x = hist2plot.index.get_loc(t)
-            # if type(x) is slice:
-            #     x = x.start
-            y = hist2plot.loc[t].Open
-            arrow_size = (hist2plot.iloc[-10:].High - hist2plot.iloc[-10:].Low).mean()
-            axlist[0].annotate("", (x, y + arrow_size*side_int), fontsize=20, xytext=(x, y),
-                        color="black", 
-                        arrowprops=dict(
-                            arrowstyle='->',
-                            facecolor='b',
-                            edgecolor='b'))
-            
-        if save_path is not None:
-            save_path = save_path / f"{prefix}-{str(np.array(t).astype('datetime64[s]')).split('.')[0]}.png".replace(":", "-")    
-            fig.savefig(save_path, bbox_inches='tight', pad_inches=0.2)  
-        if send2telegram:
-            my_telebot.send_image(save_path)
-    # except Exception as ex:
-    #     logger.error(ex)
-    # return fig
+    if save_path is not None:
+        save_path = save_path / f"{prefix}-{str(np.array(t).astype('datetime64[s]')).split('.')[0]}.png".replace(":", "-")    
+        fig.savefig(save_path, bbox_inches='tight', pad_inches=0.2)  
+    return save_path
       
       
 def log_position(t, hist2plot, lines2plot, save_path):
@@ -110,10 +104,25 @@ def log_position(t, hist2plot, lines2plot, save_path):
     
 
 class BybitTrading:
-    def __init__(self) -> None:
+    def __init__(self, cfg, credentials) -> None:
+        self.cfg = cfg
+        api_key, api_secret, bot_token = Path(credentials).read_text().splitlines()
         self.t0 = 0
         self.my_telebot = Telebot(bot_token)
         self.h = None
+        self.session = HTTP(
+            testnet=False,
+            api_key=api_key,
+            api_secret=api_secret,
+        )
+        self.exp = ByBitExpert(cfg, self.session)
+        if cfg.save_plots:
+            self.save_path = Path("real_trading") / f"{cfg.ticker}-{cfg.period}"
+            if self.save_path.exists():
+                rmtree(self.save_path)
+            self.save_path.mkdir()
+            
+        self.hist2plot, self.lines2plot, self.open_time, self.side, self.sl = None, None, None, None, None
     
     def handle_trade_message(self, message):
         try:
@@ -127,13 +136,13 @@ class BybitTrading:
         except (ValueError, AttributeError):
             pass
         
-    def trailing_sl(self, cfg, pos):
+    def trailing_sl(self, pos):
         sl = float(pos["stopLoss"])
         try:
-            sl = sl + cfg.trailing_stop_rate*(self.h.Open[-1] - sl)
+            sl = sl + self.cfg.trailing_stop_rate*(self.h.Open[-1] - sl)
             resp = self.session.set_trading_stop(
                 category="linear",
-                symbol=cfg.ticker,
+                symbol=self.cfg.ticker,
                 stopLoss=sl,
                 slTriggerB="IndexPrice",
                 positionIdx=0,
@@ -144,20 +153,7 @@ class BybitTrading:
         return sl        
 
     def update(self):
-        self.session = HTTP(
-            testnet=False,
-            api_key=api_key,
-            api_secret=api_secret,
-        )
         
-        exp = ByBitExpert(cfg, self.session)
-        if cfg.save_plots:
-            save_path = Path("real_trading") / f"{cfg.ticker}-{cfg.period}"
-            if save_path.exists():
-                rmtree(save_path)
-            save_path.mkdir()
-        
-        hist2plot, lines2plot, open_time, side = None, None, None, None
         open_orders = self.session.get_open_orders(category="linear", symbol=cfg.ticker)["result"]["list"]
         positions = self.session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
         open_position = None
@@ -166,18 +162,18 @@ class BybitTrading:
                 open_position = pos
             
         if cfg.save_plots:
-            if hist2plot is not None:
+            if self.hist2plot is not None:
                 self.h = pd.DataFrame(self.h).iloc[-2:-1]
                 self.h.index = pd.to_datetime(self.h.Date)
-                hist2plot = pd.concat([hist2plot, self.h])
-                lines2plot[-1].append((pd.to_datetime(hist2plot.iloc[-1].Date), sl))
-                log_position(open_time, hist2plot, lines2plot, save_path)
+                self.hist2plot = pd.concat([self.hist2plot, self.h])
+                self.lines2plot[-1].append((pd.to_datetime(self.hist2plot.iloc[-1].Date), self.sl))
+                log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
                             
-            if open_position is not None and hist2plot is None:
-                hist2plot = pd.DataFrame(self.h)
-                hist2plot.index = pd.to_datetime(hist2plot.Date)
-                lines2plot = deepcopy(exp.lines)
-                for line in lines2plot:
+            if open_position is not None and self.hist2plot is None:
+                self.hist2plot = pd.DataFrame(self.h)
+                self.hist2plot.index = pd.to_datetime(self.hist2plot.Date)
+                self.lines2plot = deepcopy(self.exp.lines)
+                for line in self.lines2plot:
                     for i, point in enumerate(line):
                         y = point[1]
                         try:
@@ -185,26 +181,30 @@ class BybitTrading:
                         except:
                             pass
                         x = point[0]
-                        x = max(hist2plot.Id[0], x)
-                        x = min(hist2plot.Id[-1], x)
-                        line[i] = (hist2plot.index[hist2plot.Id==x][0], y)    
-                open_time = pd.to_datetime(hist2plot.iloc[-1].Date)
-                side = open_position["side"]
-                lines2plot.append([(open_time, float(open_position["avgPrice"])), (open_time, float(open_position["avgPrice"]))])
-                lines2plot.append([(open_time, float(open_position["stopLoss"])), (open_time, float(open_position["stopLoss"]))])
-                log_position(open_time, hist2plot, lines2plot, save_path)
-                plot_fig(hist2plot, lines2plot, 
-                        save_path, 
-                        "open", 
-                        open_time, 
-                        side=side, 
-                        ticker=cfg.ticker,
-                        send2telegram=True)
-                hist2plot = hist2plot.iloc[:-1]
+                        x = max(self.hist2plot.Id[0], x)
+                        x = min(self.hist2plot.Id[-1], x)
+                        line[i] = (self.hist2plot.index[self.hist2plot.Id==x][0], y)    
+                self.open_time = pd.to_datetime(self.hist2plot.iloc[-1].Date)
+                self.side = open_position["side"]
+                self.lines2plot.append([(self.open_time, float(open_position["avgPrice"])), (self.open_time, float(open_position["avgPrice"]))])
+                self.lines2plot.append([(self.open_time, float(open_position["stopLoss"])), (self.open_time, float(open_position["stopLoss"]))])
+                log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
+                p = Process(target=plot_fig, args=(self.hist2plot, self.lines2plot, self.save_path, "open", self.open_time, self.side, cfg.ticker))
+                p.start()
+                p.join()
+                # self.my_telebot.send_image(save_path)
+                # plot_fig(self.hist2plot, self.lines2plot, 
+                #         self.save_path, 
+                #         "open", 
+                #         self.open_time, 
+                #         side=self.side, 
+                #         ticker=cfg.ticker,
+                #         send2telegram=True)
+                # self.hist2plot = self.hist2plot.iloc[:-1]
                 
                 
         if open_position is not None:
-            sl = trailing_sl(cfg, open_position)
+            self.sl = self.trailing_sl(open_position)
             
         message = self.session.get_kline(category="linear",
                         symbol=cfg.ticker,
@@ -215,20 +215,20 @@ class BybitTrading:
         self.h = get_bybit_hist(message["result"], cfg.hist_buffer_size)
             
         if cfg.save_plots:
-            if open_position is None and exp.order_sent and lines2plot: 
+            if open_position is None and self.exp.order_sent and self.lines2plot: 
                 last_row = pd.DataFrame(self.h).iloc[-2:]
                 last_row.index = pd.to_datetime(last_row.Date)
-                hist2plot = pd.concat([hist2plot, last_row])                    
-                lines2plot[-2][-1] = (pd.to_datetime(hist2plot.iloc[-1].Date), lines2plot[-2][-1][-1])
-                lines2plot[-1].append((pd.to_datetime(hist2plot.iloc[-1].Date), sl))
-                log_position(open_time, hist2plot, lines2plot, save_path)
-                plot_fig(hist2plot, lines2plot, save_path, "close", open_time, 
-                            side=side,
-                            ticker=cfg.ticker,
-                            send2telegram=True)
-                hist2plot = None    
+                self.hist2plot = pd.concat([self.hist2plot, last_row])                    
+                self.lines2plot[-2][-1] = (pd.to_datetime(self.hist2plot.iloc[-1].Date), self.lines2plot[-2][-1][-1])
+                self.lines2plot[-1].append((pd.to_datetime(self.hist2plot.iloc[-1].Date), self.sl))
+                log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
+                p = Process(target=plot_fig, args=(self.hist2plot, self.lines2plot, self.save_path, "close", self.open_time, self.side, cfg.ticker))
+                p.start()
+                p.join()
+                # self.my_telebot.send_image(save_path)
+                self.hist2plot = None    
         
-        texp = exp.update(self.h, open_position)
+        texp = self.exp.update(self.h, open_position)
         
 
     
@@ -241,14 +241,14 @@ if __name__ == "__main__":
     cfg = PyConfig(sys.argv[1]).test()
     cfg.save_plots = True
     
-    api_key, api_secret, bot_token = Path("./configs/api.yaml").read_text().splitlines()
+    
     
     public = WebSocket(channel_type='linear', testnet=False)
-    private = WebSocket(channel_type='private',
-                        api_key=api_key,
-                        api_secret=api_secret, 
-                        testnet=False) 
-    bybit_trading = BybitTrading()
+    # private = WebSocket(channel_type='private',
+    #                     api_key=api_key,
+    #                     api_secret=api_secret, 
+    #                     testnet=False) 
+    bybit_trading = BybitTrading(cfg, "./configs/api.yaml")
     public.trade_stream(symbol=cfg.ticker, callback=bybit_trading.handle_trade_message)
     while True:
         sleep(1)

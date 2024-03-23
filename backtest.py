@@ -14,6 +14,7 @@ from utils import PyConfig
 from backtest_broker import Broker
 from experts import BacktestExpert
 from real_trading import plot_fig
+from multiprocessing import Process
 logger.remove()
 
 # Если проблемы с отрисовкой графиков
@@ -136,13 +137,20 @@ def backtest(cfg):
                         except:
                             pass
                         line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)
-                plot_fig(hist2plot=hist2plot,
-                         lines2plot=lines2plot,
-                         save_path=save_path,
-                         prefix=cfg.ticker,
-                         t=pd.to_datetime(closed_pos.open_date, utc=True),
-                         side="Buy" if closed_pos.dir > 0 else "Sell",
-                         ticker=cfg.ticker)
+                        
+                p = Process(target=plot_fig, args=(hist2plot, lines2plot, save_path, cfg.ticker, 
+                                                   pd.to_datetime(closed_pos.open_date, utc=True),
+                                                   "Buy" if closed_pos.dir > 0 else "Sell",
+                                                    cfg.ticker))
+                p.start()
+                p.join()
+                # plot_fig(hist2plot=hist2plot,
+                #          lines2plot=lines2plot,
+                #          save_path=save_path,
+                #          prefix=cfg.ticker,
+                #          t=pd.to_datetime(closed_pos.open_date, utc=True),
+                #          side="Buy" if closed_pos.dir > 0 else "Sell",
+                #          ticker=cfg.ticker)
 
     
     ttotal = perf_counter() - t0
