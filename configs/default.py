@@ -48,7 +48,7 @@ forts_list = ["SBRF", "ROSN", "LKOH", "GAZR"]
 
 config = EasyDict(
     date_start=Param("2010-01-01", ["2000-01-01"]),
-    date_end=Param("2024-01-01", ["2023-06-01"]),
+    date_end=Param("2024-06-01", ["2023-06-01"]),
     no_trading_days=Param(set(), [set()]),
     trailing_stop_rate=Param(0.01, [0.01]),
     trailing_stop_type=Param(1, [1]),
