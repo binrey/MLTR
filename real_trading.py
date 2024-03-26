@@ -76,9 +76,12 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
     if side in ["Buy", "Sell"]:
         side_int = 1 if side == "Buy" else -1
         x = hist2plot.index.get_loc(t)
-        # if type(x) is slice:
-        #     x = x.start
+        print(x)
+        if type(x) is slice:
+            x = x.start
         y = hist2plot.loc[t].Open
+        if y.ndim > 0:
+            y = y.iloc[0]
         arrow_size = (hist2plot.iloc[-10:].High - hist2plot.iloc[-10:].Low).mean()
         axlist[0].annotate("", (x, y + arrow_size*side_int), fontsize=20, xytext=(x, y),
                     color="black", 
@@ -129,7 +132,7 @@ class BybitTrading:
             data = message.get('data')
             self.time = int(data[0].get("T"))#/60/int(cfg.period[1:]))
             time_rounded = int(int(data[0].get("T"))/1000/60/int(cfg.period[1:]))
-            print(f"{datetime.fromtimestamp(int(self.time/1000))} {time_rounded}")
+            logger.debug(f"{datetime.fromtimestamp(int(self.time/1000))} {time_rounded}")
             if time_rounded > self.t0:
                 self.t0 = time_rounded
                 self.update()
