@@ -57,7 +57,14 @@ class Telebot:
             self.bot.send_message(self.chat_id, ex)
                 
                 
-def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=None, ticker="X", telebot=None):
+def date2save_format(date, prefix=None):
+    s = str(np.array(date).astype('datetime64[s]')).split('.')[0].replace(":", "-") 
+    if prefix is not None and len(prefix) > 0:
+        s += f"-{prefix}"
+    return s + ".png"
+
+     
+def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=None, ticker="X"):
     mystyle=mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
     kwargs = dict(
         type='candle', 
@@ -76,7 +83,6 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
     if side in ["Buy", "Sell"]:
         side_int = 1 if side == "Buy" else -1
         x = hist2plot.index.get_loc(t)
-        print(x)
         if type(x) is slice:
             x = x.start
         y = hist2plot.loc[t].Open
@@ -91,7 +97,7 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
                         edgecolor='b'))
         
     if save_path is not None:
-        save_path = save_path / f"{prefix}-{str(np.array(t).astype('datetime64[s]')).split('.')[0]}.png".replace(":", "-")    
+        save_path = save_path / date2save_format(t, prefix)  
         fig.savefig(save_path, bbox_inches='tight', pad_inches=0.2)  
     return save_path
       
@@ -132,12 +138,13 @@ class BybitTrading:
             data = message.get('data')
             self.time = int(data[0].get("T"))#/60/int(cfg.period[1:]))
             time_rounded = int(int(data[0].get("T"))/1000/60/int(cfg.period[1:]))
-            logger.debug(f"{datetime.fromtimestamp(int(self.time/1000))} {time_rounded}")
-            if time_rounded > self.t0:
-                self.t0 = time_rounded
-                self.update()
+            # logger.debug(f"{datetime.fromtimestamp(int(self.time/1000))} {time_rounded}")
         except (ValueError, AttributeError):
-            pass
+            pass            
+        if time_rounded > self.t0:
+            self.t0 = time_rounded
+            self.update()
+
         
     def trailing_sl(self, pos):
         sl = float(pos["stopLoss"])
@@ -156,82 +163,78 @@ class BybitTrading:
         return sl        
 
     def update(self):
-        
-        open_orders = self.session.get_open_orders(category="linear", symbol=cfg.ticker)["result"]["list"]
-        positions = self.session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
-        open_position = None
-        for pos in positions :
-            if float(pos["size"]):
-                open_position = pos
-            
-        if cfg.save_plots:
-            if self.hist2plot is not None:
-                self.h = pd.DataFrame(self.h).iloc[-2:-1]
-                self.h.index = pd.to_datetime(self.h.Date)
-                self.hist2plot = pd.concat([self.hist2plot, self.h])
-                self.lines2plot[-1].append((pd.to_datetime(self.hist2plot.iloc[-1].Date), self.sl))
-                log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
-                            
-            if open_position is not None and self.hist2plot is None:
-                self.hist2plot = pd.DataFrame(self.h)
-                self.hist2plot.index = pd.to_datetime(self.hist2plot.Date)
-                self.lines2plot = deepcopy(self.exp.lines)
-                for line in self.lines2plot:
-                    for i, point in enumerate(line):
-                        y = point[1]
-                        try:
-                            y = y.item() #  If y is 1D numpy array
-                        except:
-                            pass
-                        x = point[0]
-                        x = max(self.hist2plot.Id[0], x)
-                        x = min(self.hist2plot.Id[-1], x)
-                        line[i] = (self.hist2plot.index[self.hist2plot.Id==x][0], y)    
-                self.open_time = pd.to_datetime(self.hist2plot.iloc[-1].Date)
-                self.side = open_position["side"]
-                self.lines2plot.append([(self.open_time, float(open_position["avgPrice"])), (self.open_time, float(open_position["avgPrice"]))])
-                self.lines2plot.append([(self.open_time, float(open_position["stopLoss"])), (self.open_time, float(open_position["stopLoss"]))])
-                log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
-                p = Process(target=plot_fig, args=(self.hist2plot, self.lines2plot, self.save_path, "open", self.open_time, self.side, cfg.ticker))
-                p.start()
-                p.join()
-                # self.my_telebot.send_image(save_path)
-                # plot_fig(self.hist2plot, self.lines2plot, 
-                #         self.save_path, 
-                #         "open", 
-                #         self.open_time, 
-                #         side=self.side, 
-                #         ticker=cfg.ticker,
-                #         send2telegram=True)
-                # self.hist2plot = self.hist2plot.iloc[:-1]
+        try:
+            open_orders = self.session.get_open_orders(category="linear", symbol=cfg.ticker)["result"]["list"]
+            positions = self.session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
+            open_position = None
+            for pos in positions :
+                if float(pos["size"]):
+                    open_position = pos
                 
+            if cfg.save_plots:
+                if self.hist2plot is not None:
+                    self.h = pd.DataFrame(self.h).iloc[-2:-1]
+                    print(self.h)
+                    self.h.index = pd.to_datetime(self.h.Date)
+                    self.hist2plot = pd.concat([self.hist2plot, self.h])
+                    self.lines2plot[-1].append((pd.to_datetime(self.hist2plot.iloc[-1].Date), self.sl))
+                    log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
+                                
+                if open_position is not None and self.hist2plot is None:
+                    self.hist2plot = pd.DataFrame(self.h)
+                    self.hist2plot.index = pd.to_datetime(self.hist2plot.Date)
+                    self.lines2plot = deepcopy(self.exp.lines)
+                    for line in self.lines2plot:
+                        for i, point in enumerate(line):
+                            y = point[1]
+                            try:
+                                y = y.item() #  If y is 1D numpy array
+                            except:
+                                pass
+                            x = point[0]
+                            x = max(self.hist2plot.Id[0], x)
+                            x = min(self.hist2plot.Id[-1], x)
+                            line[i] = (self.hist2plot.index[self.hist2plot.Id==x][0], y)    
+                    self.open_time = pd.to_datetime(self.hist2plot.iloc[-1].Date)
+                    self.side = open_position["side"]
+                    self.lines2plot.append([(self.open_time, float(open_position["avgPrice"])), (self.open_time, float(open_position["avgPrice"]))])
+                    self.lines2plot.append([(self.open_time, float(open_position["stopLoss"])), (self.open_time, float(open_position["stopLoss"]))])
+                    log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
+                    p = Process(target=plot_fig, args=(self.hist2plot, self.lines2plot, self.save_path, None, self.open_time, self.side, cfg.ticker))
+                    p.start()
+                    p.join()
+                    self.my_telebot.send_image(self.save_path / date2save_format(self.open_time))
+                    self.hist2plot = self.hist2plot.iloc[:-1]
+                    
+                    
+            if open_position is not None:
+                self.sl = self.trailing_sl(open_position)
                 
-        if open_position is not None:
-            self.sl = self.trailing_sl(open_position)
+            message = self.session.get_kline(category="linear",
+                            symbol=cfg.ticker,
+                            interval=cfg.period[1:],
+                            start=0,
+                            end=self.time,
+                            limit=cfg.hist_buffer_size)
+            self.h = get_bybit_hist(message["result"], cfg.hist_buffer_size)
+                
+            if cfg.save_plots:
+                if open_position is None and self.exp.order_sent and self.lines2plot: 
+                    last_row = pd.DataFrame(self.h).iloc[-2:]
+                    last_row.index = pd.to_datetime(last_row.Date)
+                    self.hist2plot = pd.concat([self.hist2plot, last_row])                    
+                    self.lines2plot[-2][-1] = (pd.to_datetime(self.hist2plot.iloc[-1].Date), self.lines2plot[-2][-1][-1])
+                    self.lines2plot[-1].append((pd.to_datetime(self.hist2plot.iloc[-1].Date), self.sl))
+                    log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
+                    p = Process(target=plot_fig, args=(self.hist2plot, self.lines2plot, self.save_path, None, self.open_time, self.side, cfg.ticker))
+                    p.start()
+                    p.join()
+                    self.my_telebot.send_image(self.save_path / date2save_format(self.open_time))
+                    self.hist2plot = None    
             
-        message = self.session.get_kline(category="linear",
-                        symbol=cfg.ticker,
-                        interval=cfg.period[1:],
-                        start=0,
-                        end=self.time,
-                        limit=cfg.hist_buffer_size)
-        self.h = get_bybit_hist(message["result"], cfg.hist_buffer_size)
-            
-        if cfg.save_plots:
-            if open_position is None and self.exp.order_sent and self.lines2plot: 
-                last_row = pd.DataFrame(self.h).iloc[-2:]
-                last_row.index = pd.to_datetime(last_row.Date)
-                self.hist2plot = pd.concat([self.hist2plot, last_row])                    
-                self.lines2plot[-2][-1] = (pd.to_datetime(self.hist2plot.iloc[-1].Date), self.lines2plot[-2][-1][-1])
-                self.lines2plot[-1].append((pd.to_datetime(self.hist2plot.iloc[-1].Date), self.sl))
-                log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
-                p = Process(target=plot_fig, args=(self.hist2plot, self.lines2plot, self.save_path, "close", self.open_time, self.side, cfg.ticker))
-                p.start()
-                p.join()
-                # self.my_telebot.send_image(save_path)
-                self.hist2plot = None    
-        
-        texp = self.exp.update(self.h, open_position)
+            texp = self.exp.update(self.h, open_position)
+        except Exception as ex:
+            logger.error(ex)
         
 
     
