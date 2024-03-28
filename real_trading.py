@@ -141,10 +141,11 @@ class BybitTrading:
             # logger.debug(f"{datetime.fromtimestamp(int(self.time/1000))} {time_rounded}")
         except (ValueError, AttributeError):
             pass            
-        if self.t0 and time_rounded > self.t0:
+        if time_rounded > self.t0:
+            if self.t0:
+                self.update()
+                logger.info(f"update for {self.cfg.ticker} {datetime.fromtimestamp(int(self.time/1000))} finished!")
             self.t0 = time_rounded
-            self.update()
-            logger.info(f"update for {self.cfg.ticker} {datetime.fromtimestamp(int(self.time/1000))} finished!")
 
         
     def trailing_sl(self, pos):
