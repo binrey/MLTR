@@ -144,6 +144,7 @@ class BybitTrading:
         if time_rounded > self.t0:
             self.t0 = time_rounded
             self.update()
+            logger.info(f"update for {self.cfg.ticker} {datetime.fromtimestamp(int(self.time/1000))} finished!")
 
         
     def trailing_sl(self, pos):
