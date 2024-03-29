@@ -29,6 +29,12 @@ body_classifiers = EasyDict(
             ncross=Param(None, [None])
             )
         ),
+    bb = EasyDict( 
+        func=ClsBB,
+        params=EasyDict(
+            
+                    )
+        ),
     custom = EasyDict( 
         func=ClsCustom,
         params=EasyDict(

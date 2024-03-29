@@ -308,6 +308,36 @@ class ClsTriangle(ExtensionBase):
         return is_fig
 
 
+class ClsBB(ExtensionBase):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(ClsBB, self).__init__(cfg, name="BB")
+        
+    def _bolinger_beams(self, h):
+        mean = h.Close.mean()
+        std = h.Close.std()
+        return mean, mean + std, mean - std
+        
+    def __call__(self, common, h) -> bool:
+        dir = 0
+        mean, bb_high, bb_low = self._bolinger_beams(h)   
+        if h.Close[-2] > bb_low:
+            dir = 1
+        if h.Close[-2] < bb_high:
+            dir = -1            
+                 
+        if dir != 0:
+            common.lines = [[(h.Id[-3], bb_low), (h.Id[-2], bb_low)], [(h.Id[-3], bb_high), (h.Id[-2], bb_high)]]
+            if dir > 0:
+                common.lprice = h.Open[-1]
+            if dir < 0:
+                common.sprice = h.Open[-1]
+            common.sl = {1: h.Low[-10:].min(), -1: h.High[-10:].max()} 
+            common.tp = {1: h.Close[-1] + abs(h.Close[-1] - common.sl[1]), 
+                        -1: h.Close[-1] - abs(h.Close[-1] - common.sl[-1])
+                        } 
+        return dir != 0
+
 class ClsDummy(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
