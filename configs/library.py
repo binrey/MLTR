@@ -15,14 +15,22 @@ body_classifiers = EasyDict(
             ),
     trngl_simp = EasyDict(
         func=ClsTriangle,
-        params=EasyDict(npairs=Param(3, [3]))
+        params=EasyDict(
+            npairs=Param(None, [None]))
         ),
     trend = EasyDict( 
         func=ClsTrend,
-        params=EasyDict(npairs=Param(None, [None]),
+        params=EasyDict(
+            npairs=Param(None, [None]),
             maxdrop=Param(None, [None])
             )
         ),    
+    tunzigzag = EasyDict( 
+        func=ClsTunZigZag,
+        params=EasyDict(
+            ncross=Param(None, [None])
+            )
+        ), 
     tunnel = EasyDict( 
         func=ClsTunnel,
         params=EasyDict(
@@ -31,9 +39,7 @@ body_classifiers = EasyDict(
         ),
     bb = EasyDict( 
         func=ClsBB,
-        params=EasyDict(
-            
-                    )
+        params=EasyDict()
         ),
     custom = EasyDict( 
         func=ClsCustom,

@@ -127,16 +127,18 @@ def backtest(cfg):
                 
                 t1plot = lines2plot[-1][-1][0]
                 t0plot = min([e[0] for e in lines2plot[0]]) 
-                dbars = max(0, 256 - (t1plot - t0plot))
+                dbars = max(0, cfg.hist_buffer_size - (t1plot - t0plot))
                 hist2plot = hist_pd.iloc[t0plot - dbars:lines2plot[-1][-1][0]+1]
+                min_id = hist2plot.Id.min()
                 for line in lines2plot:
                     for i, point in enumerate(line):
-                        y = point[1]
+                        x, y = point
+                        x = max(x, min_id)
                         try:
                             y = y.item()
                         except:
                             pass
-                        line[i] = (hist2plot.index[hist2plot.Id==point[0]][0], y)
+                        line[i] = (hist2plot.index[hist2plot.Id==x][0], y)
                         
                 p = Process(target=plot_fig, args=(hist2plot, lines2plot, save_path, cfg.ticker, 
                                                    pd.to_datetime(closed_pos.open_date, utc=True),

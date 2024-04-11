@@ -273,6 +273,68 @@ class ClsTunnel(ExtensionBase):
         return is_fig
 
 
+class ClsTunZigZag(ExtensionBase):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(ClsTunZigZag, self).__init__(cfg, name="tuntrend")
+        self.levels = []
+        self.zigzag = ZigZag2()
+        
+    def __call__(self, common, h) -> bool:
+        is_fig = False
+        best_params = {
+            "metric": 0,
+            "i": 0,
+            "line_above": None,
+            "line_below": None,
+        }
+        for i in range(4, h.Id.shape[0], 1):
+            # line_above = h.High[-i:].mean()
+            # line_below = h.Low[-i:].mean()
+            # middle_line = (line_above + line_below) / 2
+            middle_line = h.Close[-i:].mean()
+            
+            metric = 0
+            for j in range(i):
+                if h.High[-j] > middle_line and h.Low[-j] < middle_line:
+                    metric += 1  
+                metric = metric*(1 + 1/i)
+                                    
+            if metric > best_params["metric"]:
+                best_params.update(
+                    {"metric": metric,
+                    "i": i,
+                    "middle_line": middle_line
+                    }
+                )                   
+                    
+        if best_params["metric"] > self.cfg.ncross:
+            self.levels = [{"value": best_params["middle_line"], "start_id": h.Id[-i]}]
+            
+        if len(self.levels):
+            ids, values, types = self.zigzag.update(h)
+            if len(ids) >= 2*2+1:
+                flag = False
+                if types[-2] > 0 and values[-3] > self.levels[0]["value"]:
+                    flag = values[-2] > values[-4] and values[-3] > values[-5]
+                if types[-2] < 0 and values[-3] < self.levels[0]["value"]:
+                    flag = values[-2] < values[-4] and values[-3] < values[-5]
+                if flag:
+                    is_fig = True
+                    trend_type = types[-2]  
+
+        if is_fig:
+            i = best_params["i"]
+            common.lines = [[(x, y) for x, y in zip(ids[-5:-1], values[-5:-1])]]
+            common.lprice = h.Open[-1] if trend_type > 0 else None
+            common.sprice = h.Open[-1] if trend_type < 0 else None
+            common.cprice = common.lines[0][-2][1]            
+            common.sl = {1: h.Low[-i:].min(), -1: h.High[-i:].max()}   
+            common.lines += [[(h.Id[-i], self.levels[0]["value"]), (h.Id[-1], self.levels[0]["value"])]]
+            self.levels = []
+        return is_fig
+
+
 class ClsTriangle(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
@@ -316,14 +378,14 @@ class ClsBB(ExtensionBase):
     def _bolinger_beams(self, h):
         mean = h.Close.mean()
         std = h.Close.std()
-        return mean, mean + std, mean - std
+        return mean, mean + 1*std, mean - 1*std
         
     def __call__(self, common, h) -> bool:
         dir = 0
         mean, bb_high, bb_low = self._bolinger_beams(h)   
-        if h.Close[-2] > bb_low:
+        if h.Close[-3] > bb_low and h.Close[-2] < bb_low:
             dir = 1
-        if h.Close[-2] < bb_high:
+        if h.Close[-3] < bb_high and h.Close[-2] > bb_high:
             dir = -1            
                  
         if dir != 0:
@@ -333,8 +395,8 @@ class ClsBB(ExtensionBase):
             if dir < 0:
                 common.sprice = h.Open[-1]
             common.sl = {1: h.Low[-10:].min(), -1: h.High[-10:].max()} 
-            common.tp = {1: h.Close[-1] + abs(h.Close[-1] - common.sl[1]), 
-                        -1: h.Close[-1] - abs(h.Close[-1] - common.sl[-1])
+            common.tp = {1: h.Close[-1] + 2*abs(h.Close[-1] - common.sl[1]), 
+                        -1: h.Close[-1] - 2*abs(h.Close[-1] - common.sl[-1])
                         } 
         return dir != 0
 
