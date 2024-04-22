@@ -99,10 +99,21 @@ def backtest(cfg):
         if save_path.exists():
             rmtree(save_path)
         save_path.mkdir()
-    tstart = max(cfg.hist_buffer_size+1, cfg.tstart)
-    tend = cfg.tend if cfg.tend is not None else hist.Id.shape[0]
+    date_start = np.datetime64(cfg.date_start)
+    mask = hist.Date == date_start
+    id2start = 0
+    if sum(mask) == 1:
+        id2start = hist.Id[mask][0]
+    else:
+        raise ValueError("Date start not found")
+        
+    # id2start = id2start - cfg.hist_buffer_size
+    if id2start < cfg.hist_buffer_size:
+        raise ValueError("Not enough history")
+    
+    id2end = cfg.tend if cfg.tend is not None else hist.Id.shape[0]
     t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0
-    for t in tqdm(range(tstart, tend), "back test"):
+    for t in tqdm(range(id2start, id2end), "back test"):
         h, dt = mw(t)
         # TODO
         # if h.Date[-1].astype(np.datetime64) < np.array("2024-02-15T00:30:00", dtype=np.datetime64):

@@ -9,8 +9,8 @@ stops_processor.params.sl_active = Param(True, [True])
 
 config = EasyDict(
     lot=Param(None, [None]),
-    date_start=Param("2017-08-01", ["2017-08-01"]),
-    date_end=Param("2024-03-01", ["2024-03-01"]),
+    date_start=Param("2024-03-28T20:00:00", ["2017-08-01"]),
+    date_end=Param("2024-05-01", ["2024-03-01"]),
     no_trading_days=Param(set(), [set()]),
     trailing_stop_rate=Param(None, [0.002, 0.003, 0.004, 0.005, 0.006, 0.007]),
     trailing_stop_type=Param(1, [1]),
@@ -23,6 +23,6 @@ config = EasyDict(
     period=Param("M15", ["M15"]),
     ticker=Param(None, ["BTCUSDT", "ETHUSDT"]),
     data_type=Param("bybit", ["bybit"]),
-    save_plots=Param(False, [False]),
+    save_plots=Param(True, [False]),
     run_model_device=Param(None, [None])
 )

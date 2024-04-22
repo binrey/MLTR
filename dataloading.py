@@ -93,19 +93,19 @@ class DataParser():
             raise FileNotFoundError(p)
     
     def _trim_by_date(self, hist):
-        if self.cfg.date_start is not None:
-            date_start = pd.to_datetime(self.cfg.date_start, utc=True)
-            for i, d in enumerate(hist.Date):
-                if d >= date_start:
-                    break
-            hist = hist.iloc[i:]   
+        # if self.cfg.date_start is not None:
+        #     date_start = pd.to_datetime(self.cfg.date_start, utc=True)
+        #     for i, d in enumerate(hist.Date):
+        #         if d >= date_start:
+        #             break
+        #     hist = hist.iloc[i:]   
             
-        if self.cfg.date_end is not None:
-            date_end = pd.to_datetime(self.cfg.date_end, utc=True)
-            for i, d in enumerate(hist.Date):
-                if d >= date_end:
-                    break
-            hist = hist.iloc[:i]   
+        # if self.cfg.date_end is not None:
+        #     date_end = pd.to_datetime(self.cfg.date_end, utc=True)
+        #     for i, d in enumerate(hist.Date):
+        #         if d >= date_end:
+        #             break
+        #     hist = hist.iloc[:i]   
         return hist           
         
     def bybit(self, data_file):

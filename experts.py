@@ -273,6 +273,67 @@ class ClsTunnel(ExtensionBase):
         return is_fig
 
 
+class ClsTunnel2(ExtensionBase):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(ClsTunnel2, self).__init__(cfg, name="tuntrend2")
+        self.level = None
+        
+    def __call__(self, common, h) -> bool:
+        is_fig = False
+        if self.level is None:
+            best_params = {
+                "metric": 0,
+                "i": 0,
+                "line_above": None,
+                "line_below": None,
+            }
+            for i in range(4, h.Id.shape[0], 1):
+                line_above = h.High[-i:].mean()
+                line_below = h.Low[-i:].mean()
+                middle_line = (line_above + line_below) / 2
+                #middle_line = h.Close[-i:].mean()
+                
+                metric = 0
+                for j in range(i):
+                    if h.High[-j] > middle_line and h.Low[-j] < middle_line:
+                        metric += 1  
+                # metric = metric*(1 + 1/i)
+                                        
+                if metric > best_params["metric"]:
+                    best_params.update(
+                        {"metric": metric, "i": i, "middle_line": middle_line}
+                    )                   
+                        
+            if best_params["metric"] > self.cfg.ncross:
+                if h.Close[-2] > line_above:
+                    self.level = {"value": best_params["middle_line"], "start_id": h.Id[-i], "end_id": h.Id[-1], "check_line": line_above}
+                    
+                if h.Close[-2] < line_below:
+                    self.level = {"value": best_params["middle_line"], "start_id": h.Id[-i], "end_id": h.Id[-1], "check_line": -line_below}          
+            
+        if self.level is not None:
+            flag = False
+            if self.level["check_line"] > 0:
+                is_fig = h.Close[-3] < self.level["check_line"]
+            if self.level["check_line"] < 0:
+                is_fig = h.Close[-3] > self.level["check_line"]
+
+        if is_fig:
+            if self.level["check_line"] > 0:
+                common.lprice = abs(self.level["check_line"])
+                common.cprice = self.level["value"]
+            if self.level["check_line"] < 0:
+                common.sprice = abs(self.level["check_line"])
+                common.cprice = self.level["value"] 
+                      
+            common.sl = {1: h.Low[-self.level["start_id"]:].min(), -1: h.High[-self.level["start_id"]:].max()}   
+            common.lines = [[(self.level["start_id"], self.level["value"]), (self.level["end_id"], self.level["value"])],
+                            [(self.level["start_id"], abs(self.level["check_line"])), (h.Id[-1], abs(self.level["check_line"]))]]
+            self.level = None
+        return is_fig
+
+
 class ClsTunZigZag(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
