@@ -158,7 +158,7 @@ class BybitTrading:
     def trailing_sl(self, pos):
         sl = float(pos["stopLoss"])
         try:
-            sl = sl + self.cfg.trailing_stop_rate*(self.h.Open[-1] - sl)
+            sl = sl + self.cfg.trailing_stop_rate*(self.h.Open.iloc[-1] - sl)
             resp = self.session.set_trading_stop(
                 category="linear",
                 symbol=self.cfg.ticker,
@@ -172,6 +172,8 @@ class BybitTrading:
         return sl        
 
     def get_open_orders_positions(self):
+            self.open_orders = []
+            self.open_position = None
             self.open_orders = self.session.get_open_orders(category="linear", symbol=cfg.ticker)["result"]["list"]
             positions = self.session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
             for pos in positions :
@@ -184,7 +186,6 @@ class BybitTrading:
             if cfg.save_plots:
                 if self.hist2plot is not None:
                     self.h = pd.DataFrame(self.h).iloc[-2:-1]
-                    print(self.h)
                     self.h.index = pd.to_datetime(self.h.Date)
                     self.hist2plot = pd.concat([self.hist2plot, self.h])
                     self.lines2plot[-1].append((pd.to_datetime(self.hist2plot.iloc[-1].Date), self.sl))
