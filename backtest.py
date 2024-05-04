@@ -105,7 +105,7 @@ def backtest(cfg):
     if sum(mask) == 1:
         id2start = hist.Id[mask][0]
     else:
-        raise ValueError("Date start not found")
+        raise ValueError(f"Date start {date_start}not found")
         
     # id2start = id2start - cfg.hist_buffer_size
     if id2start < cfg.hist_buffer_size:

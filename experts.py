@@ -478,26 +478,25 @@ class ClsCustom(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsCustom, self).__init__(cfg, name="custom")
-        folder = "./data/handmade_train/aapl_results_240105"
+        folder = "data/handmade_test/AAPL_H1"
         self.signals, self.props = {}, {}
         for fname in sorted(Path(folder).rglob("*.xlsx")):
-            if "true" in fname.parent.name:
-                d = str(fname.stem).split("___")[1]
-                side = -1 if "min" in fname.parent.name else 1
-                k = np.array(d, dtype='datetime64[D]').item()
-                self.signals[k] = side
-                
-                df = pd.read_excel(fname)
-                self.props[k] = []
-                for i in range(df.shape[0]):
-                    row = df.iloc[i]
-                    x = np.array(row.Date, dtype="datetime64[D]")
-                    y = {"real_peak_max": row.High,
-                         "real_peak_min": row.Low}.get(row.Analyze, row.Close)
-                    self.props[k] += [(x, y)]
+            # d = str(fname.stem).split("___")[1]
+            df = pd.read_excel(fname)
+            side = -1 if "min" in df.Analyze.iloc[1] else 1
+            k = np.array(str(df.Date.iloc[0])[:11] + df.Time.iloc[0], dtype='datetime64[ns]').item()
+            self.signals[k] = side
+            
+            self.props[k] = []
+            for i in range(df.shape[0]):
+                row = df.iloc[i]
+                x = np.array(str(row.Date)[:11] + row.Time, dtype="datetime64[ns]")
+                y = {"real_peak_max": row.High,
+                        "real_peak_min": row.Low}.get(row.Analyze, row.Close)
+                self.props[k] += [(x, y)]
         
     def __call__(self, common, h) -> bool:
-        t = h.Date[-1].astype("datetime64[D]").item()
+        t = h.Date[-1].astype("datetime64").item()
         side = self.signals.get(t, 0)
         if side != 0:
             if side == 1:
@@ -506,7 +505,9 @@ class ClsCustom(ExtensionBase):
                 common.sprice = h.Open[-1] #min(h.High[-2], h.Low[-2])
             common.lines = [[]]    
             for i, pt in enumerate(self.props[t]):
-                common.lines[0].append((h.Id[h.Date.astype("datetime64[D]") == pt[0]][0], pt[1]))
+                found_date = h.Id[h.Date == pt[0]]
+                if len(found_date):
+                    common.lines[0].append((found_date[0], pt[1]))
                 if i == 2:
                     common.sl = {1: pt[1], -1: pt[1]} 
                     common.tp = {1: h.Close[-1] + abs(h.Close[-1] - pt[1])*3, 
