@@ -479,7 +479,7 @@ class ClsCustom(ExtensionBase):
         self.cfg = cfg
         super(ClsCustom, self).__init__(cfg, name="custom")
         folder = "data/handmade_test/AAPL_H1"
-        self.signals, self.props = {}, {}
+        self.signals, self.props, self.features = {}, {}, {}
         for fname in sorted(Path(folder).rglob("*.xlsx")):
             # d = str(fname.stem).split("___")[1]
             df = pd.read_excel(fname)
@@ -494,11 +494,24 @@ class ClsCustom(ExtensionBase):
                 y = {"real_peak_max": row.High,
                         "real_peak_min": row.Low}.get(row.Analyze, row.Close)
                 self.props[k] += [(x, y)]
+                
+            df.Date = pd.to_datetime(df.Date)
+            dt = np.array([(df.iloc[0].Date - df.iloc[i].Date).days for i in range(0, df.shape[0])])
+            dy = [df.iloc[0].Close]
+            dy += [df.iloc[i].High if df.iloc[i].Analyze == "real_peak_max" else df.iloc[i].Low for i in range(1, df.shape[0])]
+            dy = (np.array(dy) - df.iloc[0].Close)/df.iloc[0].Close*100
+            self.features[k] = np.hstack([dt, dy])
+        
+        from joblib import load
+        self.model = load('random_forest_model.joblib')
         
     def __call__(self, common, h) -> bool:
         t = h.Date[-1].astype("datetime64").item()
         side = self.signals.get(t, 0)
         if side != 0:
+            prediction = self.model.predict(self.features[t].reshape(1, -1))[0]
+            if prediction[0] == 0:
+                return False
             if side == 1:
                 common.lprice = h.Open[-1] #max(h.High[-2], h.Low[-2])
             if side == -1:
