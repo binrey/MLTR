@@ -132,14 +132,17 @@ def backtest(cfg):
             broker.close_orders(h.Id[-2])
             if cfg.save_plots:
                 ords_lines = [order.lines for order in broker.orders if order.open_indx >= closed_pos.open_indx]
+                # exp_lines = [p for p in exp.lines if p[0] > closed_pos.lines[0][0] - cfg.hist_buffer_size]
                 lines2plot = exp.lines + ords_lines + [closed_pos.lines]
+                for line in lines2plot:
+                    while line[0][0] < closed_pos.lines[0][0] - cfg.hist_buffer_size:
+                        line.pop(0)
                 colors = ["blue"]*(len(lines2plot)-1) + ["green" if closed_pos.profit > 0 else "red"]
                 widths = [1]*(len(lines2plot)-1) + [2]
                 
-                t1plot = lines2plot[-1][-1][0]
-                t0plot = min([e[0] for e in lines2plot[0]]) 
-                dbars = max(0, cfg.hist_buffer_size - (t1plot - t0plot))
-                hist2plot = hist_pd.iloc[t0plot - dbars:lines2plot[-1][-1][0]+1]
+                tplot_end = lines2plot[-1][-1][0]
+                tplot_start = min([e[0] for e in lines2plot[0]])
+                hist2plot = hist_pd.iloc[tplot_start:tplot_end+1]
                 min_id = hist2plot.Id.min()
                 for line in lines2plot:
                     for i, point in enumerate(line):
