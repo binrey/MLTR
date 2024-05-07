@@ -7,6 +7,7 @@ from easydict import EasyDict
 from loguru import logger
 from pathlib import Path
 import pandas as pd
+from collections import OrderedDict
 
 from indicators import ZigZag, ZigZag2, ZigZagOpt
 from backtest_broker import Order
@@ -473,13 +474,18 @@ class ClsLevels(ExtensionBase):
         self.cfg = cfg
         super(ClsLevels, self).__init__(cfg, name="levels")
         self.ma = {}
-        self.extrems = {}
+        self.extrems = OrderedDict()
         self.last_cross = 0
         self.cur_cross = 0
         self.last_extr = (None, None)
         self.last_n = self.cfg.n
         
     def update_inner_state(self, h):
+        def remove_last_extrem():
+            # remove the last added element of dict self.extrems
+            last_key = max(self.extrems.keys())
+            self.extrems.pop(last_key) #TODO
+            
         id_cur = h.Id[-1]
         self.ma[id_cur] = h.Close[-self.cfg.ma:-1].mean() 
         self.last_cross = self.cur_cross
@@ -487,6 +493,8 @@ class ClsLevels(ExtensionBase):
             if h.Close[-2] > self.ma[id_cur] and h.Close[-3] <= self.ma[id_cur-1]:
                 if self.last_n >= self.cfg.n and self.last_cross != 1:
                     self.cur_cross = 1
+                    # if self.last_cross == self.cur_cross:
+                    #     remove_last_extrem()
                     if self.last_extr[0] is not None :
                         self.extrems[self.last_extr[0]-1] = self.last_extr[1]
                     self.last_extr = (id_cur, h.High[-2])
@@ -494,6 +502,8 @@ class ClsLevels(ExtensionBase):
             if h.Close[-2] < self.ma[id_cur] and h.Close[-3] >= self.ma[id_cur-1]:
                 if self.last_n >= self.cfg.n and self.last_cross != -1:
                     self.cur_cross = -1  
+                    # if self.last_cross == self.cur_cross:
+                    #     remove_last_extrem()
                     if self.last_extr[0] is not None:
                         self.extrems[self.last_extr[0]-1] = self.last_extr[1]
                     self.last_extr = (id_cur, h.Low[-2])
@@ -511,11 +521,25 @@ class ClsLevels(ExtensionBase):
                                 
                            
     def __call__(self, common, h) -> bool:
-        is_fig = self.cur_cross != self.last_cross                    
-        if is_fig:
-            common.lines = [[(t, p) for t, p in self.ma.items()], [(t, p) for t, p in self.extrems.items()]]
-            common.lprice = h.Close[-1] if self.last_cross > 0 else None
-            common.sprice = h.Close[-1] if self.last_cross < 0 else None
+        is_fig = 0
+        for extr_id in list(self.extrems.keys())[-4:]:
+            cur_extr = self.extrems[extr_id]
+            if h.Close[-2] > cur_extr and h.Close[-3] > cur_extr and h.Close[-4] <= cur_extr:
+                is_fig = 1
+            if h.Close[-2] < cur_extr and h.Close[-3] < cur_extr and h.Close[-4] >= cur_extr:
+                is_fig = -1
+                                                                 
+        if is_fig != 0:
+            common.lines = [[(t, p) for t, p in self.ma.items()]]
+            if len(self.extrems):
+                # common.lines += [[(t, p) for t, p in self.extrems.items()]]
+                levels = []
+                for extr_id in list(self.extrems.keys())[-4:]:
+                    levels.append([(extr_id, self.extrems[extr_id]), (h.Id[-1], self.extrems[extr_id])])
+                common.lines += levels
+                                                                
+            common.lprice = h.Close[-1] if is_fig > 0 else None
+            common.sprice = h.Close[-1] if is_fig < 0 else None
             # common.sl = {1: min(common.lines[0][-3][1], common.lines[0][-4][1]), 
             #             -1: max(common.lines[0][-3][1], common.lines[0][-4][1])} 
             # common.tp = {1: common.lprice + abs(common.lprice - common.sl[1])*5, 

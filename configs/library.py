@@ -47,6 +47,10 @@ body_classifiers = EasyDict(
         func=ClsBB,
         params=EasyDict()
         ),
+    levels = EasyDict(
+        func=ClsLevels,
+        params=EasyDict()
+        ),
     custom = EasyDict( 
         func=ClsCustom,
         params=EasyDict(

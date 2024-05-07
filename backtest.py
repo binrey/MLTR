@@ -105,7 +105,7 @@ def backtest(cfg):
     if sum(mask) == 1:
         id2start = hist.Id[mask][0]
     else:
-        raise ValueError(f"Date start {date_start}not found")
+        raise ValueError(f"Date start {date_start} not found, current dates range {hist.Date[0]} - {hist.Date[-1]}")
         
     # id2start = id2start - cfg.hist_buffer_size
     if id2start < cfg.hist_buffer_size:
@@ -132,9 +132,9 @@ def backtest(cfg):
             broker.close_orders(h.Id[-2])
             if cfg.save_plots:
                 ords_lines = [order.lines for order in broker.orders if order.open_indx >= closed_pos.open_indx]
-                # exp_lines = [p for p in exp.lines if p[0] > closed_pos.lines[0][0] - cfg.hist_buffer_size]
                 lines2plot = exp.lines + ords_lines + [closed_pos.lines]
                 for line in lines2plot:
+                    assert len(line)
                     while line[0][0] < closed_pos.lines[0][0] - cfg.hist_buffer_size:
                         line.pop(0)
                 colors = ["blue"]*(len(lines2plot)-1) + ["green" if closed_pos.profit > 0 else "red"]
