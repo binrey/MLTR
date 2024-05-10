@@ -528,7 +528,7 @@ class ClsLevels(ExtensionBase):
                 
         self.active_level = {"extr": None, "dir": 0}
         extrs2del = []
-        for extr_id in list(self.extrems.keys())[-4:]:
+        for extr_id in list(self.extrems.keys()):
             cur_extr_val = self.extrems[extr_id]
             if h.Close[-2] > cur_extr_val and h.Close[-3] < cur_extr_val:
                 update_active_level((extr_id, cur_extr_val))
@@ -556,7 +556,7 @@ class ClsLevels(ExtensionBase):
             common.lines = [[(t, p) for t, p in self.ma.items()]]
             if len(self.extrems):
                 levels = []
-                for extr_id in list(self.extrems.keys())[-4:]:
+                for extr_id in list(self.extrems.keys())[-self.cfg.show_n_peaks:]:
                     levels.append([(extr_id, self.extrems[extr_id]), (h.Id[-1], self.extrems[extr_id])])
                 levels.append([(self.active_level["extr"][0], self.active_level["extr"][1]), (h.Id[-1], self.active_level["extr"][1])])
                 common.lines += levels

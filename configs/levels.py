@@ -3,7 +3,8 @@ from configs.library import *
 
 classifier = body_classifiers.levels
 classifier.params.ma = Param(64, [64])
-classifier.params.n = Param(30, [4])
+classifier.params.n = Param(15, [4])
+classifier.params.show_n_peaks = Param(5, [4])
 
 stops_processor = stops_processors.stops_fixed
 stops_processor.params.sl = Param(3, [True])
@@ -22,9 +23,9 @@ config = EasyDict(
     hist_buffer_size=Param(256, [64]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("H1", ["M15"]),
+    period=Param("M15", ["M15"]),
     ticker=Param("BTCUSDT", ["BTCUSDT", "ETHUSDT"]),
     data_type=Param("metatrader", ["bybit"]),
-    save_plots=Param(False, [False]),
+    save_plots=Param(True, [False]),
     run_model_device=Param(None, [None])
 )
