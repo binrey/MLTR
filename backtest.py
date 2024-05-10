@@ -29,7 +29,7 @@ class BackTestResults:
         self.durations = np.array([pos.duration for pos in backtest_broker.positions])
         self.open_risks = np.array([pos.open_risk for pos in backtest_broker.positions])
         self.dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
-        self.final_balance = self.balance[-1]
+        self.final_balance = self.balance[-1] if len(self.balance) > 0 else 0
         self.daily_balance = self.convert_hist(self.profits, self.dates, date_start, date_end)
         self.daily_bstair, self.metrics = self._calc_metrics(self.daily_balance["balance"])
         self.metrics.update({"mean_pos_duration": self.durations.mean(),
@@ -167,6 +167,7 @@ def backtest(cfg):
                          t=pd.to_datetime(closed_pos.open_date, utc=True),
                          side="Buy" if closed_pos.dir > 0 else "Sell",
                          ticker=cfg.ticker)
+                print("closed position")
 
     
     ttotal = perf_counter() - t0
