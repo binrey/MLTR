@@ -134,9 +134,9 @@ def backtest(cfg):
                 ords_lines = [order.lines for order in broker.orders if order.open_indx >= closed_pos.open_indx]
                 lines2plot = exp.lines + ords_lines + [closed_pos.lines]
                 for line in lines2plot:
-                    assert len(line)
-                    while line[0][0] < closed_pos.lines[0][0] - cfg.hist_buffer_size:
-                        line.pop(0)
+                    if len(line) > 2:
+                        while line[0][0] < closed_pos.lines[0][0] - cfg.hist_buffer_size:
+                            line.pop(0)
                 colors = ["blue"]*(len(lines2plot)-1) + ["green" if closed_pos.profit > 0 else "red"]
                 widths = [1]*(len(lines2plot)-1) + [2]
                 
@@ -154,19 +154,19 @@ def backtest(cfg):
                             pass
                         line[i] = (hist2plot.index[hist2plot.Id==x][0], y)
                         
-                p = Process(target=plot_fig, args=(hist2plot, lines2plot, save_path, cfg.ticker, 
-                                                   pd.to_datetime(closed_pos.open_date, utc=True),
-                                                   "Buy" if closed_pos.dir > 0 else "Sell",
-                                                    cfg.ticker))
-                p.start()
-                p.join()
-                # plot_fig(hist2plot=hist2plot,
-                #          lines2plot=lines2plot,
-                #          save_path=save_path,
-                #          prefix=cfg.ticker,
-                #          t=pd.to_datetime(closed_pos.open_date, utc=True),
-                #          side="Buy" if closed_pos.dir > 0 else "Sell",
-                #          ticker=cfg.ticker)
+                # p = Process(target=plot_fig, args=(hist2plot, lines2plot, save_path, cfg.ticker, 
+                #                                    pd.to_datetime(closed_pos.open_date, utc=True),
+                #                                    "Buy" if closed_pos.dir > 0 else "Sell",
+                #                                     cfg.ticker))
+                # p.start()
+                # p.join()
+                plot_fig(hist2plot=hist2plot,
+                         lines2plot=lines2plot,
+                         save_path=save_path,
+                         prefix=cfg.ticker,
+                         t=pd.to_datetime(closed_pos.open_date, utc=True),
+                         side="Buy" if closed_pos.dir > 0 else "Sell",
+                         ticker=cfg.ticker)
 
     
     ttotal = perf_counter() - t0
