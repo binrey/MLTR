@@ -479,12 +479,20 @@ class ClsLevels(ExtensionBase):
         self.cur_cross = 0
         self.last_extr = (None, None)
         self.last_n = self.cfg.n
+        self.active_level = {"extr": None, "dir": 0}
         
     def update_inner_state(self, h):
         def remove_last_extrem():
             # remove the last added element of dict self.extrems
             last_key = max(self.extrems.keys())
             self.extrems.pop(last_key) #TODO
+            
+        def update_active_level(extr: tuple, type="extr"):
+            if self.active_level[type] is None:
+                self.active_level[type] = extr
+            else:
+                self.active_level[type] = (min(self.active_level[type][0], extr[0]), 
+                                           (self.active_level[type][1] + extr[1])/2)
             
         id_cur = h.Id[-1]
         self.ma[id_cur] = h.Close[-self.cfg.ma:-1].mean() 
@@ -518,26 +526,41 @@ class ClsLevels(ExtensionBase):
             if h.Low[-2] < self.last_extr[1]:
                 self.last_extr = (id_cur, h.Low[-2])
                 
+        self.active_level = {"extr": None, "dir": 0}
+        extrs2del = []
+        for extr_id in list(self.extrems.keys())[-4:]:
+            cur_extr_val = self.extrems[extr_id]
+            if h.Close[-2] > cur_extr_val and h.Close[-3] < cur_extr_val:
+                update_active_level((extr_id, cur_extr_val))
+                self.active_level["dir"] = 1
+                extrs2del.append(extr_id)
+            elif h.Close[-2] > cur_extr_val and h.High[-3] <= cur_extr_val:
+                update_active_level((extr_id, cur_extr_val))
+                self.active_level["dir"] = 1
+            if h.Close[-2] < cur_extr_val and h.Close[-3] > cur_extr_val:
+                update_active_level((extr_id, cur_extr_val))
+                self.active_level["dir"] = -1      
+                extrs2del.append(extr_id)    
+            elif h.Close[-2] < cur_extr_val and h.Low[-3] >= cur_extr_val:
+                update_active_level((extr_id, cur_extr_val))
+                self.active_level["dir"] = -1
+                
+        for extr_id in extrs2del:
+            self.extrems.pop(extr_id)
+                
                                 
                            
     def __call__(self, common, h) -> bool:
-        is_fig = 0
-        for extr_id in list(self.extrems.keys())[-4:]:
-            cur_extr = self.extrems[extr_id]
-            if h.Close[-2] > cur_extr and h.Close[-3] > cur_extr and h.Close[-4] <= cur_extr:
-                is_fig = 1
-            if h.Close[-2] < cur_extr and h.Close[-3] < cur_extr and h.Close[-4] >= cur_extr:
-                is_fig = -1
-                                                                 
-        if is_fig != 0:
+        is_fig = self.active_level["dir"]                                                      
+        if is_fig:
             common.lines = [[(t, p) for t, p in self.ma.items()]]
             if len(self.extrems):
-                # common.lines += [[(t, p) for t, p in self.extrems.items()]]
                 levels = []
                 for extr_id in list(self.extrems.keys())[-4:]:
                     levels.append([(extr_id, self.extrems[extr_id]), (h.Id[-1], self.extrems[extr_id])])
+                levels.append([(self.active_level["extr"][0], self.active_level["extr"][1]), (h.Id[-1], self.active_level["extr"][1])])
                 common.lines += levels
-                                                                
+                                                                    
             common.lprice = h.Close[-1] if is_fig > 0 else None
             common.sprice = h.Close[-1] if is_fig < 0 else None
             # common.sl = {1: min(common.lines[0][-3][1], common.lines[0][-4][1]), 
