@@ -65,6 +65,14 @@ def date2save_format(date, prefix=None):
 
      
 def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=None, ticker="X"):
+    for line in lines2plot:
+        assert len(line) >= 2, "line must have more than 1 point"
+        for point in line:
+            assert len(point) == 2
+            assert type(point[0]) is pd.Timestamp
+            assert type(point[1]) is float
+            assert point[0] >= hist2plot.index[0]
+            assert point[0] <= hist2plot.index[-1]
     mystyle=mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
     kwargs = dict(
         type='candle', 
