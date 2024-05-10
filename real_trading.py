@@ -2,6 +2,7 @@ from pathlib import Path
 from shutil import rmtree
 from time import sleep
 import mplfinance as mpf
+import matplotlib.pyplot as plt
 import pandas as pd
 from loguru import logger
 pd.options.mode.chained_assignment = None
@@ -107,6 +108,7 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
     if save_path is not None:
         save_path = save_path / date2save_format(t, prefix)  
         fig.savefig(save_path, bbox_inches='tight', pad_inches=0.2)  
+    plt.close('all')
     return save_path
       
       
