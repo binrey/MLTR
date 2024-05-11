@@ -58,8 +58,8 @@ class BackTestResults:
         twaits.append(twait)
         twaits = np.array(twaits) if len(twaits) else np.array([len(ts)])
         twaits.sort()
-        lin_err = sum(np.abs(ts - np.arange(0, ts[-1], ts[-1]/len(ts))[:len(ts)]))
-        lin_err /= len(ts)*ts[-1]
+        # lin_err = sum(np.abs(ts - np.arange(0, ts[-1], ts[-1]/len(ts))[:len(ts)]))
+        # lin_err /= len(ts)*ts[-1]
         metrics = {"maxwait": twaits.max(),#[-5:].mean(), 
                    "recovery": ts[-1]/max_loss, 
                    "loss_max": max_loss}
@@ -167,7 +167,6 @@ def backtest(cfg):
                          t=pd.to_datetime(closed_pos.open_date, utc=True),
                          side="Buy" if closed_pos.dir > 0 else "Sell",
                          ticker=cfg.ticker)
-                print("closed position")
 
     
     ttotal = perf_counter() - t0

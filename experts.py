@@ -478,75 +478,72 @@ class ClsLevels(ExtensionBase):
         self.last_cross = 0
         self.cur_cross = 0
         self.last_extr = (None, None)
+        self.tmp_extr = (None, None, 0)
         self.last_n = self.cfg.n
         self.active_level = {"extr": None, "dir": 0}
-        
-    def update_inner_state(self, h):
-        def remove_last_extrem():
-            # remove the last added element of dict self.extrems
-            last_key = max(self.extrems.keys())
-            self.extrems.pop(last_key) #TODO
-            
-        def update_active_level(extr: tuple, type="extr"):
-            if self.active_level[type] is None:
-                self.active_level[type] = extr
-            else:
-                self.active_level[type] = (min(self.active_level[type][0], extr[0]), 
-                                           (self.active_level[type][1] + extr[1])/2)
-            
+    
+    def _last_extrem_side(self):
+        side = 0
+        if len(self.extrems) > 0:
+            last_id = max(self.extrems.keys())
+            side = 1 if self.extrems[last_id] > self.ma[last_id] else -1
+        return side
+    
+    def _update_active_level(self, extr: tuple, type="extr"):
+        if self.active_level[type] is None:
+            self.active_level[type] = extr
+        else:
+            self.active_level[type] = (min(self.active_level[type][0], extr[0]), 
+                                        (self.active_level[type][1] + extr[1])/2)
+    
+    def update_inner_state(self, h):     
         id_cur = h.Id[-1]
         self.ma[id_cur] = h.Close[-self.cfg.ma:-1].mean() 
         self.last_cross = self.cur_cross
         if len(self.ma) > 2:
-            if h.Close[-2] > self.ma[id_cur] and h.Close[-3] <= self.ma[id_cur-1]:
-                if self.last_n >= self.cfg.n and self.last_cross != 1:
-                    self.cur_cross = 1
-                    # if self.last_cross == self.cur_cross:
-                    #     remove_last_extrem()
-                    if self.last_extr[0] is not None :
-                        self.extrems[self.last_extr[0]-1] = self.last_extr[1]
-                    self.last_extr = (id_cur, h.High[-2])
+            if h.Close[-2] > self.ma[id_cur]:
+                self.cur_cross = 1   
+                if h.Close[-3] <= self.ma[id_cur-1]:
+                    if self.last_n > self.cfg.n and self.last_extr[0] is not None and self._last_extrem_side() >= 0:              
+                        self.extrems[self.last_extr[0]-1] = self.last_extr[1] 
+                    self.last_extr = (id_cur, h.High[-2])  
                     self.last_n = 0
-            if h.Close[-2] < self.ma[id_cur] and h.Close[-3] >= self.ma[id_cur-1]:
-                if self.last_n >= self.cfg.n and self.last_cross != -1:
-                    self.cur_cross = -1  
-                    # if self.last_cross == self.cur_cross:
-                    #     remove_last_extrem()
-                    if self.last_extr[0] is not None:
-                        self.extrems[self.last_extr[0]-1] = self.last_extr[1]
+                    
+            if h.Close[-2] < self.ma[id_cur]:
+                self.cur_cross = -1
+                if h.Close[-3] >= self.ma[id_cur-1]:
+                    if self.last_n > self.cfg.n and self.last_extr[0] is not None and self._last_extrem_side() <= 0:              
+                        self.extrems[self.last_extr[0]-1] = self.last_extr[1] 
                     self.last_extr = (id_cur, h.Low[-2])
                     self.last_n = 0
+        self.last_n += 1            
               
-        if self.cur_cross > 0:
-            self.last_n += 1
-            if h.High[-2] > self.last_extr[1]:
-                self.last_extr = (id_cur, h.High[-2])
-        if self.cur_cross < 0:
-            self.last_n += 1
-            if h.Low[-2] < self.last_extr[1]:
-                self.last_extr = (id_cur, h.Low[-2])
-                
+        if self.cur_cross > 0 and self.last_extr[1] is not None and h.High[-2] > self.last_extr[1]:
+            self.last_extr = (id_cur, h.High[-2])
+        if self.cur_cross < 0 and self.last_extr[1] is not None and h.Low[-2] < self.last_extr[1]:
+            self.last_extr = (id_cur, h.Low[-2])
+                 
         self.active_level = {"extr": None, "dir": 0}
         extrs2del = []
         for extr_id in list(self.extrems.keys()):
             cur_extr_val = self.extrems[extr_id]
             if h.Close[-2] > cur_extr_val and h.Close[-3] < cur_extr_val:
-                update_active_level((extr_id, cur_extr_val))
+                self._update_active_level((extr_id, cur_extr_val))
                 self.active_level["dir"] = 1
                 extrs2del.append(extr_id)
             elif h.Close[-2] > cur_extr_val and h.High[-3] <= cur_extr_val:
-                update_active_level((extr_id, cur_extr_val))
+                self._update_active_level((extr_id, cur_extr_val))
                 self.active_level["dir"] = 1
             if h.Close[-2] < cur_extr_val and h.Close[-3] > cur_extr_val:
-                update_active_level((extr_id, cur_extr_val))
+                self._update_active_level((extr_id, cur_extr_val))
                 self.active_level["dir"] = -1      
                 extrs2del.append(extr_id)    
             elif h.Close[-2] < cur_extr_val and h.Low[-3] >= cur_extr_val:
-                update_active_level((extr_id, cur_extr_val))
+                self._update_active_level((extr_id, cur_extr_val))
                 self.active_level["dir"] = -1
                 
-        for extr_id in extrs2del:
-            self.extrems.pop(extr_id)
+        # for extr_id in extrs2del:
+        #     self.extrems.pop(extr_id)
                 
                                 
                            
@@ -556,15 +553,15 @@ class ClsLevels(ExtensionBase):
             common.lines = [[(t, p) for t, p in self.ma.items()]]
             if len(self.extrems):
                 levels = []
-                for extr_id in list(self.extrems.keys())[-self.cfg.show_n_peaks:]:
+                for extr_id in list(self.extrems.keys())[-self.cfg.show_n_peaks+1:]:
                     levels.append([(extr_id, self.extrems[extr_id]), (h.Id[-1], self.extrems[extr_id])])
                 levels.append([(self.active_level["extr"][0], self.active_level["extr"][1]), (h.Id[-1], self.active_level["extr"][1])])
                 common.lines += levels
                                                                     
             common.lprice = h.Close[-1] if is_fig > 0 else None
             common.sprice = h.Close[-1] if is_fig < 0 else None
-            # common.sl = {1: min(common.lines[0][-3][1], common.lines[0][-4][1]), 
-            #             -1: max(common.lines[0][-3][1], common.lines[0][-4][1])} 
+            common.sl = {1: self.active_level["extr"][1], 
+                        -1: self.active_level["extr"][1]} 
             # common.tp = {1: common.lprice + abs(common.lprice - common.sl[1])*5, 
             #             -1: common.sprice - abs(common.sprice - common.sl[-1])*5} 
         return is_fig
