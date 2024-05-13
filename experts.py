@@ -496,6 +496,15 @@ class ClsLevels(ExtensionBase):
             self.active_level[type] = (min(self.active_level[type][0], extr[0]), 
                                         (self.active_level[type][1] + extr[1])/2)
     
+    def check_cross(self, h, side, cur_extr_val):
+        nn = 0
+        for i in range(self.cfg.ncross+1):
+            if side*(h.Close[-i-2] - cur_extr_val) > 0:
+                nn += 1
+            else:
+                break
+        return nn == self.cfg.ncross+1
+    
     def update_inner_state(self, h):     
         id_cur = h.Id[-1]
         self.ma[id_cur] = h.Close[-self.cfg.ma:-1].mean() 
@@ -527,21 +536,37 @@ class ClsLevels(ExtensionBase):
         extrs2del = []
         for extr_id in list(self.extrems.keys()):
             cur_extr_val = self.extrems[extr_id]
-            if h.Close[-2] > cur_extr_val and h.Close[-3] < cur_extr_val:
+            if self.check_cross(h, 1, cur_extr_val) and h.Close[-self.cfg.ncross-3] < cur_extr_val:
                 self._update_active_level((extr_id, cur_extr_val))
                 self.active_level["dir"] = 1
                 extrs2del.append(extr_id)
-            elif h.Close[-2] > cur_extr_val and h.High[-3] <= cur_extr_val:
+            elif self.check_cross(h, 1, cur_extr_val) and h.High[-self.cfg.ncross-3] <= cur_extr_val:
                 self._update_active_level((extr_id, cur_extr_val))
                 self.active_level["dir"] = 1
-            if h.Close[-2] < cur_extr_val and h.Close[-3] > cur_extr_val:
+            if self.check_cross(h, -1, cur_extr_val) and h.Close[-self.cfg.ncross-3] > cur_extr_val:
                 self._update_active_level((extr_id, cur_extr_val))
                 self.active_level["dir"] = -1      
                 extrs2del.append(extr_id)    
-            elif h.Close[-2] < cur_extr_val and h.Low[-3] >= cur_extr_val:
+            elif self.check_cross(h, -1, cur_extr_val) and h.Low[-self.cfg.ncross-3] >= cur_extr_val:
                 self._update_active_level((extr_id, cur_extr_val))
                 self.active_level["dir"] = -1
                 
+        # for extr_id in list(self.extrems.keys()):
+        #     cur_extr_val = self.extrems[extr_id]
+        #     if h.Close[-2] > cur_extr_val and h.Close[-3] < cur_extr_val:
+        #         self._update_active_level((extr_id, cur_extr_val))
+        #         self.active_level["dir"] = 1
+        #         extrs2del.append(extr_id)
+        #     elif h.Close[-2] > cur_extr_val and h.High[-3] <= cur_extr_val:
+        #         self._update_active_level((extr_id, cur_extr_val))
+        #         self.active_level["dir"] = 1
+        #     if h.Close[-2] < cur_extr_val and h.Close[-3] > cur_extr_val:
+        #         self._update_active_level((extr_id, cur_extr_val))
+        #         self.active_level["dir"] = -1      
+        #         extrs2del.append(extr_id)    
+        #     elif h.Close[-2] < cur_extr_val and h.Low[-3] >= cur_extr_val:
+        #         self._update_active_level((extr_id, cur_extr_val))
+        #         self.active_level["dir"] = -1
         # for extr_id in extrs2del:
         #     self.extrems.pop(extr_id)
                 
