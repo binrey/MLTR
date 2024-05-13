@@ -101,16 +101,20 @@ def backtest(cfg):
         save_path.mkdir()
     date_start = np.datetime64(cfg.date_start)
     mask = hist.Date == date_start
-    id2start = 0
+    id2start = cfg.hist_buffer_size
     if sum(mask) == 1:
         id2start = hist.Id[mask][0]
     else:
-        raise ValueError(f"Date start {date_start} not found, current dates range {hist.Date[0]} - {hist.Date[-1]}")
+        logger.warning(f"Date start {date_start} not found, current dates range {hist.Date[0]} - {hist.Date[-1]}")
+        print("Print <y> to start from the first available date:")
+        answer = input()
+        if answer != "y":
+            raise ValueError("Wrong start date/time")
         
-    # id2start = id2start - cfg.hist_buffer_size
     if id2start < cfg.hist_buffer_size:
-        raise ValueError("Not enough history")
-    
+        logger.warning(f"Not enough history, shift start id from {id2start} to {cfg.hist_buffer_size}")
+        id2start = cfg.hist_buffer_size
+        
     id2end = cfg.tend if cfg.tend is not None else hist.Id.shape[0]
     t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0
     for t in tqdm(range(id2start, id2end), "back test"):
