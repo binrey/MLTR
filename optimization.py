@@ -5,7 +5,6 @@ from multiprocessing import Pool
 from pathlib import Path
 from shutil import rmtree
 from time import time
-import json
 
 import numpy as np
 import pandas as pd
