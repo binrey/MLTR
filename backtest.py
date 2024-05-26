@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from shutil import rmtree
 from time import perf_counter
@@ -15,7 +16,7 @@ from backtest_broker import Broker
 from experts import BacktestExpert
 from real_trading import plot_fig
 from multiprocessing import Process
-logger.remove()
+# logger.remove()
 
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen
@@ -89,7 +90,10 @@ class BackTestResults:
         return {"days": target_dates, "balance": res}
 
 
-def backtest(cfg):
+def backtest(cfg, loglevel = "INFO"):
+    logger.remove()
+    logger.add(sys.stderr, level=loglevel)
+    
     exp = BacktestExpert(cfg)
     broker = Broker(cfg)
     hist_pd, hist = DataParser(cfg).load()
@@ -117,7 +121,9 @@ def backtest(cfg):
         
     id2end = cfg.tend if cfg.tend is not None else hist.Id.shape[0]
     t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0
-    for t in tqdm(range(id2start, id2end), "back test"):
+    for t in tqdm(range(id2start, id2end), 
+                  desc=f"back test {cfg.body_classifier.func.name}",
+                  disable=loglevel == "ERROR"):
         h, dt = mw(t)
         # TODO
         # if h.Date[-1].astype(np.datetime64) < np.array("2024-02-15T00:30:00", dtype=np.datetime64):
@@ -195,11 +201,8 @@ def backtest(cfg):
     
     
 if __name__ == "__main__":
-    import sys
-    logger.remove()
-    logger.add(sys.stderr, level="INFO")
     cfg = PyConfig(sys.argv[1]).test()
-    btest_results = backtest(cfg)
+    btest_results = backtest(cfg, loglevel="INFO")
     plt.subplots(figsize=(15, 8))
     plt.plot(btest_results.dates, btest_results.balance, linewidth=2, alpha=0.6)
     plt.tight_layout()
