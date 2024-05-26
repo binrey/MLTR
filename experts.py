@@ -474,7 +474,8 @@ class ClsLevels(ExtensionBase):
         self.cfg = cfg
         super(ClsLevels, self).__init__(cfg, name="levels")
         self.ma = {}
-        self.n_extrems = 10
+        self.n_extrems = self.cfg.n_extrems
+        self.show_n_peaks = min(self.cfg.show_n_peaks, self.cfg.n_extrems)
         self.extrems = {"ids": np.zeros(self.n_extrems, dtype=np.int32), "values": np.zeros(self.n_extrems), "sides": np.zeros(self.n_extrems)}
         self.last_cross = 0
         self.cur_cross = 0
@@ -482,6 +483,7 @@ class ClsLevels(ExtensionBase):
         self.tmp_extr = (None, None, 0)
         self.last_n = self.cfg.n
         self.active_level = {"extr": None, "dir": 0}
+        
     
     def _last_extrem_side(self):
         side = 0
@@ -515,10 +517,12 @@ class ClsLevels(ExtensionBase):
         self.ma[id_cur] = h.Close[-self.cfg.ma:-1].mean() 
         self.last_cross = self.cur_cross
         if len(self.ma) > 2:
+            if id_cur - 1 not in self.ma.keys():
+                print("puk")
             if h.Close[-2] > self.ma[id_cur]:
                 self.cur_cross = 1   
                 if h.Close[-3] <= self.ma[id_cur-1]:
-                    if self.last_n > self.cfg.n and self.last_extr[0] is not None and self.extrems["sides"][-1] >= 0:    
+                    if self.last_n > self.cfg.n and self.last_extr[0] is not None and self.extrems["sides"][-1] <= 0:    
                         self._upd_peaks(self.last_extr[0]-1, self.last_extr[1], self.cur_cross)         
                     self.last_extr = (id_cur, h.High[-2])  
                     self.last_n = 0
@@ -526,7 +530,7 @@ class ClsLevels(ExtensionBase):
             if h.Close[-2] < self.ma[id_cur]:
                 self.cur_cross = -1
                 if h.Close[-3] >= self.ma[id_cur-1]:
-                    if self.last_n > self.cfg.n and self.last_extr[0] is not None and self.extrems["sides"][-1] <= 0:              
+                    if self.last_n > self.cfg.n and self.last_extr[0] is not None and self.extrems["sides"][-1] >= 0:              
                         self._upd_peaks(self.last_extr[0]-1, self.last_extr[1], self.cur_cross)         
                     self.last_extr = (id_cur, h.Low[-2])
                     self.last_n = 0
@@ -539,43 +543,46 @@ class ClsLevels(ExtensionBase):
                  
         self.active_level = {"extr": None, "dir": 0}
         extrs2del = []
-        for extr_id in range(1, self.n_extrems+1):
-            cur_extr_val = self.extrems["values"][-extr_id]
-            # s = h.Close[-self.cfg.ncross-1:-1] - cur_extr_val
-            if h.Close[-2] > cur_extr_val:#sum(s >= self.cfg.ncross) == self.cfg.ncross:
-                if h.Close[-self.cfg.ncross-1] < cur_extr_val:
-                    self._update_active_level((extr_id, cur_extr_val))
+        for i_extr in range(self.n_extrems):
+            if self.extrems["sides"][i_extr] == 0:
+                continue                         
+            cur_extr_val = self.extrems["values"][i_extr]
+            cur_extr_id = self.extrems["ids"][i_extr]
+            s = h.Close[-self.cfg.ncross-1:-1] - cur_extr_val
+            if sum(s >= 0) == self.cfg.ncross: #h.Close[-2] > cur_extr_val:#
+                if h.Close[-self.cfg.ncross-2] < cur_extr_val:
+                    self._update_active_level((cur_extr_id, cur_extr_val))
                     self.active_level["dir"] = 1
-                    extrs2del.append(extr_id)
-                elif h.Low[-self.cfg.ncross-1] <= cur_extr_val:
-                    self._update_active_level((extr_id, cur_extr_val))
-                    self.active_level["dir"] = 1
-            if h.Close[-2] < cur_extr_val:#sum(s <= self.cfg.ncross) == self.cfg.ncross: 
-                if h.Close[-self.cfg.ncross-1] > cur_extr_val:
-                    self._update_active_level((extr_id, cur_extr_val))
+                    extrs2del.append(i_extr)
+                # elif h.Low[-self.cfg.ncross-1] <= cur_extr_val and h.Open[-self.cfg.ncross-1] >= cur_extr_val and self.cur_cross < 0:
+                #     self._update_active_level((cur_extr_id, cur_extr_val))
+                #     self.active_level["dir"] = 1
+            if sum(s <= 0) == self.cfg.ncross: #h.Close[-2] < cur_extr_val:#
+                if h.Close[-self.cfg.ncross-2] > cur_extr_val:
+                    self._update_active_level((cur_extr_id, cur_extr_val))
                     self.active_level["dir"] = -1      
-                    extrs2del.append(extr_id)    
-                elif h.High[-self.cfg.ncross-1] >= cur_extr_val:
-                    self._update_active_level((extr_id, cur_extr_val))
-                    self.active_level["dir"] = -1
+                    extrs2del.append(i_extr)    
+                # elif h.High[-self.cfg.ncross-1] >= cur_extr_val and h.Open[-self.cfg.ncross-1] <= cur_extr_val and self.cur_cross > 0:
+                #     self._update_active_level((cur_extr_id, cur_extr_val))
+                #     self.active_level["dir"] = -1
         
-        # for extr_id in extrs2del:
-        #     for k in self.extrems.keys():
-        #         self.extrems[k][extr_id] = 0
+        for i_extr in extrs2del:
+            for k in self.extrems.keys():
+                self.extrems[k][1:i_extr+1] = self.extrems[k][:i_extr]
+                self.extrems[k][0] = 0
                 
                                 
-                           
     def __call__(self, common, h) -> bool:
         is_fig = self.active_level["dir"]                                                      
         if is_fig:
             common.lines = [[(t, p) for t, p in self.ma.items()]]
-            if sum(self.extrems["sides"]):
+            if sum(abs(self.extrems["sides"])):
                 levels = []
-                for extr_id in range(self.cfg.show_n_peaks):
-                    if self.extrems["sides"][extr_id]:
-                        levels.append([(self.extrems["ids"][extr_id], self.extrems["values"][-extr_id]), 
-                                    (self.extrems["ids"][extr_id], self.extrems["values"][-extr_id])])
-                levels.append([(self.active_level["extr"][0], self.active_level["extr"][1]), (h.Id[-1], self.active_level["extr"][1])])
+                for i_extr in range(self.show_n_peaks):
+                    if self.extrems["sides"][-i_extr-1] != 0:
+                        levels.append([(self.extrems["ids"][-i_extr-1], self.extrems["values"][-i_extr-1]), 
+                                    (h.Id[-2], self.extrems["values"][-i_extr-1])])
+                levels.append([(self.active_level["extr"][0], self.active_level["extr"][1]), (h.Id[-2], self.active_level["extr"][1])])
                 common.lines += levels
                                                                     
             common.lprice = h.Close[-1] if is_fig > 0 else None
