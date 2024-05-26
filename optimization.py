@@ -5,15 +5,19 @@ from multiprocessing import Pool
 from pathlib import Path
 from shutil import rmtree
 from time import time
-
+import sys
 import numpy as np
 import pandas as pd
 from easydict import EasyDict
 from loguru import logger
 from matplotlib import pyplot as plt
+from copy import deepcopy as copy
 
 from backtest import BackTestResults, backtest
 from utils import PyConfig
+
+logger.remove()
+logger.add(sys.stderr, level="DEBUG") 
 
 
 def plot_daily_balances_with_av(btests, test_ids, balance_av, recovery_av):
@@ -35,12 +39,11 @@ class Optimizer:
             self.sortby = "recovery" #"recovery" #"final_balance" #
 
       def backtest_process(self, args):
-            logger.debug(args)
             num, cfg = args
-            logger.debug(f"start backtest {num}")
+            logger.debug(f"start backtest {num}: {cfg}")
             locnum = 0
             while True:
-                  btest = backtest(cfg)
+                  btest = backtest(cfg, loglevel="INFO")
                   if len(btest.profits) == 0:
                         break
                   # cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
@@ -57,7 +60,9 @@ class Optimizer:
             logger.info(f"Number of cpu : {ncpu}")
 
             keys, values = zip(*optim_cfg.items())
-            cfgs = [EasyDict(zip(keys, v)) for v in itertools.product(*values)]
+            cfgs = [EasyDict(zip(keys, copy(v))) for v in itertools.product(*values)]
+            for cfg in cfgs:
+                  print(cfg["stops_processor"]["func"].cfg.sl, id(cfg["body_classifier"]["func"]))
             logger.info(f"optimization steps number: {len(cfgs)}")
 
             # logger.info("\n".join(["const params:"]+[f"{k}={v[0]}" for k, v in optim_cfg.items() if len(param_summary[k])==1]))
@@ -67,7 +72,7 @@ class Optimizer:
       
       
       def optimize(self, optim_cfg, run_backtests=True):
-            logger.remove()
+            # logger.remove()
             self.data_path = Path("optimization") / f"data_{optim_cfg.period[0]}"
             t0 = time()
             if run_backtests:
