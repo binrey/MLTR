@@ -63,6 +63,7 @@ class Position:
         self.close_price = None
         self.close_date = None
         self.profit = None
+        self.profit_abs = None
         logger.debug(f"{date2str(date)} open position {self.id}")
     
     def __str__(self):
@@ -84,9 +85,9 @@ class Position:
         self.close_price = abs(price)
         self.close_date = date
         self.close_indx = indx
-        self.profit = (self.close_price - self.open_price)*self.dir/self.open_price*100
+        self.profit_abs = (self.close_price - self.open_price)*self.dir
+        self.profit = self.profit_abs/self.open_price*100
         logger.debug(f"{date2str(date)} close position {self.id} at {self.close_price:.2f}, profit: {self.profit:.2f}")
-        return self.profit
     
     @property
     def lines(self):
@@ -116,6 +117,10 @@ class Broker:
     @property
     def profits(self):
         return np.array([p.profit for p in self.positions])
+    
+    @property
+    def profits_abs(self):
+        return np.array([p.profit_abs for p in self.positions])    
         
     def update(self, h):
         t0 = perf_counter()

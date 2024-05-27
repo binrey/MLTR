@@ -517,8 +517,6 @@ class ClsLevels(ExtensionBase):
         self.ma[id_cur] = h.Close[-self.cfg.ma:-1].mean() 
         self.last_cross = self.cur_cross
         if len(self.ma) > 2:
-            if id_cur - 1 not in self.ma.keys():
-                print("puk")
             if h.Close[-2] > self.ma[id_cur]:
                 self.cur_cross = 1   
                 if h.Close[-3] <= self.ma[id_cur-1]:

@@ -61,8 +61,8 @@ class Optimizer:
 
             keys, values = zip(*optim_cfg.items())
             cfgs = [EasyDict(zip(keys, copy(v))) for v in itertools.product(*values)]
-            for cfg in cfgs:
-                  print(cfg["stops_processor"]["func"].cfg.sl, id(cfg["body_classifier"]["func"]))
+            # for cfg in cfgs:
+            #       print(cfg["stops_processor"]["func"].cfg.sl, id(cfg["body_classifier"]["func"]))
             logger.info(f"optimization steps number: {len(cfgs)}")
 
             # logger.info("\n".join(["const params:"]+[f"{k}={v[0]}" for k, v in optim_cfg.items() if len(param_summary[k])==1]))

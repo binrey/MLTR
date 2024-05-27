@@ -37,6 +37,15 @@ class BackTestResults:
                              "mean_pos_result": self.profits.mean(),
                              "mean_open_risk": np.nanmean(self.open_risks)
                              })
+        
+        self.buy_and_hold = None
+
+    def write_buy_and_hold(self, hist, id2start, id2end):
+        dp = (hist.Close[id2start+1:id2end] - hist.Close[id2start:id2end-1]) / hist.Close[id2start:id2end-1] * 100
+        self.buy_and_hold = {
+            "dates": hist.Date[id2start:id2end],
+            "profit": np.hstack([np.array([0]), dp.cumsum()])
+        }
 
     @staticmethod
     def _calc_metrics(ts):
@@ -181,6 +190,8 @@ def backtest(cfg, loglevel = "INFO"):
     
     ttotal = perf_counter() - t0
     backtest_results = BackTestResults(broker, cfg.date_start, cfg.date_end)
+    backtest_results.write_buy_and_hold(hist, id2start, id2end)
+    
     sformat = lambda type: {1:"{:>30}: {:>5.0f}", 2: "{:>30}: {:5.2f}"}.get(type)
     logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}")
     logger.info(sformat(2).format("total backtest", ttotal) + " sec")
@@ -195,8 +206,6 @@ def backtest(cfg, loglevel = "INFO"):
     logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["recovery"])) 
     logger.info(sformat(1).format("MAXWAIT", backtest_results.metrics["maxwait"])+"\n")
     
-    # import pickle
-    # pickle.dump((cfg, broker), open(str(Path("backtests") / f"btest{0:003.0f}.pickle"), "wb"))
     return backtest_results
     
     
@@ -205,5 +214,6 @@ if __name__ == "__main__":
     btest_results = backtest(cfg, loglevel="INFO")
     plt.subplots(figsize=(15, 8))
     plt.plot(btest_results.dates, btest_results.balance, linewidth=2, alpha=0.6)
+    plt.plot(btest_results.buy_and_hold["dates"], btest_results.buy_and_hold["profit"], linewidth=1, alpha=0.6)    
     plt.tight_layout()
     plt.savefig("backtest.png")
