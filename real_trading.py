@@ -82,7 +82,7 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
         volume=True,
         figscale=1.5,
         style=mystyle,
-        datetime_format='%m-%d %H:%M',
+        datetime_format='%m-%d %H:%M:%Y',
         title=f"{np.array(t).astype('datetime64[s]')}-{ticker}-{side}",
         returnfig=True
     )
