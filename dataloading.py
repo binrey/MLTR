@@ -90,7 +90,7 @@ class DataParser():
                     "bybit": self.bybit
                     }.get(self.cfg.data_type, None)(flist[0])
         else:
-            raise FileNotFoundError(p)
+            raise FileNotFoundError(f"No data for {self.cfg.ticker} in {p}")
     
     def _trim_by_date(self, hist):
         # if self.cfg.date_start is not None:

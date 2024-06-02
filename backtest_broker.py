@@ -49,7 +49,7 @@ class Order:
         
 
 class Position:
-    def __init__(self, price, date, indx, ticker="NoName", period="M5", sl=None):
+    def __init__(self, price, date, indx, ticker="NoName", volume=1, period="M5", sl=None, fee_rate=0):
         self.ticker = ticker
         self.period = period
         self.open_price = abs(price)
@@ -60,14 +60,23 @@ class Position:
         if self.sl is not None:
             self.open_risk = abs(self.open_price - self.sl)/self.open_price*100
         self.dir = np.sign(price)
+        self.volume = volume
         self.close_price = None
         self.close_date = None
         self.profit = None
         self.profit_abs = None
+        self.fee_rate  = fee_rate
+        self.fees = 0
+        self.fees_abs = 0
+        self._update_fees(self.open_price, volume)
         logger.debug(f"{date2str(date)} open position {self.id}")
     
     def __str__(self):
         return f"pos {self.dir} {self.id}"
+    
+    def _update_fees(self, price, volume):
+        self.fees_abs += price*volume*self.fee_rate/100
+        self.fees = self.fees_abs/self.volume/self.open_price*100
     
     @property
     def str_dir(self):
@@ -85,8 +94,11 @@ class Position:
         self.close_price = abs(price)
         self.close_date = date
         self.close_indx = indx
-        self.profit_abs = (self.close_price - self.open_price)*self.dir
-        self.profit = self.profit_abs/self.open_price*100
+        self._update_fees(self.close_price, self.volume)
+        self.profit_abs = (self.close_price - self.open_price)*self.dir*self.volume
+        self.profit = self.profit_abs/self.open_price*100 - self.fees
+        self.profit_abs -= self.fees_abs
+        
         logger.debug(f"{date2str(date)} close position {self.id} at {self.close_price:.2f}, profit: {self.profit:.2f}")
     
     @property
@@ -153,7 +165,13 @@ class Broker:
                         if order.dir*triggered_price < 0:
                             if (triggered_price > 0 and order.price < triggered_price) or (triggered_price < 0 and order.price > abs(triggered_price)):
                                 sl = order.price
-                    self.active_position = Position(triggered_price, triggered_date, triggered_id, self.cfg.ticker, self.cfg.period, sl)
+                    self.active_position = Position(price=triggered_price, 
+                                                    date=triggered_date, 
+                                                    indx=triggered_id, 
+                                                    ticker=self.cfg.ticker, 
+                                                    period=self.cfg.period, 
+                                                    fee_rate=self.cfg.fee_rate,
+                                                    sl=sl)
                 else:
                     if self.active_position.dir*triggered_price < 0:
                         self.active_position.close(triggered_price, triggered_date, triggered_id)

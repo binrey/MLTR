@@ -14,6 +14,7 @@ import pandas as pd
 from easydict import EasyDict
 from copy import deepcopy
 import telebot
+import json
 from PIL import Image
 import pickle
 from multiprocessing import Process
@@ -125,7 +126,10 @@ def log_position(t, hist2plot, lines2plot, save_path):
 class BybitTrading:
     def __init__(self, cfg, credentials) -> None:
         self.cfg = cfg
-        api_key, api_secret, bot_token = Path(credentials).read_text().splitlines()[:3]
+        self.creds = json.load(credentials)
+        api_key = self.creds.api_key
+        api_secret = self.creds.api_secret
+        bot_token = self.creds.bot_token
         self.t0 = 0
         self.my_telebot = Telebot(bot_token)
         self.h = None

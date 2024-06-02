@@ -27,12 +27,15 @@ class BackTestResults:
         self.profits = backtest_broker.profits
         self.balance = self.profits.cumsum()
         self.ndeals = len(self.profits)
+        self.date_start = date_start
+        self.date_end = date_end
         self.durations = np.array([pos.duration for pos in backtest_broker.positions])
         self.open_risks = np.array([pos.open_risk for pos in backtest_broker.positions])
         self.dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
         self.final_balance = self.balance[-1] if len(self.balance) > 0 else 0
-        self.daily_balance = self.convert_hist(self.profits, self.dates, date_start, date_end)
+        self.daily_balance = self.convert_hist(self.profits.cumsum(), self.dates, date_start, date_end)
         self.daily_bstair, self.metrics = self._calc_metrics(self.daily_balance["balance"])
+        self.fees = sum(pos.fees for pos in backtest_broker.positions)
         self.metrics.update({"mean_pos_duration": self.durations.mean(),
                              "mean_pos_result": self.profits.mean(),
                              "mean_open_risk": np.nanmean(self.open_risks)
@@ -40,12 +43,19 @@ class BackTestResults:
         
         self.buy_and_hold = None
 
-    def write_buy_and_hold(self, hist, id2start, id2end):
-        dp = (hist.Close[id2start+1:id2end] - hist.Close[id2start:id2end-1]) / hist.Close[id2start:id2end-1] * 100
-        self.buy_and_hold = {
-            "dates": hist.Date[id2start:id2end],
-            "profit": np.hstack([np.array([0]), dp.cumsum()])
-        }
+    def write_buy_and_hold(self, closes, dates):
+        # dp = (hist.Close[id2start+1:id2end] - hist.Close[id2start:id2end-1]) / hist.Close[id2start:id2end-1] * 100
+        # profit = np.hstack([np.array([0]), dp.cumsum()])
+        # profit = hist.Close[id2start:id2end] - hist.Close[id2start] 
+        profit = closes - closes[0]
+        days = [pd.to_datetime(d).date() for d in dates]
+        daily_profit = self.convert_hist(profit, days, self.date_start, self.date_end)
+        daily_profit["balance"] = np.hstack([np.array([0]), (daily_profit["balance"][1:] - daily_profit["balance"][:-1])/daily_profit["balance"][:-1]]).cumsum()*100
+        self.buy_and_hold = daily_profit
+        # {
+        #     "dates": hist.Date[id2start:id2end],
+        #     "profit": daily_profit
+        # }
 
     @staticmethod
     def _calc_metrics(ts):
@@ -76,12 +86,11 @@ class BackTestResults:
         return h, metrics
 
     @staticmethod
-    def convert_hist(profits, dates, t0, t1):
+    def convert_hist(profit, dates, t0, t1):
         dates2load = pd.date_range(start="/".join([t0.split("-")[i] for i in [1, 2, 0]]), 
                                    end="/".join([t1.split("-")[i] for i in [1, 2, 0]]), 
                                    freq="D")
         target_dates = [pd.to_datetime(d).date() for d in dates2load]
-        profit = profits.cumsum()
         balance = [0]
         unbias=False
         for d in target_dates:
@@ -190,7 +199,7 @@ def backtest(cfg, loglevel = "INFO"):
     
     ttotal = perf_counter() - t0
     backtest_results = BackTestResults(broker, cfg.date_start, cfg.date_end)
-    backtest_results.write_buy_and_hold(hist, id2start, id2end)
+    backtest_results.write_buy_and_hold(hist.Close[id2start: id2end], hist.Date[id2start: id2end])
     
     sformat = lambda type: {1:"{:>30}: {:>5.0f}", 2: "{:>30}: {:5.2f}"}.get(type)
     logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}")
@@ -200,7 +209,7 @@ def backtest(cfg, loglevel = "INFO"):
     logger.info(sformat(1).format("data loadings", tdata/ttotal*100) + " %")
     logger.info("-"*30)
     logger.info(sformat(1).format("FINAL PROFIT", backtest_results.final_balance) + f" %  ({backtest_results.ndeals} deals)") 
-    logger.info(sformat(2).format("MEAN POS. RESULT", backtest_results.metrics["mean_pos_result"]) + " %")
+    logger.info(sformat(2).format("FEES", backtest_results.fees) + " %")
     logger.info(sformat(2).format("MEAN ONOPEN RISK", backtest_results.metrics["mean_open_risk"]) + " %")
     logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.metrics["mean_pos_duration"]))            
     logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["recovery"])) 
@@ -213,7 +222,8 @@ if __name__ == "__main__":
     cfg = PyConfig(sys.argv[1]).test()
     btest_results = backtest(cfg, loglevel="INFO")
     plt.subplots(figsize=(15, 8))
-    plt.plot(btest_results.dates, btest_results.balance, linewidth=2, alpha=0.6)
-    plt.plot(btest_results.buy_and_hold["dates"], btest_results.buy_and_hold["profit"], linewidth=1, alpha=0.6)    
+    plt.plot(btest_results.daily_balance["days"], btest_results.daily_balance["balance"], linewidth=3, alpha=0.6)
+    plt.plot(btest_results.buy_and_hold["days"], btest_results.buy_and_hold["balance"], linewidth=1, alpha=0.6)    
+    plt.legend(["trade balance", "buy and hold"])
     plt.tight_layout()
     plt.savefig("backtest.png")
