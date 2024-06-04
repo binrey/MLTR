@@ -47,10 +47,11 @@ class BackTestResults:
         # dp = (hist.Close[id2start+1:id2end] - hist.Close[id2start:id2end-1]) / hist.Close[id2start:id2end-1] * 100
         # profit = np.hstack([np.array([0]), dp.cumsum()])
         # profit = hist.Close[id2start:id2end] - hist.Close[id2start] 
-        profit = closes - closes[0]
+        profit_abs = closes - closes[0]
+        profit = profit_abs/closes*100
         days = [pd.to_datetime(d).date() for d in dates]
         daily_profit = self.convert_hist(profit, days, self.date_start, self.date_end)
-        daily_profit["balance"] = np.hstack([np.array([0]), (daily_profit["balance"][1:] - daily_profit["balance"][:-1])/daily_profit["balance"][:-1]]).cumsum()*100
+        # daily_profit["balance"] = np.hstack([np.array([0]), (daily_profit["balance"][1:] - daily_profit["balance"][:-1])/daily_profit["balance"][:-1]]).cumsum()*100
         self.buy_and_hold = daily_profit
         # {
         #     "dates": hist.Date[id2start:id2end],
