@@ -12,9 +12,10 @@ class Order:
         MARKET = "market order"
         LIMIT = "limit order"
     
-    def __init__(self, directed_price, type, indx, date):
+    def __init__(self, directed_price, type, volume, indx, date):
         self.dir = np.sign(directed_price)
         self.type = type
+        self.volume = volume
         self.open_indx = indx
         self.open_date = date
         self.close_date = None
@@ -133,6 +134,10 @@ class Broker:
     @property
     def profits_abs(self):
         return np.array([p.profit_abs for p in self.positions])    
+
+    @property
+    def fees(self):
+        return np.array([p.fees_abs for p in self.positions])
         
     def update(self, h):
         t0 = perf_counter()
@@ -144,17 +149,17 @@ class Broker:
             if order.type == Order.TYPE.MARKET and order.open_indx == h.Id[-1]:
                 logger.debug(f"{date2str(date)} process order {order.id} (O:{h.Open[-1]})")
                 triggered_price = h.Open[-1]*order.dir
-                triggered_date, triggered_id = date, h.Id[-1]
+                triggered_date, triggered_id, triggered_vol = date, h.Id[-1], order.volume
                 order.change(h.Id[-1], h.Open[-1])
             if order.type == Order.TYPE.LIMIT and order.open_indx != h.Id[-1]:
                 if (h.Low[-2] > order.price and h.Open[-1] < order.price) or (h.High[-2] < order.price and h.Open[-1] > order.price):
                     logger.debug(f"{date2str(date)} process order {order.id}, and change price to O:{h.Open[-1]}")    
                     triggered_price = h.Open[-1]*order.dir 
-                    triggered_date, triggered_id = date, h.Id[-1]                      
+                    triggered_date, triggered_id, triggered_vol = date, h.Id[-1], order.volume                     
                 elif h.High[-2] >= order.price and h.Low[-2] <= order.price:
                     logger.debug(f"{date2str(date)} process order {order.id} (L:{h.Low[-2]} <= {order.price:.2f} <= H:{h.High[-2]})")
                     triggered_price = order.price*order.dir
-                    triggered_date, triggered_id = h.Date[-2], h.Id[-2]
+                    triggered_date, triggered_id, triggered_vol = h.Date[-2], h.Id[-2], order.volume
                     
             if triggered_price is not None:
                 self.close_orders(triggered_id, i)
@@ -168,7 +173,8 @@ class Broker:
                     self.active_position = Position(price=triggered_price, 
                                                     date=triggered_date, 
                                                     indx=triggered_id, 
-                                                    ticker=self.cfg.ticker, 
+                                                    ticker=self.cfg.ticker,
+                                                    volume=triggered_vol,
                                                     period=self.cfg.period, 
                                                     fee_rate=self.cfg.fee_rate,
                                                     sl=sl)

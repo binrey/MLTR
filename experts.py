@@ -57,6 +57,7 @@ class ExpertFormation(ExpertBase):
         self.wait_length = cfg.wait_entry_point
         self.reset_state()
         self.order_sent = False
+        self.lot = 0
         
         if self.cfg.run_model_device is not None:
             from ml import Net, Net2
@@ -73,6 +74,9 @@ class ExpertFormation(ExpertBase):
         self.lprice = None
         self.sprice = None
         self.cprice = None
+            
+    def estimate_volume(self, h):
+        self.volume = self.cfg.wallet/h.Open[-1]
             
     def get_body(self, h):
         self.body_cls.update_inner_state(h)
@@ -115,6 +119,7 @@ class ExpertFormation(ExpertBase):
             x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.cfg.run_model_device)
             y = [0.5, 1, 2, 4, 8][self.model.predict(x).item()]
             
+        self.estimate_volume(h)
         if self.order_dir != 0:
             tp, sl = self.stops_processor(self, h)
             self.create_orders(h.Id[-1], self.order_dir, tp, sl)
@@ -133,11 +138,11 @@ class BacktestExpert(ExpertFormation):
         super(BacktestExpert, self).__init__(cfg)
         
     def create_orders(self, time_id, order_dir, tp, sl):
-        self.orders = [Order(order_dir, Order.TYPE.MARKET, time_id, time_id)]
+        self.orders = [Order(order_dir, Order.TYPE.MARKET, self.volume, time_id, time_id)]
         if tp:
-            self.orders.append(Order(tp, Order.TYPE.LIMIT, time_id, time_id))
+            self.orders.append(Order(tp, Order.TYPE.LIMIT, self.volume, time_id, time_id))
         if sl:
-            self.orders.append(Order(sl, Order.TYPE.LIMIT, time_id, time_id))
+            self.orders.append(Order(sl, Order.TYPE.LIMIT, self.volume, time_id, time_id))
         logger.debug(f"{time_id} send order {self.orders[0]}, " + 
                         f"tp: {self.orders[1] if len(self.orders)>1 else 'NO'}, " +
                         f"sl: {self.orders[2] if len(self.orders)>2 else 'NO'}")
@@ -156,7 +161,7 @@ class ByBitExpert(ExpertFormation):
                 symbol=self.cfg.ticker,
                 side="Buy" if order_dir > 0 else "Sell",
                 orderType="Market",
-                qty=str(self.cfg.lot),
+                qty=str(self.volume),
                 timeInForce="GTC",
                 # orderLinkId="spot-test-postonly",
                 stopLoss="" if sl is None else str(abs(sl)),

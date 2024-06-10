@@ -22,49 +22,55 @@ from multiprocessing import Process
 # export QT_QPA_PLATFORM=offscreen
 
 class BackTestResults:
-    def __init__(self, backtest_broker, date_start, date_end):
-        self.cfg = backtest_broker.cfg
-        self.profits = backtest_broker.profits
-        self.balance = self.profits.cumsum()
-        self.ndeals = len(self.profits)
+    def __init__(self, date_start, date_end):
         self.date_start = date_start
-        self.date_end = date_end
+        self.date_end = date_end   
+        dates2load = pd.date_range(start="/".join([date_start.split("-")[i] for i in [1, 2, 0]]), 
+                                   end="/".join([date_end.split("-")[i] for i in [1, 2, 0]]), 
+                                   freq="D")
+        self.target_dates = [pd.to_datetime(d).date() for d in dates2load]
+        
+    def process_backtest(self, backtest_broker: Broker):
+        t0 = perf_counter()
+        self.cfg = backtest_broker.cfg
+        self.profits = backtest_broker.profits_abs
+        self.balance_rel = backtest_broker.profits.cumsum()
+        self.balance = self.profits.cumsum()
+        self.balance_nofees = self.balance + backtest_broker.fees.cumsum()
+        self.ndeals = len(self.profits)
+
         self.durations = np.array([pos.duration for pos in backtest_broker.positions])
         self.open_risks = np.array([pos.open_risk for pos in backtest_broker.positions])
         self.dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
         self.final_balance = self.balance[-1] if len(self.balance) > 0 else 0
-        self.daily_balance = self.convert_hist(self.profits.cumsum(), self.dates, date_start, date_end)
+        self.daily_balance = self.convert_hist(self.balance, self.dates, self.date_start, self.date_end)
+        self.daily_balance_rel = self.convert_hist(self.balance_rel, self.dates, self.date_start, self.date_end)        
         self.daily_bstair, self.metrics = self._calc_metrics(self.daily_balance["balance"])
-        self.fees = sum(pos.fees for pos in backtest_broker.positions)
+        self.fees = sum(backtest_broker.fees)
         self.metrics.update({"mean_pos_duration": self.durations.mean(),
                              "mean_pos_result": self.profits.mean(),
                              "mean_open_risk": np.nanmean(self.open_risks)
                              })
         
+        self.buy_and_hold_daily = None
         self.buy_and_hold = None
+        return perf_counter() - t0
 
-    def write_buy_and_hold(self, closes, dates):
-        # dp = (hist.Close[id2start+1:id2end] - hist.Close[id2start:id2end-1]) / hist.Close[id2start:id2end-1] * 100
-        # profit = np.hstack([np.array([0]), dp.cumsum()])
-        # profit = hist.Close[id2start:id2end] - hist.Close[id2start] 
-        profit_abs = closes - closes[0]
-        profit = profit_abs/closes*100
-        days = [pd.to_datetime(d).date() for d in dates]
-        daily_profit = self.convert_hist(profit, days, self.date_start, self.date_end)
-        # daily_profit["balance"] = np.hstack([np.array([0]), (daily_profit["balance"][1:] - daily_profit["balance"][:-1])/daily_profit["balance"][:-1]]).cumsum()*100
-        self.buy_and_hold = daily_profit
-        # {
-        #     "dates": hist.Date[id2start:id2end],
-        #     "profit": daily_profit
-        # }
-
+    def process_buy_and_hold(self, closes, dates):
+        t0  = perf_counter()
+        profit_abs = (closes - closes[0])*self.cfg.wallet/closes[0]
+        self.buy_and_hold = (dates, profit_abs)#/closes*100
+        days = [d.date() for d in pd.to_datetime(dates)]
+        self.buy_and_hold_daily = self.convert_hist(self.buy_and_hold[1], days, self.date_start, self.date_end)
+        return perf_counter() - t0
+        
     @staticmethod
     def _calc_metrics(ts):
         ymax = ts[0]
         twait = 0
         twaits = []
-        h = []
-        for y in ts:
+        h = np.zeros(len(ts))
+        for i, y in enumerate(ts):
             if y >= ymax:
                 ymax = y
                 if twait>0:
@@ -73,8 +79,7 @@ class BackTestResults:
                     twait = 0
             else:
                 twait += 1
-            h.append(ymax)
-        h = np.array(h)
+            h[i] = ymax
         max_loss = (h - ts).max()
         twaits.append(twait)
         twaits = np.array(twaits) if len(twaits) else np.array([len(ts)])
@@ -86,27 +91,25 @@ class BackTestResults:
                    "loss_max": max_loss}
         return h, metrics
 
-    @staticmethod
-    def convert_hist(profit, dates, t0, t1):
-        dates2load = pd.date_range(start="/".join([t0.split("-")[i] for i in [1, 2, 0]]), 
-                                   end="/".join([t1.split("-")[i] for i in [1, 2, 0]]), 
-                                   freq="D")
-        target_dates = [pd.to_datetime(d).date() for d in dates2load]
-        balance = [0]
+    def convert_hist(self, profit, dates, t0, t1):
+        balance = np.zeros(len(self.target_dates))
         unbias=False
-        for d in target_dates:
+        darray = np.array(dates)
+        for i, date_terget in enumerate(self.target_dates):
             # Select balance records with same day
-            day_profs = [balance[-1]] + [b for b, sd in zip(profit, dates) if sd == d]
+            # day_profs = [b for b, sd in zip(profit, dates) if sd == d]
+            day_profs = profit[darray == date_terget]
             # If there are records for currend day, store latest of them, else fill days with no records with latest sored record
-            balance.append(day_profs[-1])
-        if len(balance) - len(target_dates) == 1:
-            target_dates = [target_dates[0]] + target_dates
-        if len(target_dates) + len(balance) == 1:
-            balance = balance + [balance[-1]] 
-        res = np.array(balance)
+            if len(day_profs):
+                balance[i] = day_profs[-1]
+            elif len(balance):
+                balance[i] = balance[i-1]
+            else:
+                pass
+
         if unbias:
-            res = res - profit[0]
-        return {"days": target_dates, "balance": res}
+            balance = balance - profit[0]
+        return {"days": self.target_dates, "balance": balance}
 
 
 def backtest(cfg, loglevel = "INFO"):
@@ -117,8 +120,9 @@ def backtest(cfg, loglevel = "INFO"):
     broker = Broker(cfg)
     hist_pd, hist = DataParser(cfg).load()
     mw = MovingWindow(hist, cfg.hist_buffer_size)
+
     if cfg.save_plots:
-        save_path = Path("backtests") / f"{cfg.ticker}-{cfg.period}"
+        save_path = Path("backtests") / f"{cfg.body_classifier.func.name}-{cfg.ticker}-{cfg.period}"
         if save_path.exists():
             rmtree(save_path)
         save_path.mkdir()
@@ -140,13 +144,11 @@ def backtest(cfg, loglevel = "INFO"):
         
     id2end = cfg.tend if cfg.tend is not None else hist.Id.shape[0]
     t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0
+    
     for t in tqdm(range(id2start, id2end), 
                   desc=f"back test {cfg.body_classifier.func.name}",
                   disable=loglevel == "ERROR"):
         h, dt = mw(t)
-        # TODO
-        # if h.Date[-1].astype(np.datetime64) < np.array("2024-02-15T00:30:00", dtype=np.datetime64):
-        #     continue
         tdata += dt
         texp += exp.update(h, broker.active_position)
         if len(exp.orders):
@@ -170,7 +172,7 @@ def backtest(cfg, loglevel = "INFO"):
                 widths = [1]*(len(lines2plot)-1) + [2]
                 
                 tplot_end = lines2plot[-1][-1][0]
-                tplot_start = min([e[0] for e in lines2plot[0]])
+                tplot_start = min([e[0] for e in lines2plot[0]] + [closed_pos.lines[0][0] - cfg.hist_buffer_size])
                 hist2plot = hist_pd.iloc[tplot_start:tplot_end+1]
                 min_id = hist2plot.Id.min()
                 for line in lines2plot:
@@ -198,20 +200,24 @@ def backtest(cfg, loglevel = "INFO"):
                          ticker=cfg.ticker)
 
     
+    
+    backtest_results = BackTestResults(cfg.date_start, cfg.date_end)
+    tpost = backtest_results.process_backtest(broker)
+    tbandh = backtest_results.process_buy_and_hold(hist.Close[id2start: id2end], hist.Date[id2start: id2end])
     ttotal = perf_counter() - t0
-    backtest_results = BackTestResults(broker, cfg.date_start, cfg.date_end)
-    backtest_results.write_buy_and_hold(hist.Close[id2start: id2end], hist.Date[id2start: id2end])
     
     sformat = lambda type: {1:"{:>30}: {:>5.0f}", 2: "{:>30}: {:5.2f}"}.get(type)
     logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}")
     logger.info(sformat(2).format("total backtest", ttotal) + " sec")
+    logger.info(sformat(1).format("data loadings", tdata/ttotal*100) + " %")    
     logger.info(sformat(1).format("expert updates", texp/ttotal*100) + " %")
     logger.info(sformat(1).format("broker updates", tbrok/ttotal*100) + " %")
-    logger.info(sformat(1).format("data loadings", tdata/ttotal*100) + " %")
+    logger.info(sformat(1).format("postproc. broker", tpost/ttotal*100) + " %")
+    logger.info(sformat(1).format("But&Hold", tbandh/ttotal*100) + " %")
+
     logger.info("-"*30)
-    logger.info(sformat(1).format("FINAL PROFIT", backtest_results.final_balance) + f" %  ({backtest_results.ndeals} deals)") 
-    logger.info(sformat(2).format("FEES", backtest_results.fees) + " %")
-    logger.info(sformat(2).format("MEAN ONOPEN RISK", backtest_results.metrics["mean_open_risk"]) + " %")
+    logger.info(sformat(1).format("FINAL PROFIT", backtest_results.final_balance) + f" ({backtest_results.ndeals} deals)") 
+    logger.info(sformat(1).format("FEES", backtest_results.fees))
     logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.metrics["mean_pos_duration"]))            
     logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["recovery"])) 
     logger.info(sformat(1).format("MAXWAIT", backtest_results.metrics["maxwait"])+"\n")
@@ -222,9 +228,19 @@ def backtest(cfg, loglevel = "INFO"):
 if __name__ == "__main__":
     cfg = PyConfig(sys.argv[1]).test()
     btest_results = backtest(cfg, loglevel="INFO")
-    plt.subplots(figsize=(15, 8))
-    plt.plot(btest_results.daily_balance["days"], btest_results.daily_balance["balance"], linewidth=3, alpha=0.6)
-    plt.plot(btest_results.buy_and_hold["days"], btest_results.buy_and_hold["balance"], linewidth=1, alpha=0.6)    
+    fig, ax1 = plt.subplots(figsize=(15, 8))
+    ax2 = ax1.twinx()
+    ax1.plot(btest_results.daily_balance["days"], btest_results.daily_balance["balance"], linewidth=3, color="b", alpha=0.6)
+    ax1.plot(btest_results.dates, btest_results.balance_nofees, linewidth=1, color="b", alpha=0.6)
+    
+    # ax2.plot(btest_results.daily_balance["days"], 
+    #          btest_results.daily_balance["balance"] - btest_results.buy_and_hold_daily["balance"], "--", linewidth=1, alpha=0.3)
+
+    # ax1.plot(btest_results.buy_and_hold[0], btest_results.buy_and_hold[1], linewidth=1, alpha=0.6)    
+    ax1.plot(btest_results.buy_and_hold_daily["days"], btest_results.buy_and_hold_daily["balance"], linewidth=1, alpha=0.6)    
+
     plt.legend(["trade balance", "buy and hold"])
     plt.tight_layout()
+    plt.grid("on")
     plt.savefig("backtest.png")
+    plt.show()

@@ -8,8 +8,8 @@ stops_processor = stops_processors.stops_dynamic
 stops_processor.params.sl_active = Param(True, [True])
 
 config = EasyDict(
-    lot=Param(None, [None]),
-    date_start=Param("2022-09-01T00:00:00", ["2017-09-01"]),
+    wallet=Param(1000, [100]),
+    date_start=Param("2017-09-01T00:00:00", ["2017-09-01"]),
     date_end=Param("2024-07-01", ["2025-01-01"]),
     no_trading_days=Param(set(), [set()]),
     trailing_stop_rate=Param(None, [0.002, 0.004, 0.006, 0.008, 0.01]),
