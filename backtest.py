@@ -34,24 +34,31 @@ class BackTestResults:
         t0 = perf_counter()
         self.cfg = backtest_broker.cfg
         self.profits = backtest_broker.profits_abs
-        self.balance_rel = backtest_broker.profits.cumsum()
         self.balance = self.profits.cumsum()
+        self.balance_rel = self.balance / self.cfg.wallet
         self.balance_nofees = self.balance + backtest_broker.fees.cumsum()
         self.ndeals = len(self.profits)
-
+        
         self.durations = np.array([pos.duration for pos in backtest_broker.positions])
         self.open_risks = np.array([pos.open_risk for pos in backtest_broker.positions])
         self.dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
+        self.num_years_on_trade = self.compute_n_years(backtest_broker)
         self.final_balance = self.balance[-1] if len(self.balance) > 0 else 0
         self.daily_balance = self.convert_hist(self.balance, self.dates, self.date_start, self.date_end)
         self.daily_balance_rel = self.convert_hist(self.balance_rel, self.dates, self.date_start, self.date_end)        
+        
+        
         self.daily_bstair, self.metrics = self._calc_metrics(self.daily_balance["balance"])
-        self.fees = sum(backtest_broker.fees)
+        
+
+        self.deposit = backtest_broker.cfg.wallet + 2*self.metrics["loss_max"]
+        self.APR = self.compute_APR(backtest_broker)
         self.metrics.update({"mean_pos_duration": self.durations.mean(),
                              "mean_pos_result": self.profits.mean(),
-                             "mean_open_risk": np.nanmean(self.open_risks)
-                             })
-        
+                             "mean_open_risk": np.nanmean(self.open_risks),
+                             "loss_max_rel": self.metrics["loss_max"]/self.deposit*100
+                             })        
+        self.fees = sum(backtest_broker.fees)
         self.buy_and_hold_daily = None
         self.buy_and_hold = None
         return perf_counter() - t0
@@ -63,6 +70,15 @@ class BackTestResults:
         days = [d.date() for d in pd.to_datetime(dates)]
         self.buy_and_hold_daily = self.convert_hist(self.buy_and_hold[1], days, self.date_start, self.date_end)
         return perf_counter() - t0
+        
+    def compute_n_years(self, backtest_broker):
+        d0 = backtest_broker.positions[0].open_date
+        d1 = backtest_broker.positions[-1].close_date
+        return (d1-d0).astype("timedelta64[M]").item()/12
+        
+    def compute_APR(self, backtest_broker):
+        final_balance_rel = self.final_balance/self.deposit*100
+        return final_balance_rel/self.num_years_on_trade            
         
     @staticmethod
     def _calc_metrics(ts):
@@ -111,6 +127,14 @@ class BackTestResults:
             balance = balance - profit[0]
         return {"days": self.target_dates, "balance": balance}
 
+def find_available_date(hist: pd.DataFrame, date_start: pd.Timestamp):
+    dt = hist.Date[1] - hist.Date[0]
+    date_test = date_start
+    while date_test not in hist.Date:
+        date_test  = date_test + pd.Timedelta(days=1)
+    return date_test
+
+
 
 def backtest(cfg, loglevel = "INFO"):
     logger.remove()
@@ -128,19 +152,16 @@ def backtest(cfg, loglevel = "INFO"):
         save_path.mkdir()
     date_start = np.datetime64(cfg.date_start)
     mask = hist.Date == date_start
-    id2start = cfg.hist_buffer_size
+    id2start = 0
     if sum(mask) == 1:
         id2start = hist.Id[mask][0]
     else:
-        logger.warning(f"Date start {date_start} not found, current dates range {hist.Date[0]} - {hist.Date[-1]}")
-        print("Print <y> to start from the first available date:")
-        answer = input()
-        if answer != "y":
-            raise ValueError("Wrong start date/time")
+        logger.warning(f"!!! Date start {date_start} not found, current dates range {hist.Date[0]} - {hist.Date[-1]}")
         
     if id2start < cfg.hist_buffer_size:
         logger.warning(f"Not enough history, shift start id from {id2start} to {cfg.hist_buffer_size}")
         id2start = cfg.hist_buffer_size
+        logger.warning(f"!!! Switch to {hist.Date[id2start]}")
         
     id2end = cfg.tend if cfg.tend is not None else hist.Id.shape[0]
     t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0
@@ -203,7 +224,8 @@ def backtest(cfg, loglevel = "INFO"):
     
     backtest_results = BackTestResults(cfg.date_start, cfg.date_end)
     tpost = backtest_results.process_backtest(broker)
-    tbandh = backtest_results.process_buy_and_hold(hist.Close[id2start: id2end], hist.Date[id2start: id2end])
+    if cfg.eval_buyhold:
+        tbandh = backtest_results.process_buy_and_hold(hist.Close[id2start: id2end], hist.Date[id2start: id2end])
     ttotal = perf_counter() - t0
     
     sformat = lambda type: {1:"{:>30}: {:>5.0f}", 2: "{:>30}: {:5.2f}"}.get(type)
@@ -213,14 +235,15 @@ def backtest(cfg, loglevel = "INFO"):
     logger.info(sformat(1).format("expert updates", texp/ttotal*100) + " %")
     logger.info(sformat(1).format("broker updates", tbrok/ttotal*100) + " %")
     logger.info(sformat(1).format("postproc. broker", tpost/ttotal*100) + " %")
-    logger.info(sformat(1).format("But&Hold", tbandh/ttotal*100) + " %")
+    if cfg.eval_buyhold:
+        logger.info(sformat(1).format("But & Hold", tbandh/ttotal*100) + " %")
 
     logger.info("-"*30)
-    logger.info(sformat(1).format("FINAL PROFIT", backtest_results.final_balance) + f" ({backtest_results.ndeals} deals)") 
-    logger.info(sformat(1).format("FEES", backtest_results.fees))
+    logger.info(sformat(1).format("APR", backtest_results.APR) + f" % ({backtest_results.ndeals} deals)" + f"({backtest_results.final_balance/backtest_results.fees:.1f} fees, %)") 
     logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.metrics["mean_pos_duration"]))            
     logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["recovery"])) 
-    logger.info(sformat(1).format("MAXWAIT", backtest_results.metrics["maxwait"])+"\n")
+    logger.info(sformat(1).format("MAXWAIT", backtest_results.metrics["maxwait"]) + " days")
+    logger.info(sformat(1).format("MAXLOSS", backtest_results.metrics["loss_max_rel"])+" %\n")
     
     return backtest_results
     

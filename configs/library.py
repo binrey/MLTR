@@ -13,6 +13,7 @@ body_classifiers = EasyDict(
         func=ClsDummy,
         params=EasyDict()
             ),
+    
     trngl_simp = EasyDict(
         func=ClsTriangle,
         params=EasyDict(

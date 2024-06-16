@@ -89,8 +89,11 @@ class DataParser():
                     "yahoo": self.yahoo,
                     "bybit": self.bybit
                     }.get(self.cfg.data_type, None)(flist[0])
-        else:
+        elif len(flist) ==  0:
             raise FileNotFoundError(f"No data for {self.cfg.ticker} in {p}")
+        else:
+            raise FileNotFoundError(f"Too many data for {self.cfg.ticker} in {p}")
+            
     
     def _trim_by_date(self, hist):
         # if self.cfg.date_start is not None:

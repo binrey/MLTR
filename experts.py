@@ -597,6 +597,16 @@ class ClsLevels(ExtensionBase):
         return is_fig
 
 
+class ClsBuyAndHold(ExtensionBase):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(ClsBuyAndHold, self).__init__(cfg, name="buy_and_hold")
+        
+    def __call__(self, common, h) -> bool:
+        raise NotImplementedError
+        return False
+
+
 class ClsDummy(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
@@ -608,7 +618,7 @@ class ClsDummy(ExtensionBase):
         common.sl = {1: common.sprice, -1: common.lprice}  
         common.lines = [[(h.Id[-5], common.lprice), (h.Id[-1], common.lprice)], [(h.Id[-5], common.sprice), (h.Id[-1], common.sprice)]]
         return True
-    
+        
 
 class ClsCustom(ExtensionBase):
     def __init__(self, cfg):
