@@ -34,25 +34,22 @@ class BackTestResults:
         t0 = perf_counter()
         self.cfg = backtest_broker.cfg
         self.profits = backtest_broker.profits_abs
-        self.balance = self.profits.cumsum()
-        self.balance_rel = self.balance / self.cfg.wallet
-        self.balance_nofees = self.balance + backtest_broker.fees.cumsum()
+        self.profit = self.profits.cumsum()
+        self.profit_rel = self.profit / self.cfg.wallet
+        self.profit_nofees = self.profit + backtest_broker.fees.cumsum()
         self.ndeals = len(self.profits)
         
         self.durations = np.array([pos.duration for pos in backtest_broker.positions])
         self.open_risks = np.array([pos.open_risk for pos in backtest_broker.positions])
         self.dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
         self.num_years_on_trade = self.compute_n_years(backtest_broker)
-        self.final_balance = self.balance[-1] if len(self.balance) > 0 else 0
-        self.daily_balance = self.convert_hist(self.balance, self.dates, self.date_start, self.date_end)
-        self.daily_balance_rel = self.convert_hist(self.balance_rel, self.dates, self.date_start, self.date_end)        
+        daily_vals = self.convert_hist(self.profit, self.dates) 
+        self.daily_hist = pd.DataFrame({"days": self.target_dates, "profit": daily_vals})
         
-        
-        self.metrics, _ = self._calc_metrics(self.balance)
-        
-
-        self.deposit = backtest_broker.cfg.wallet + 2*self.metrics["loss_max"]
-        self.APR = self.compute_APR(backtest_broker)
+        self.metrics, profit_stair = self._calc_metrics(self.daily_hist["profit"].values)
+        self.deposit = backtest_broker.cfg.wallet + self.metrics["loss_max"]
+        self.daily_hist["deposit"] = self.deposit - (profit_stair - self.daily_hist["profit"].values)
+        self.APR = self.compute_APR()
         self.metrics.update({"mean_pos_duration": self.durations.mean(),
                              "mean_pos_result": self.profits.mean(),
                              "mean_open_risk": np.nanmean(self.open_risks),
@@ -65,24 +62,35 @@ class BackTestResults:
     def process_buy_and_hold(self, closes, dates):
         t0  = perf_counter()
         days = [d.date() for d in pd.to_datetime(dates)]
-        bh = self.convert_hist(closes, days, self.date_start, self.date_end)
-        days, bh = bh["days"], bh["balance"]
-        bh = np.hstack([0, (bh[1:] - bh[:-1])*self.cfg.wallet/bh[:-1]]).cumsum()
-        self.buy_and_hold = pd.DataFrame({"balance": bh}, index=pd.DatetimeIndex(days))
-        loss_max = self._calc_metrics(self.buy_and_hold["balance"].values)[0]["loss_max"]
-        deposit = self.cfg.wallet + 2*loss_max
-        revenue_rel = self.buy_and_hold.balance[-1]/deposit*100/self.num_years_on_trade
+        bh = self.convert_hist(closes, days)
+        bh = np.hstack([0, ((bh[1:] - bh[:-1])*self.cfg.wallet/bh[:-1])]).cumsum()
+        self.daily_hist["buy_and_hold"] = bh
+        self.daily_hist["profit"] += bh
+        metrics, profit_stair = self._calc_metrics(self.daily_hist["profit"].values)
+        
+        self.deposit = self.cfg.wallet + metrics["loss_max"]
+        self.daily_hist["deposit"] = self.deposit - (profit_stair - self.daily_hist["profit"].values)
+        self.APR = self.compute_APR()
+        # self.metrics.update({"mean_pos_duration": self.durations.mean(),
+        #                      "mean_pos_result": self.profits.mean(),
+        #                      "mean_open_risk": np.nanmean(self.open_risks),
+        #                      "loss_max_rel": self.metrics["loss_max"]/self.deposit*100
+        #                      })      
         
         return perf_counter() - t0
-        
+    
+    @property    
+    def final_profit(self):
+        return self.daily_hist["profit"].values[-1] if len(self.daily_hist["profit"].values[-1]) > 0 else 0    
+    
     def compute_n_years(self, backtest_broker):
         d0 = backtest_broker.positions[0].open_date
         d1 = backtest_broker.positions[-1].close_date
         return (d1-d0).astype("timedelta64[M]").item()/12
         
-    def compute_APR(self, backtest_broker):
-        final_balance_rel = self.final_balance/self.deposit*100
-        return final_balance_rel/self.num_years_on_trade            
+    def compute_APR(self):
+        final_profit_rel = self.final_profit/self.deposit*100
+        return final_profit_rel/self.num_years_on_trade            
         
     @staticmethod
     def _calc_metrics(ts):
@@ -111,25 +119,24 @@ class BackTestResults:
                    "loss_max": max_loss}
         return metrics, h
 
-    def convert_hist(self, profit, dates, t0, t1):
-        balance = np.zeros(len(self.target_dates))
+    def convert_hist(self, profit, dates):
+        daily_vals = np.zeros(len(self.target_dates))
         unbias=False
         darray = np.array(dates)
         for i, date_terget in enumerate(self.target_dates):
-            # Select balance records with same day
-            # day_profs = [b for b, sd in zip(profit, dates) if sd == d]
+            # Select profit records with same day
             day_profs = profit[darray == date_terget]
             # If there are records for currend day, store latest of them, else fill days with no records with latest sored record
             if len(day_profs):
-                balance[i] = day_profs[-1]
-            elif len(balance):
-                balance[i] = balance[i-1]
+                daily_vals[i] = day_profs[-1]
+            elif len(profit):
+                daily_vals[i] = daily_vals[i-1]
             else:
                 pass
 
         if unbias:
-            balance = balance - profit[0]
-        return {"days": self.target_dates, "balance": balance}
+            daily_vals = daily_vals - daily_vals[0]
+        return daily_vals
 
 def find_available_date(hist: pd.DataFrame, date_start: pd.Timestamp):
     dt = hist.Date[1] - hist.Date[0]
@@ -243,7 +250,7 @@ def backtest(cfg, loglevel = "INFO"):
         logger.info(sformat(1).format("But & Hold", tbandh/ttotal*100) + " %")
 
     logger.info("-"*30)
-    logger.info(sformat(1).format("APR", backtest_results.APR) + f" % ({backtest_results.ndeals} deals)" + f" ({backtest_results.final_balance/backtest_results.fees:.1f} fees, %)") 
+    logger.info(sformat(1).format("APR", backtest_results.APR) + f" % ({backtest_results.ndeals} deals)" + f" ({backtest_results.final_profit/backtest_results.fees:.1f} fees, %)") 
     logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.metrics["mean_pos_duration"]))            
     logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["recovery"])) 
     logger.info(sformat(1).format("MAXWAIT", backtest_results.metrics["maxwait"]) + " days")
@@ -257,16 +264,13 @@ if __name__ == "__main__":
     btest_results = backtest(cfg, loglevel="INFO")
     fig, ax1 = plt.subplots(figsize=(15, 8))
     ax2 = ax1.twinx()
-    ax1.plot(btest_results.daily_balance["days"], btest_results.daily_balance["balance"], linewidth=3, color="b", alpha=0.6)
-    ax1.plot(btest_results.dates, btest_results.balance_nofees, linewidth=1, color="b", alpha=0.6)
+    ax1.plot(btest_results.daily_hist["days"], btest_results.daily_hist["profit"], linewidth=3, color="b", alpha=0.6)
+    ax1.plot(btest_results.dates, btest_results.profit_nofees, linewidth=1, color="b", alpha=0.6)
+    ax1.plot(btest_results.daily_hist["days"], btest_results.daily_hist["buy_and_hold"], linewidth=1, alpha=0.6)  
+    plt.legend(["profit", "profit without fees", "buy and hold"])
+    ax2.plot(btest_results.daily_hist["days"], btest_results.daily_hist["deposit"], "-", linewidth=3, alpha=0.3)
+    plt.legend(["deposit"])
     
-    # ax2.plot(btest_results.daily_balance["days"], 
-    #          btest_results.daily_balance["balance"] - btest_results.buy_and_hold["balance"], "--", linewidth=1, alpha=0.3)
-
-    # ax1.plot(btest_results.buy_and_hold[0], btest_results.buy_and_hold[1], linewidth=1, alpha=0.6)    
-    ax1.plot(btest_results.buy_and_hold.index, btest_results.buy_and_hold["balance"], linewidth=1, alpha=0.6)    
-
-    plt.legend(["trade balance", "buy and hold"])
     plt.tight_layout()
     plt.grid("on")
     plt.savefig("backtest.png")
