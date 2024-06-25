@@ -29,71 +29,59 @@ class BackTestResults:
                                    end="/".join([date_end.split("-")[i] for i in [1, 2, 0]]), 
                                    freq="D")
         self.target_dates = [pd.to_datetime(d).date() for d in dates2load]
+        self.daily_hist = pd.DataFrame({"days": self.target_dates})
+        self.buy_and_hold = None
+        self.cfg = None
         
     def process_backtest(self, backtest_broker: Broker):
         t0 = perf_counter()
         self.cfg = backtest_broker.cfg
         self.profits = backtest_broker.profits_abs
-        self.profit = self.profits.cumsum()
-        self.profit_rel = self.profit / self.cfg.wallet
-        self.profit_nofees = self.profit + backtest_broker.fees.cumsum()
+        profit_cumsum = self.profits.cumsum()
+        dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
+        profit_nofees = profit_cumsum + backtest_broker.fees.cumsum()
+        self.deal_hist = pd.DataFrame({"dates": dates, "profit": profit_cumsum, "profit_nofees": profit_nofees})
         self.ndeals = len(self.profits)
-        
-        self.durations = np.array([pos.duration for pos in backtest_broker.positions])
-        self.open_risks = np.array([pos.open_risk for pos in backtest_broker.positions])
-        self.dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
+        self.mean_pos_duration = np.array([pos.duration for pos in backtest_broker.positions]).mean()
+        # self.open_risks = np.array([pos.open_risk for pos in backtest_broker.positions])
         self.num_years_on_trade = self.compute_n_years(backtest_broker)
-        daily_vals = self.convert_hist(self.profit, self.dates) 
-        self.daily_hist = pd.DataFrame({"days": self.target_dates, "profit": daily_vals})
-        
-        self.metrics, profit_stair = self._calc_metrics(self.daily_hist["profit"].values)
-        self.deposit = backtest_broker.cfg.wallet + self.metrics["loss_max"]
-        self.daily_hist["deposit"] = self.deposit - (profit_stair - self.daily_hist["profit"].values)
-        self.APR = self.compute_APR()
-        self.metrics.update({"mean_pos_duration": self.durations.mean(),
-                             "mean_pos_result": self.profits.mean(),
-                             "mean_open_risk": np.nanmean(self.open_risks),
-                             "loss_max_rel": self.metrics["loss_max"]/self.deposit*100
-                             })        
+        self.update_daily_profit(self._convert_hist(profit_cumsum, dates))
         self.fees = sum(backtest_broker.fees)
-        self.buy_and_hold = None
         return perf_counter() - t0
 
-    def process_buy_and_hold(self, closes, dates):
+    def compute_buy_and_hold(self, closes, dates, fuse=False):
         t0  = perf_counter()
-        days = [d.date() for d in pd.to_datetime(dates)]
-        bh = self.convert_hist(closes, days)
+        dates = [d.date() for d in pd.to_datetime(dates)]
+        bh = self._convert_hist(closes, dates)
         bh = np.hstack([0, ((bh[1:] - bh[:-1])*self.cfg.wallet/bh[:-1])]).cumsum()
         self.daily_hist["buy_and_hold"] = bh
-        self.daily_hist["profit"] += bh
-        metrics, profit_stair = self._calc_metrics(self.daily_hist["profit"].values)
-        
-        self.deposit = self.cfg.wallet + metrics["loss_max"]
-        self.daily_hist["deposit"] = self.deposit - (profit_stair - self.daily_hist["profit"].values)
-        self.APR = self.compute_APR()
-        # self.metrics.update({"mean_pos_duration": self.durations.mean(),
-        #                      "mean_pos_result": self.profits.mean(),
-        #                      "mean_open_risk": np.nanmean(self.open_risks),
-        #                      "loss_max_rel": self.metrics["loss_max"]/self.deposit*100
-        #                      })      
-        
+        if fuse:
+            self.update_daily_profit(self.daily_hist["profit"] + bh)  
         return perf_counter() - t0
     
-    @property    
+    def update_daily_profit(self, daily_profit):
+        self.daily_hist["profit"] = daily_profit
+        profit_stair = self._calc_metrics()
+        self.deposit = self.cfg.wallet + self.metrics["loss_max"]
+        self.daily_hist["deposit"] = self.deposit - (profit_stair - self.daily_hist["profit"].values)
+        self.metrics["loss_max_rel"] = self.metrics["loss_max"]/self.deposit*100
+        
+    @property
     def final_profit(self):
-        return self.daily_hist["profit"].values[-1] if len(self.daily_hist["profit"].values[-1]) > 0 else 0    
+        return self.daily_hist["profit"].values[-1] if len(self.daily_hist["profit"].values) > 0 else 0    
     
+    @property
+    def APR(self):
+        final_profit_rel = self.final_profit/self.deposit*100
+        return final_profit_rel/self.num_years_on_trade    
+      
     def compute_n_years(self, backtest_broker):
         d0 = backtest_broker.positions[0].open_date
         d1 = backtest_broker.positions[-1].close_date
         return (d1-d0).astype("timedelta64[M]").item()/12
-        
-    def compute_APR(self):
-        final_profit_rel = self.final_profit/self.deposit*100
-        return final_profit_rel/self.num_years_on_trade            
-        
-    @staticmethod
-    def _calc_metrics(ts):
+    
+    def _calc_metrics(self):
+        ts = self.daily_hist["profit"].values
         ymax = ts[0]
         twait = 0
         twaits = []
@@ -114,22 +102,22 @@ class BackTestResults:
         twaits.sort()
         # lin_err = sum(np.abs(ts - np.arange(0, ts[-1], ts[-1]/len(ts))[:len(ts)]))
         # lin_err /= len(ts)*ts[-1]
-        metrics = {"maxwait": twaits.max(),#[-5:].mean(), 
+        self.metrics = {"maxwait": twaits.max(),#[-5:].mean(), 
                    "recovery": ts[-1]/max_loss, 
                    "loss_max": max_loss}
-        return metrics, h
+        return h
 
-    def convert_hist(self, profit, dates):
+    def _convert_hist(self, vals, dates):
         daily_vals = np.zeros(len(self.target_dates))
         unbias=False
         darray = np.array(dates)
         for i, date_terget in enumerate(self.target_dates):
-            # Select profit records with same day
-            day_profs = profit[darray == date_terget]
+            # Select vals records with same day
+            day_profs = vals[darray == date_terget]
             # If there are records for currend day, store latest of them, else fill days with no records with latest sored record
             if len(day_profs):
                 daily_vals[i] = day_profs[-1]
-            elif len(profit):
+            elif len(vals):
                 daily_vals[i] = daily_vals[i-1]
             else:
                 pass
@@ -236,7 +224,9 @@ def backtest(cfg, loglevel = "INFO"):
     backtest_results = BackTestResults(cfg.date_start, cfg.date_end)
     tpost = backtest_results.process_backtest(broker)
     if cfg.eval_buyhold:
-        tbandh = backtest_results.process_buy_and_hold(hist.Close[id2start: id2end], hist.Date[id2start: id2end])
+        tbandh = backtest_results.compute_buy_and_hold(hist.Close[id2start: id2end], 
+                                                       hist.Date[id2start: id2end],
+                                                       fuse=cfg.fuse_buyhold)
     ttotal = perf_counter() - t0
     
     sformat = lambda type: {1:"{:>30}: {:>5.0f}", 2: "{:>30}: {:5.2f}"}.get(type)
@@ -250,12 +240,11 @@ def backtest(cfg, loglevel = "INFO"):
         logger.info(sformat(1).format("But & Hold", tbandh/ttotal*100) + " %")
 
     logger.info("-"*30)
-    logger.info(sformat(1).format("APR", backtest_results.APR) + f" % ({backtest_results.ndeals} deals)" + f" ({backtest_results.final_profit/backtest_results.fees:.1f} fees, %)") 
-    logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.metrics["mean_pos_duration"]))            
+    logger.info(sformat(1).format("APR", backtest_results.APR) + f" % ({backtest_results.ndeals} deals)" + f" ({backtest_results.fees/backtest_results.final_profit*100:.1f}% fees)") 
+    logger.info(sformat(1).format("MAXLOSS", backtest_results.metrics["loss_max_rel"]) + "%")
     logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["recovery"])) 
     logger.info(sformat(1).format("MAXWAIT", backtest_results.metrics["maxwait"]) + " days")
-    logger.info(sformat(1).format("MAXLOSS", backtest_results.metrics["loss_max_rel"])+" %\n")
-    
+    logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.mean_pos_duration) + " \n")        
     return backtest_results
     
     
@@ -264,9 +253,11 @@ if __name__ == "__main__":
     btest_results = backtest(cfg, loglevel="INFO")
     fig, ax1 = plt.subplots(figsize=(15, 8))
     ax2 = ax1.twinx()
-    ax1.plot(btest_results.daily_hist["days"], btest_results.daily_hist["profit"], linewidth=3, color="b", alpha=0.6)
-    ax1.plot(btest_results.dates, btest_results.profit_nofees, linewidth=1, color="b", alpha=0.6)
-    ax1.plot(btest_results.daily_hist["days"], btest_results.daily_hist["buy_and_hold"], linewidth=1, alpha=0.6)  
+    ax1.plot(btest_results.daily_hist.days, btest_results.daily_hist.profit, linewidth=3, color="b", alpha=0.6)
+    ax1.plot(btest_results.deal_hist.dates, btest_results.deal_hist.profit, linewidth=1, color="b", alpha=0.6)    
+    ax1.plot(btest_results.deal_hist.dates, btest_results.deal_hist.profit_nofees, linewidth=1, color="r", alpha=0.6)
+    if "buy_and_hold" in btest_results.daily_hist.columns:
+        ax1.plot(btest_results.daily_hist.days, btest_results.daily_hist.buy_and_hold, linewidth=1, alpha=0.6)  
     plt.legend(["profit", "profit without fees", "buy and hold"])
     ax2.plot(btest_results.daily_hist["days"], btest_results.daily_hist["deposit"], "-", linewidth=3, alpha=0.3)
     plt.legend(["deposit"])

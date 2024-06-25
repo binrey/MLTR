@@ -105,11 +105,10 @@ class Optimizer:
                         
             opt_summary["final_balance"], opt_summary["ndeals"], opt_summary["recovery"], opt_summary["maxwait"] = [], [], [], []
             for btest in btests:
-                  opt_summary["final_balance"].append(btest.final_balance)
+                  opt_summary["final_balance"].append(btest.final_profit)
                   opt_summary["ndeals"].append(btest.ndeals)
-                  _, metrics = BackTestResults._calc_metrics(btest.daily_balance["balance"])
-                  opt_summary["recovery"].append(metrics["recovery"])
-                  opt_summary["maxwait"].append(metrics["maxwait"])
+                  opt_summary["recovery"].append(btest.metrics["recovery"])
+                  opt_summary["maxwait"].append(btest.metrics["maxwait"])
             
             opt_summary = pd.DataFrame(opt_summary)
             opt_summary.sort_values(by=["recovery"], ascending=False, inplace=True)
@@ -120,9 +119,9 @@ class Optimizer:
             for ticker in set(opt_summary.ticker):
                   opt_summary_for_ticker = opt_summary[opt_summary.ticker == ticker]
                   top_runs_ids.append(opt_summary_for_ticker.index[0])
-                  sum_daily_balance += btests[top_runs_ids[-1]].daily_balance["balance"]
+                  sum_daily_balance += btests[top_runs_ids[-1]].daily_hist.profit
                   logger.info(f"\n{opt_summary_for_ticker.head(10)}\n")
-                  pd.DataFrame(btests[top_runs_ids[-1]].daily_balance).to_csv(f"optimization/{ticker}.{optim_cfg.period[0]}.top_{self.sortby}_sorted.csv", index=False)
+                  pd.DataFrame(btests[top_runs_ids[-1]].daily_hist.profit).to_csv(f"optimization/{ticker}.{optim_cfg.period[0]}.top_{self.sortby}_sorted.csv", index=False)
                   
             balance_av = sum_daily_balance / len(top_runs_ids)
             bstair_av, metrics = BackTestResults._calc_metrics(balance_av)

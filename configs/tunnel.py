@@ -26,5 +26,6 @@ config = EasyDict(
     save_plots=Param(False, [False]),
     run_model_device=Param(None, [None]),
     fee_rate=Param(0.05, [0.05]),
-    eval_buyhold=Param(True, [False]),
+    eval_buyhold=Param(True, [True]),
+    fuse_buyhold=Param(True, [True]),
 )
