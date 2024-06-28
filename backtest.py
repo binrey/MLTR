@@ -61,7 +61,7 @@ class BackTestResults:
     
     def update_daily_profit(self, daily_profit):
         self.daily_hist["profit"] = daily_profit
-        profit_stair = self._calc_metrics()
+        profit_stair, self.metrics = self._calc_metrics(self.daily_hist["profit"].values)
         self.deposit = self.cfg.wallet + self.metrics["loss_max"]
         self.daily_hist["deposit"] = self.deposit - (profit_stair - self.daily_hist["profit"].values)
         self.metrics["loss_max_rel"] = self.metrics["loss_max"]/self.deposit*100
@@ -80,8 +80,8 @@ class BackTestResults:
         d1 = backtest_broker.positions[-1].close_date
         return (d1-d0).astype("timedelta64[M]").item()/12
     
-    def _calc_metrics(self):
-        ts = self.daily_hist["profit"].values
+    @staticmethod
+    def _calc_metrics(ts):
         ymax = ts[0]
         twait = 0
         twaits = []
@@ -102,10 +102,10 @@ class BackTestResults:
         twaits.sort()
         # lin_err = sum(np.abs(ts - np.arange(0, ts[-1], ts[-1]/len(ts))[:len(ts)]))
         # lin_err /= len(ts)*ts[-1]
-        self.metrics = {"maxwait": twaits.max(),#[-5:].mean(), 
-                   "recovery": ts[-1]/max_loss, 
-                   "loss_max": max_loss}
-        return h
+        metrics = {"maxwait": twaits.max(),#[-5:].mean(), 
+                        "recovery": ts[-1]/max_loss, 
+                        "loss_max": max_loss}
+        return h, metrics
 
     def _convert_hist(self, vals, dates):
         daily_vals = np.zeros(len(self.target_dates))
