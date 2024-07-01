@@ -258,11 +258,11 @@ if __name__ == "__main__":
     ax1.plot(btest_results.deal_hist.dates, btest_results.deal_hist.profit_nofees, linewidth=1, color="r", alpha=0.6)
     if "buy_and_hold" in btest_results.daily_hist.columns:
         ax1.plot(btest_results.daily_hist.days, btest_results.daily_hist.buy_and_hold, linewidth=1, alpha=0.6)  
-    plt.legend(["profit", "profit without fees", "buy and hold"])
+    ax1.legend(["sum. profit", "profit from strategy", "profit without fees", "buy and hold"])
+    plt.grid("on")
     ax2.plot(btest_results.daily_hist["days"], btest_results.daily_hist["deposit"], "-", linewidth=3, alpha=0.3)
-    plt.legend(["deposit"])
+    ax2.legend(["deposit"])
     
     plt.tight_layout()
-    plt.grid("on")
     plt.savefig("backtest.png")
     plt.show()
