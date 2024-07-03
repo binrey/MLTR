@@ -227,31 +227,12 @@ class ClsTunnel(ExtensionBase):
             "line_below": None,
         }
         for i in range(4, h.Id.shape[0], 1):
-            # v1
-            # line_above = h.Close[-i:].max()
-            # line_below = h.Close[-i:].min()
-            # v2
             line_above = h.High[-i:].mean()
             line_below = h.Low[-i:].mean()
-            # v3
-            # line_above = h.High[-i:].max()
-            # line_below = h.Low[-i:].min()    
-                    
-            # v1
-            # middle_line = h.Close[-i:].mean()
-            # v2
             middle_line = (line_above + line_below) / 2
             
             if h.Close[-1] < line_above and h.Close[-1] > line_below:
-                # v1
                 metric = i / ((line_above - line_below) / middle_line) / 100
-
-                # v2
-                # metric = 0
-                # for j in range(i):
-                #     if h.High[-j] > middle_line and h.Low[-j] < middle_line:
-                #         metric += 1  
-                # metric = metric*(1 + 1/i)
                                         
                 if metric > best_params["metric"]:
                     best_params.update(

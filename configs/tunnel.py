@@ -9,6 +9,7 @@ stops_processor.params.sl_active = Param(True, [True])
 
 config = EasyDict(
     wallet=Param(100, [100]),
+    leverage=Param(2, [1]),
     date_start=Param("2017-09-01T00:00:00", ["2017-09-01"]),
     date_end=Param("2024-07-01", ["2025-01-01"]),
     no_trading_days=Param(set(), [set()]),
@@ -25,7 +26,7 @@ config = EasyDict(
     data_type=Param("bybit", ["bybit"]),
     save_plots=Param(False, [False]),
     run_model_device=Param(None, [None]),
-    fee_rate=Param(0.05, [0.05]),
+    fee_rate=Param(0.1, [0.1]),
     eval_buyhold=Param(True, [True]),
-    fuse_buyhold=Param(True, [True]),
+    fuse_buyhold=Param(True, [False]),
 )

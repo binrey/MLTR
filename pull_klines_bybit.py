@@ -74,7 +74,7 @@ class BybitDownloader:
 
 
 if __name__ == "__main__":
-    symbol = "BTCUSDT"
+    symbol = "ETHUSDT"
     period = 60
     init_data = f"data/bybit/M{period}/{symbol}_M{period}.csv"
     bb_loader = BybitDownloader(symbol=symbol, 

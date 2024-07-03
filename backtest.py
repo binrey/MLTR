@@ -25,10 +25,11 @@ class BackTestResults:
     def __init__(self, date_start, date_end):
         self.date_start = date_start
         self.date_end = date_end   
-        dates2load = pd.date_range(start="/".join([date_start.split("-")[i] for i in [1, 2, 0]]), 
+        self.target_dates = [pd.to_datetime(d).date() for d in 
+                             pd.date_range(start="/".join([date_start.split("-")[i] for i in [1, 2, 0]]), 
                                    end="/".join([date_end.split("-")[i] for i in [1, 2, 0]]), 
                                    freq="D")
-        self.target_dates = [pd.to_datetime(d).date() for d in dates2load]
+                             ]
         self.daily_hist = pd.DataFrame({"days": self.target_dates})
         self.buy_and_hold = None
         self.cfg = None
@@ -52,11 +53,16 @@ class BackTestResults:
     def compute_buy_and_hold(self, closes, dates, fuse=False):
         t0  = perf_counter()
         dates = [d.date() for d in pd.to_datetime(dates)]
-        bh = self._convert_hist(closes, dates)
+        monthly_dates = [pd.to_datetime(d).date() for d in 
+                         pd.date_range(start="/".join([self.date_start.split("-")[i] for i in [1, 2, 0]]), 
+                                       end="/".join([self.date_end.split("-")[i] for i in [1, 2, 0]]), 
+                                       freq="M")
+                         ]
+        bh = self._convert_hist(closes, dates, monthly_dates)
         bh = np.hstack([0, ((bh[1:] - bh[:-1])*self.cfg.wallet/bh[:-1])]).cumsum()
-        self.daily_hist["buy_and_hold"] = bh
+        self.daily_hist["buy_and_hold"] = self._convert_hist(bh, monthly_dates)
         if fuse:
-            self.update_daily_profit(self.daily_hist["profit"] + bh)  
+            self.update_daily_profit(self.daily_hist["profit"] + self.daily_hist["buy_and_hold"])  
         return perf_counter() - t0
     
     def update_daily_profit(self, daily_profit):
@@ -107,11 +113,13 @@ class BackTestResults:
                         "loss_max": max_loss}
         return h, metrics
 
-    def _convert_hist(self, vals, dates):
-        daily_vals = np.zeros(len(self.target_dates))
+    def _convert_hist(self, vals, dates, target_dates=None):
+        if target_dates is None:
+            target_dates = self.target_dates
+        daily_vals = np.zeros(len(target_dates))
         unbias=False
         darray = np.array(dates)
-        for i, date_terget in enumerate(self.target_dates):
+        for i, date_terget in enumerate(target_dates):
             # Select vals records with same day
             day_profs = vals[darray == date_terget]
             # If there are records for currend day, store latest of them, else fill days with no records with latest sored record
@@ -241,7 +249,7 @@ def backtest(cfg, loglevel = "INFO"):
 
     logger.info("-"*30)
     logger.info(sformat(1).format("APR", backtest_results.APR) + f" % ({backtest_results.ndeals} deals)" + f" ({backtest_results.fees/backtest_results.final_profit*100:.1f}% fees)") 
-    logger.info(sformat(1).format("MAXLOSS", backtest_results.metrics["loss_max_rel"]) + "%")
+    logger.info(sformat(1).format("MAXLOSS", backtest_results.metrics["loss_max_rel"]) + " %")
     logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["recovery"])) 
     logger.info(sformat(1).format("MAXWAIT", backtest_results.metrics["maxwait"]) + " days")
     logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.mean_pos_duration) + " \n")        
