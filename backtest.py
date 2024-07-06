@@ -56,7 +56,7 @@ class BackTestResults:
         monthly_dates = [pd.to_datetime(d).date() for d in 
                          pd.date_range(start="/".join([self.date_start.split("-")[i] for i in [1, 2, 0]]), 
                                        end="/".join([self.date_end.split("-")[i] for i in [1, 2, 0]]), 
-                                       freq="M")
+                                       freq="W")
                          ]
         bh = self._convert_hist(closes, dates, monthly_dates)
         bh = np.hstack([0, ((bh[1:] - bh[:-1])*self.cfg.wallet/bh[:-1])]).cumsum()
