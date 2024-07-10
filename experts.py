@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 from collections import OrderedDict
 
-from indicators import ZigZag, ZigZag2, ZigZagOpt
+from indicators import *
 from backtest_broker import Order
 from dataloading import build_features
 import torch
@@ -177,7 +177,7 @@ class ClsTrend(ExtensionBase):
         self.cfg = cfg
         super(ClsTrend, self).__init__(cfg, name="trend")
         # self.zigzag = ZigZagOpt(max_drop=self.cfg.maxdrop)
-        self.zigzag = ZigZag2()
+        self.zigzag = ZigZagNew(self.cfg.period)
         
     def __call__(self, common, h) -> bool:
         ids, values, types = self.zigzag.update(h)
@@ -192,23 +192,16 @@ class ClsTrend(ExtensionBase):
                 flag = values[-2] < values[-4] and values[-3] < values[-5]
                 if self.cfg.npairs == 3:
                     flag = flag and values[-4] < values[-6] and values[-5] < values[-7]
-            # if flag:
-                # flag = flag and abs(values[-2] - values[-5])/abs(values[-3] - values[-4]) >= self.cfg.minspace
-                # for i in range(2, self.cfg.npairs*2):
-                #     flag = flag and ids[-i] - ids[-i-1] >= self.cfg.minspace
-                #     if not flag:
-                #         break
             if flag:
                 is_fig = True
                 trend_type = types[-2]                        
     
         if is_fig:
-            
             i = self.cfg.npairs*2 + 1
-            common.sl = {1: h.Low[-i:].min(), -1: h.High[-i:].max()} 
+            common.sl = {1: values[-3], -1: values[-3]} 
             common.lines = [[(x, y) for x, y in zip(ids[-i:-1], values[-i:-1])]]
-            common.lprice = max(common.lines[0][-1][1], common.lines[0][-2][1]) if trend_type > 0 else None
-            common.sprice = min(common.lines[0][-1][1], common.lines[0][-2][1]) if trend_type < 0 else None
+            common.lprice = values[-1] if trend_type > 0 else None
+            common.sprice = values[-1] if trend_type < 0 else None
             common.cprice = common.lines[0][-2][1]
         return is_fig
 
@@ -266,126 +259,59 @@ class ClsTunnel(ExtensionBase):
         return is_fig
 
 
-class ClsTunnel2(ExtensionBase):
-    def __init__(self, cfg):
-        self.cfg = cfg
-        super(ClsTunnel2, self).__init__(cfg, name="tuntrend2")
-        self.level = None
-        
-    def __call__(self, common, h) -> bool:
-        is_fig = False
-        if self.level is None:
-            best_params = {
-                "metric": 0,
-                "i": 0,
-                "line_above": None,
-                "line_below": None,
-            }
-            for i in range(4, h.Id.shape[0], 1):
-                line_above = h.High[-i:].mean()
-                line_below = h.Low[-i:].mean()
-                middle_line = (line_above + line_below) / 2
-                #middle_line = h.Close[-i:].mean()
-                
-                metric = 0
-                for j in range(i):
-                    if h.High[-j] > middle_line and h.Low[-j] < middle_line:
-                        metric += 1  
-                # metric = metric*(1 + 1/i)
-                                        
-                if metric > best_params["metric"]:
-                    best_params.update(
-                        {"metric": metric, "i": i, "middle_line": middle_line}
-                    )                   
-                        
-            if best_params["metric"] > self.cfg.ncross:
-                if h.Close[-2] > line_above:
-                    self.level = {"value": best_params["middle_line"], "start_id": h.Id[-i], "end_id": h.Id[-1], "check_line": line_above}
-                    
-                if h.Close[-2] < line_below:
-                    self.level = {"value": best_params["middle_line"], "start_id": h.Id[-i], "end_id": h.Id[-1], "check_line": -line_below}          
-            
-        if self.level is not None:
-            flag = False
-            if self.level["check_line"] > 0:
-                is_fig = h.Close[-3] < self.level["check_line"]
-            if self.level["check_line"] < 0:
-                is_fig = h.Close[-3] > self.level["check_line"]
-
-        if is_fig:
-            if self.level["check_line"] > 0:
-                common.lprice = abs(self.level["check_line"])
-                common.cprice = self.level["value"]
-            if self.level["check_line"] < 0:
-                common.sprice = abs(self.level["check_line"])
-                common.cprice = self.level["value"] 
-                      
-            common.sl = {1: h.Low[-self.level["start_id"]:].min(), -1: h.High[-self.level["start_id"]:].max()}   
-            common.lines = [[(self.level["start_id"], self.level["value"]), (self.level["end_id"], self.level["value"])],
-                            [(self.level["start_id"], abs(self.level["check_line"])), (h.Id[-1], abs(self.level["check_line"]))]]
-            self.level = None
-        return is_fig
-
-
 class ClsTunZigZag(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsTunZigZag, self).__init__(cfg, name="tuntrend")
-        self.levels = []
-        self.zigzag = ZigZag2()
+        self.zigzag = ZigZagNew(self.cfg.period)
         
     def __call__(self, common, h) -> bool:
-        is_fig = False
-        best_params = {
-            "metric": 0,
-            "i": 0,
-            "line_above": None,
-            "line_below": None,
-        }
-        for i in range(4, h.Id.shape[0], 1):
-            # line_above = h.High[-i:].mean()
-            # line_below = h.Low[-i:].mean()
-            # middle_line = (line_above + line_below) / 2
-            middle_line = h.Close[-i:].mean()
+        trend_type = 0
+
+        zz_ids, values, types = self.zigzag.update(h)
+        std_min = np.Inf
+        piks_upper = []
+        piks_bottom = []
+        for i in range(-2, -len(zz_ids), -1):
+            if types[i] > 0:
+                piks_upper.append(values[i])
+                last_pik_upper = zz_ids[i]
+            if types[i] < 0:
+                piks_bottom.append(values[i])
+                last_pik_bottom = zz_ids[i]
+            if len(piks_upper) == len(piks_bottom):      
+                std_up = (np.array(piks_upper).std()+1)/len(piks_upper) 
+                std_bot = (np.array(piks_bottom).std()+1)/len(piks_bottom) 
+                  
+                level_tmp, sl_tmp, tp_tmp = np.array(piks_upper).mean(), max(piks_upper), min(piks_bottom)    
+                if tp_tmp < h.Close[-2] < level_tmp and std_up < std_min:
+                    std_min = std_up
+                    trend_type = -1
+                    level = level_tmp
+                    last_id = last_pik_upper
+                    sl = sl_tmp
+                    tp = tp_tmp
+                
+                level_tmp = np.array(piks_bottom).mean()
+                sl_tmp, tp_tmp = min(piks_bottom), max(piks_upper)                    
+                if level_tmp < h.Close[-2] < tp_tmp and std_bot < std_min:
+                    std_min = std_bot
+                    trend_type = 1  
+                    level = level_tmp      
+                    last_id = last_pik_bottom
+                    sl = sl_tmp
+                    tp = tp_tmp
             
-            metric = 0
-            for j in range(i):
-                if h.High[-j] > middle_line and h.Low[-j] < middle_line:
-                    metric += 1  
-                metric = metric*(1 + 1/i)
-                                    
-            if metric > best_params["metric"]:
-                best_params.update(
-                    {"metric": metric,
-                    "i": i,
-                    "middle_line": middle_line
-                    }
-                )                   
-                    
-        if best_params["metric"] > self.cfg.ncross:
-            self.levels = [{"value": best_params["middle_line"], "start_id": h.Id[-i]}]
-            
-        if len(self.levels):
-            ids, values, types = self.zigzag.update(h)
-            if len(ids) >= 2*2+1:
-                flag = False
-                if types[-2] > 0 and values[-3] > self.levels[0]["value"]:
-                    flag = values[-2] > values[-4] and values[-3] > values[-5]
-                if types[-2] < 0 and values[-3] < self.levels[0]["value"]:
-                    flag = values[-2] < values[-4] and values[-3] < values[-5]
-                if flag:
-                    is_fig = True
-                    trend_type = types[-2]  
+        is_fig = trend_type != 0 and std_min < self.cfg.ncross
 
         if is_fig:
-            i = best_params["i"]
-            common.lines = [[(x, y) for x, y in zip(ids[-5:-1], values[-5:-1])]]
-            common.lprice = h.Open[-1] if trend_type > 0 else None
-            common.sprice = h.Open[-1] if trend_type < 0 else None
-            common.cprice = common.lines[0][-2][1]            
-            common.sl = {1: h.Low[-i:].min(), -1: h.High[-i:].max()}   
-            common.lines += [[(h.Id[-i], self.levels[0]["value"]), (h.Id[-1], self.levels[0]["value"])]]
-            self.levels = []
+            common.lines = [[(x, y) for x, y in zip(zz_ids, values)]]
+            common.lprice = values[-1] if trend_type > 0 else None
+            common.sprice = values[-1] if trend_type < 0 else None
+            common.cprice = sl
+            common.sl = {1: sl, -1: sl}  
+            common.tp = {1: tp, -1: tp}
+            common.lines += [[(last_id, level), (h.Id[-1], level)]]
         return is_fig
 
 
@@ -663,12 +589,13 @@ class StopsFixed(ExtensionBase):
         super(StopsFixed, self).__init__(cfg, name="stops_fix")
         
     def __call__(self, common, h, sl_custom=None):
-        tp = -common.order_dir*h.Open[-1]*(1+common.order_dir*self.cfg.tp/100) if self.cfg.tp is not None else self.cfg.tp
+        tp = -common.order_dir*h.Open[-1]*(1+common.order_dir*self.cfg.tp*self.cfg.sl/100) if self.cfg.tp is not None else self.cfg.tp
         sl = self.cfg.sl
         if sl_custom is not None:
             sl = sl_custom
         if sl is not None:
             sl = -common.order_dir*h.Open[-1]*(1-common.order_dir*sl/100)
+            
         return tp, sl
     
 
