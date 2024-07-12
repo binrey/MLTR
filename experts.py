@@ -13,7 +13,7 @@ from indicators import *
 from backtest_broker import Order
 from dataloading import build_features
 import torch
-from backtest_broker import Broker
+from backtest_broker import Broker, Position
 
 
 class ExpertBase(ABC):
@@ -29,7 +29,7 @@ class ExpertBase(ABC):
     def create_orders(self) -> None:
         pass
     
-    def update(self, h, active_position):
+    def update(self, h, active_position: Position):
         t0 = perf_counter()
         self.active_position = active_position
         self.get_body(h)
@@ -125,10 +125,11 @@ class ExpertFormation(ExpertBase):
             
         
         if self.order_dir != 0:
-            tp, sl = self.stops_processor(self, h)
-            self.create_orders(h.Id[-1], self.order_dir, self.estimate_volume(h), tp, sl)
-            self.order_sent = True
-            self.reset_state()
+            if self.active_position is None or self.active_position.dir*self.order_dir < 0:
+                tp, sl = self.stops_processor(self, h)
+                self.create_orders(h.Id[-1], self.order_dir, self.estimate_volume(h), tp, sl)
+                self.order_sent = True
+                self.reset_state()
 
         if self.wait_entry_point == 0:
             self.formation_found = False

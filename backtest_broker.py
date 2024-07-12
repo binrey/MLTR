@@ -1,6 +1,7 @@
 import numpy as np
 from loguru import logger
 from time import perf_counter
+from typing import List
 
 
 def date2str(date):
@@ -119,15 +120,6 @@ class Broker:
         self.correction = 0
         self.add_profit = 0
     
-    def close_orders(self, close_date, i=None):
-        if i is not None:
-            self.active_orders[i].close(close_date)
-            self.orders.append(self.active_orders.pop(i))
-        else:            
-            while len(self.active_orders):
-                self.active_orders[0].close(close_date)
-                self.orders.append(self.active_orders.pop(0))
-    
     @property
     def profits(self):
         return np.array([p.profit for p in self.positions])
@@ -139,6 +131,20 @@ class Broker:
     @property
     def fees(self):
         return np.array([p.fees_abs for p in self.positions])
+
+    def close_orders(self, close_date, i=None):
+        if i is not None:
+            self.active_orders[i].close(close_date)
+            self.orders.append(self.active_orders.pop(i))
+        else:            
+            while len(self.active_orders):
+                self.active_orders[0].close(close_date)
+                self.orders.append(self.active_orders.pop(0))
+                
+    def set_active_orders(self, h, new_orders_list: List[Order]):
+        if len(new_orders_list):
+            self.close_orders(h.Id[-1])
+        self.active_orders = new_orders_list
         
     def update(self, h):
         t0 = perf_counter()

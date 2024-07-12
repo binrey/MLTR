@@ -196,15 +196,16 @@ def backtest(cfg, loglevel = "INFO"):
         tdata += dt
         texp += exp.update(h, broker.active_position)
         if len(exp.orders):
-            broker.active_orders = exp.orders
+            broker.set_active_orders(h, exp.orders)
             exp.orders = []
         
         closed_pos, dt = broker.update(h)
         tbrok += dt
-        # if closed_pos is not None:
-        if broker.active_position is None and exp.order_sent:
+        if closed_pos is not None:
+        # if broker.active_position is None and exp.order_sent:
             logger.debug(f"t = {t} -> postprocess closed position")
-            broker.close_orders(h.Id[-2])
+            if broker.active_position is None:
+                broker.close_orders(h.Id[-2])
             if cfg.save_plots:
                 ords_lines = [order.lines for order in broker.orders if order.open_indx >= closed_pos.open_indx]
                 lines2plot = exp.lines + ords_lines + [closed_pos.lines]
@@ -235,7 +236,7 @@ def backtest(cfg, loglevel = "INFO"):
                          t=pd.to_datetime(closed_pos.open_date, utc=True),
                          side="Buy" if closed_pos.dir > 0 else "Sell",
                          ticker=cfg.ticker)
-
+            closed_pos = None
     
     
     backtest_results = BackTestResults(cfg.date_start, cfg.date_end)
