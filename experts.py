@@ -77,7 +77,10 @@ class ExpertFormation(ExpertBase):
             
     def estimate_volume(self, h):
         volume = self.cfg.wallet/h.Open[-1]*self.cfg.leverage
-        self.volume = round(volume/self.cfg.ticksize, 0)*self.cfg.ticksize
+        volume = round(volume/self.cfg.ticksize, 0)*self.cfg.ticksize
+        if self.active_position is not None:
+            volume += self.active_position.volume
+        return volume
             
     def get_body(self, h):
         self.body_cls.update_inner_state(h)
@@ -120,10 +123,10 @@ class ExpertFormation(ExpertBase):
             x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.cfg.run_model_device)
             y = [0.5, 1, 2, 4, 8][self.model.predict(x).item()]
             
-        self.estimate_volume(h)
+        
         if self.order_dir != 0:
             tp, sl = self.stops_processor(self, h)
-            self.create_orders(h.Id[-1], self.order_dir, tp, sl)
+            self.create_orders(h.Id[-1], self.order_dir, self.estimate_volume(h), tp, sl)
             self.order_sent = True
             self.reset_state()
 
@@ -138,12 +141,12 @@ class BacktestExpert(ExpertFormation):
         self.cfg = cfg
         super(BacktestExpert, self).__init__(cfg)
         
-    def create_orders(self, time_id, order_dir, tp, sl):
-        self.orders = [Order(order_dir, Order.TYPE.MARKET, self.volume, time_id, time_id)]
+    def create_orders(self, time_id, dir, volume, tp, sl):
+        self.orders = [Order(dir, Order.TYPE.MARKET, volume, time_id, time_id)]
         if tp:
-            self.orders.append(Order(tp, Order.TYPE.LIMIT, self.volume, time_id, time_id))
+            self.orders.append(Order(tp, Order.TYPE.LIMIT, volume, time_id, time_id))
         if sl:
-            self.orders.append(Order(sl, Order.TYPE.LIMIT, self.volume, time_id, time_id))
+            self.orders.append(Order(sl, Order.TYPE.LIMIT, volume, time_id, time_id))
         logger.debug(f"{time_id} send order {self.orders[0]}, " + 
                         f"tp: {self.orders[1] if len(self.orders)>1 else 'NO'}, " +
                         f"sl: {self.orders[2] if len(self.orders)>2 else 'NO'}")

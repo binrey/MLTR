@@ -228,12 +228,6 @@ def backtest(cfg, loglevel = "INFO"):
                             pass
                         line[i] = (hist2plot.index[hist2plot.Id==x][0], y)
                         
-                # p = Process(target=plot_fig, args=(hist2plot, lines2plot, save_path, cfg.ticker, 
-                #                                    pd.to_datetime(closed_pos.open_date, utc=True),
-                #                                    "Buy" if closed_pos.dir > 0 else "Sell",
-                #                                     cfg.ticker))
-                # p.start()
-                # p.join()
                 plot_fig(hist2plot=hist2plot,
                          lines2plot=lines2plot,
                          save_path=save_path,

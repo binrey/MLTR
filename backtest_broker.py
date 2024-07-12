@@ -51,6 +51,7 @@ class Order:
 
 class Position:
     def __init__(self, price, date, indx, ticker="NoName", volume=1, period="M5", sl=None, fee_rate=0):
+        assert volume > 0
         self.ticker = ticker
         self.period = period
         self.open_price = abs(price)
@@ -163,13 +164,30 @@ class Broker:
                     
             if triggered_price is not None:
                 self.close_orders(triggered_id, i)
-                # triggered_id = triggered_date#.Id[np.where(h.index == triggered_date)[0].item()]
-                if self.active_position is None:
+
+                if self.active_position is not None:
+                    if self.active_position.dir*triggered_price < 0:
+                        if triggered_vol >= self.active_position.volume:
+                            self.active_position.close(triggered_price, triggered_date, triggered_id)
+                            closed_position = self.active_position
+                            triggered_vol -= closed_position.volume
+                            self.active_position = None
+                            self.positions.append(closed_position)
+                        else:
+                            # Частичное закрытие
+                            raise NotImplementedError()
+                    else:
+                        # Добор позиции
+                        raise NotImplementedError()
+                
+                # Открытие новой позиции 
+                if triggered_vol: 
                     sl = None
                     for order in self.active_orders:
                         if order.dir*triggered_price < 0:
                             if (triggered_price > 0 and order.price < triggered_price) or (triggered_price < 0 and order.price > abs(triggered_price)):
                                 sl = order.price
+                
                     self.active_position = Position(price=triggered_price, 
                                                     date=triggered_date, 
                                                     indx=triggered_id, 
@@ -178,16 +196,7 @@ class Broker:
                                                     period=self.cfg.period, 
                                                     fee_rate=self.cfg.fee_rate,
                                                     sl=sl)
-                else:
-                    if self.active_position.dir*triggered_price < 0:
-                        self.active_position.close(triggered_price, triggered_date, triggered_id)
-                        closed_position = self.active_position
-                        self.active_position = None
-                        self.positions.append(closed_position)
-                    else:
-                        # Докупка
-                        pass
-                        #raise NotImplementedError()
+
                     
         self.trailing_stop(h)
         return closed_position, perf_counter() - t0
