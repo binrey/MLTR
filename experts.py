@@ -76,7 +76,8 @@ class ExpertFormation(ExpertBase):
         self.cprice = None
             
     def estimate_volume(self, h):
-        self.volume = self.cfg.wallet/h.Open[-1]*self.cfg.leverage
+        volume = self.cfg.wallet/h.Open[-1]*self.cfg.leverage
+        self.volume = round(volume/self.cfg.ticksize, 0)*self.cfg.ticksize
             
     def get_body(self, h):
         self.body_cls.update_inner_state(h)

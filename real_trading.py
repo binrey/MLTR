@@ -14,13 +14,14 @@ import pandas as pd
 from easydict import EasyDict
 from copy import deepcopy
 import telebot
-import json
+import yaml
 from PIL import Image
 import pickle
 from multiprocessing import Process
+import stackprinter
+from pybit.unified_trading import HTTP, WebSocket
 
-
-
+stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen
  
@@ -67,12 +68,13 @@ def date2save_format(date, prefix=None):
 
      
 def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=None, ticker="X"):
-    for line in lines2plot:
+    for i, line in enumerate(lines2plot):
         assert len(line) >= 2, "line must have more than 1 point"
         for point in line:
             assert len(point) == 2
-            assert type(point[0]) is pd.Timestamp
-            assert type(point[1]) is float
+            point = (point[0], float(point[1]))
+            assert type(point[0]) is pd.Timestamp, f"point[0]={point[0]} in line {i}, must be pd.Timestamp, but has type {type(point[0])}"
+            assert type(point[1]) is float, f"point[1]={point[1]} in line {i}, must be float, but has type {type(point[1])}"
             assert point[0] >= hist2plot.index[0]
             assert point[0] <= hist2plot.index[-1]
     mystyle=mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
@@ -126,18 +128,14 @@ def log_position(t, hist2plot, lines2plot, save_path):
 class BybitTrading:
     def __init__(self, cfg, credentials) -> None:
         self.cfg = cfg
-        self.creds = json.load(credentials)
-        api_key = self.creds.api_key
-        api_secret = self.creds.api_secret
-        bot_token = self.creds.bot_token
         self.t0 = 0
-        self.my_telebot = Telebot(bot_token)
+        self.my_telebot = Telebot(credentials["bot_token"])
         self.h = None
         self.open_position = None
         self.session = HTTP(
             testnet=False,
-            api_key=api_key,
-            api_secret=api_secret,
+            api_key=credentials["api_key"],
+            api_secret=credentials["api_secret"],
         )
         self.exp = ByBitExpert(cfg, self.session)
         if cfg.save_plots:
@@ -170,7 +168,7 @@ class BybitTrading:
 
         
     def trailing_sl(self, pos):
-        sl = float(pos["stopLoss"])
+        sl = pos["stopLoss"]
         try:
             sl = sl + self.cfg.trailing_stop_rate*(self.h.Open.iloc[-1] - sl)
             resp = self.session.set_trading_stop(
@@ -183,7 +181,7 @@ class BybitTrading:
             logger.debug(resp)
         except Exception as ex:
             print(ex)
-        return sl        
+        return float(sl)       
 
     def get_open_orders_positions(self):
             self.open_orders = []
@@ -235,12 +233,14 @@ class BybitTrading:
             if self.open_position is not None:
                 self.sl = self.trailing_sl(self.open_position)
                 
-            message = self.session.get_kline(category="linear",
-                            symbol=cfg.ticker,
-                            interval=cfg.period[1:],
-                            start=0,
-                            end=self.time,
-                            limit=cfg.hist_buffer_size)
+            message = self.session.get_kline(
+                category="linear",
+                symbol=cfg.ticker,
+                interval=cfg.period[1:],
+                start=0,
+                end=self.time,
+                limit=cfg.hist_buffer_size
+                )
             self.h = get_bybit_hist(message["result"], cfg.hist_buffer_size)
                 
             if cfg.save_plots:
@@ -265,21 +265,32 @@ class BybitTrading:
     
 if __name__ == "__main__":
     import sys
-    from pybit.unified_trading import HTTP, WebSocket
+    import argparse
     
     logger.remove()
-    logger.add(sys.stderr, level="DEBUG")
-    cfg = PyConfig(sys.argv[1]).test()
+    logger.add(sys.stderr, level="INFO")
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("config", help="path to configuration file")
+    parser.add_argument("--demo", action="store_true", help="use demo acc")
+    args = parser.parse_args()
+
+    cfg = PyConfig(args.config).test()
+    demo = args.demo
     cfg.save_plots = True
     
-    
+    with open("./configs/api.yaml", "r") as f:
+        creds = yaml.safe_load(f)
+    if args.demo:
+        creds["api_secret"] = creds["api_secret_demo"]
+        creds["api_key"] = creds["api_key_demo"]
     
     public = WebSocket(channel_type='linear', testnet=False)
     # private = WebSocket(channel_type='private',
     #                     api_key=api_key,
     #                     api_secret=api_secret, 
     #                     testnet=False) 
-    bybit_trading = BybitTrading(cfg, "./configs/api.yaml")
+    bybit_trading = BybitTrading(cfg, creds)
     bybit_trading.test_connection()
     public.trade_stream(symbol=cfg.ticker, callback=bybit_trading.handle_trade_message)
     while True:
