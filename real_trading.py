@@ -58,6 +58,9 @@ class Telebot:
             self.bot.send_photo(self.chat_id, img)
         except Exception as ex:
             self.bot.send_message(self.chat_id, ex)
+
+    def send_text(self, text):
+            self.bot.send_message(self.chat_id, text)        
                 
                 
 def date2save_format(date, prefix=None):
@@ -157,20 +160,24 @@ class BybitTrading:
             data = message.get('data')
             self.time = int(data[0].get("T"))#/60/int(cfg.period[1:]))
             time_rounded = int(int(data[0].get("T"))/1000/60/int(cfg.period[1:]))
-            # logger.debug(f"{datetime.fromtimestamp(int(self.time/1000))} {time_rounded}")
+            print ("\033[A\033[A")
+            logger.info(f"server time: {datetime.fromtimestamp(int(self.time/1000))}")
         except (ValueError, AttributeError):
             pass            
         if time_rounded > self.t0:
             if self.t0:
                 self.update()
-                logger.info(f"update for {self.cfg.ticker} {datetime.fromtimestamp(int(self.time/1000))} finished!")
+                msg = f"{datetime.fromtimestamp(int(self.time/1000))}: processed new candle. Current pos: {self.cfg.ticker} {self.exp.active_position}"
+                logger.info(msg)
+                print()
+                self.my_telebot.send_text(msg)
             self.t0 = time_rounded
 
         
     def trailing_sl(self, pos):
-        sl = pos["stopLoss"]
+        sl = float(pos["stopLoss"])
         try:
-            sl = sl + self.cfg.trailing_stop_rate*(self.h.Open.iloc[-1] - sl)
+            sl = sl + self.cfg.trailing_stop_rate*(self.h.Open[-1] - sl)
             resp = self.session.set_trading_stop(
                 category="linear",
                 symbol=self.cfg.ticker,
@@ -215,8 +222,8 @@ class BybitTrading:
                             except:
                                 pass
                             x = point[0]
-                            x = max(self.hist2plot.Id[0], x)
-                            x = min(self.hist2plot.Id[-1], x)
+                            x = max(self.hist2plot.Id.iloc[0], x)
+                            x = min(self.hist2plot.Id.iloc[-1], x)
                             line[i] = (self.hist2plot.index[self.hist2plot.Id==x][0], y)    
                     self.open_time = pd.to_datetime(self.hist2plot.iloc[-1].Date)
                     self.side = self.open_position["side"]

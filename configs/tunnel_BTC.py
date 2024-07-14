@@ -10,3 +10,4 @@ config.leverage.test = 1
 
 config.body_classifier.test.params.ncross.test = 4
 config.trailing_stop_rate.test = 0.005
+config.period.test = "M60"
