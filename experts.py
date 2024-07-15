@@ -12,7 +12,7 @@ from collections import OrderedDict
 from indicators import *
 from backtest_broker import Order
 from dataloading import build_features
-import torch
+# import torch
 from backtest_broker import Broker, Position
 
 
@@ -168,14 +168,14 @@ class ByBitExpert(ExpertFormation):
         self.session = session
         super(ByBitExpert, self).__init__(cfg)
         
-    def create_orders(self, time_id, order_dir, tp, sl):
+    def create_orders(self, time_id, order_dir, volume, tp, sl):
         try:
             resp = self.session.place_order(
                 category="linear",
                 symbol=self.cfg.ticker,
                 side="Buy" if order_dir > 0 else "Sell",
                 orderType="Market",
-                qty=str(self.volume),
+                qty=str(volume),
                 timeInForce="GTC",
                 # orderLinkId="spot-test-postonly",
                 stopLoss="" if sl is None else str(abs(sl)),
