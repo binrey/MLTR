@@ -57,7 +57,11 @@ class ExpertFormation(ExpertBase):
         self.wait_length = cfg.wait_entry_point
         self.reset_state()
         self.order_sent = False
-        self.lot = 0
+        self.wait_entry_point = 0
+        
+        self.lprice = None
+        self.sprice = None
+        self.cprice = None
         
         if self.cfg.run_model_device is not None:
             from ml import Net, Net2
@@ -70,30 +74,35 @@ class ExpertFormation(ExpertBase):
     def reset_state(self):
         self.order_dir = 0
         self.formation_found = False
-        self.wait_entry_point = 0
-        self.lprice = None
-        self.sprice = None
-        self.cprice = None
+        # self.wait_entry_point = 0
+        # self.lprice = None
+        # self.sprice = None
+        # self.cprice = None
             
     def estimate_volume(self, h):
         volume = self.cfg.wallet/h.Open[-1]*self.cfg.leverage
-        volume = round(volume/self.cfg.ticksize, 0)*self.cfg.ticksize
-        if self.active_position is not None:
-            volume += self.active_position.volume
+        volume = self.normalize_volume(volume)
         return volume
+    
+    def normalize_volume(self, volume):
+        return round(volume/self.cfg.ticksize, 0)*self.cfg.ticksize
             
     def get_body(self, h):
         self.body_cls.update_inner_state(h)
-        if self.active_position is not None:
-            return
+        # if self.active_position is not None:
+        #     return
         
         self.order_sent = False
-        if self.formation_found == False:
-            self.formation_found = self.body_cls(self, h)
-            if self.formation_found:
-                self.wait_entry_point = self.wait_length
-            else:
-                return
+        # if self.wait_entry_point >= 0:
+        #     self.wait_entry_point -= 1
+        # else:
+        #     self.lprice = None
+        #     self.sprice = None
+        #     self.cprice = None
+        self.formation_found = False
+        self.formation_found = self.body_cls(self, h)
+        if self.formation_found:
+            self.wait_entry_point = self.wait_length        
             
         logger.debug(f"{h.Id[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, open: {h.Open[-1]}")
         
@@ -131,11 +140,6 @@ class ExpertFormation(ExpertBase):
                 self.order_sent = True
                 self.reset_state()
 
-        if self.wait_entry_point == 0:
-            self.formation_found = False
-        else:
-            self.wait_entry_point -= 1
-
             
 class BacktestExpert(ExpertFormation):
     def __init__(self, cfg):
@@ -143,14 +147,19 @@ class BacktestExpert(ExpertFormation):
         super(BacktestExpert, self).__init__(cfg)
         
     def create_orders(self, time_id, dir, volume, tp, sl):
-        self.orders = [Order(dir, Order.TYPE.MARKET, volume, time_id, time_id)]
-        if tp:
-            self.orders.append(Order(tp, Order.TYPE.LIMIT, volume, time_id, time_id))
+        market_vol = volume
+        # if self.active_position is not None:
+        #     market_vol = self.normalize_volume(volume + self.active_position.volume)
+        self.orders = [Order(dir, Order.TYPE.MARKET, market_vol, time_id, time_id)]
+        log_message = f"{time_id} send order {self.orders[0]}"
         if sl:
             self.orders.append(Order(sl, Order.TYPE.LIMIT, volume, time_id, time_id))
-        logger.debug(f"{time_id} send order {self.orders[0]}, " + 
-                        f"tp: {self.orders[1] if len(self.orders)>1 else 'NO'}, " +
-                        f"sl: {self.orders[2] if len(self.orders)>2 else 'NO'}")
+            log_message += f", sl: {self.orders[-1]}"     
+        if tp:
+            self.orders.append(Order(tp, Order.TYPE.LIMIT, volume, time_id, time_id))
+            log_message += f", tp: {self.orders[-1]}"
+
+        logger.debug(log_message)
         
             
 class ByBitExpert(ExpertFormation):
@@ -225,8 +234,8 @@ class ClsTunnel(ExtensionBase):
             "line_below": None,
         }
         for i in range(4, h.Id.shape[0], 1):
-            line_above = h.High[-i:].mean()
-            line_below = h.Low[-i:].mean()
+            line_above = h.High[-i:].max()
+            line_below = h.Low[-i:].min()
             middle_line = (line_above + line_below) / 2
             
             if h.Close[-1] < line_above and h.Close[-1] > line_below:

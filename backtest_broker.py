@@ -24,7 +24,7 @@ class Order:
         self.change(date, abs(directed_price) if type == Order.TYPE.LIMIT else 0)
 
     def __str__(self):
-        return f"{self.type} {self.id}"
+        return f"{self.type} {self.id} {self.volume}"
     
     @property
     def str_dir(self):
@@ -75,7 +75,7 @@ class Position:
         logger.debug(f"{date2str(date)} open position {self.id}")
     
     def __str__(self):
-        return f"pos {self.dir} {self.id}"
+        return f"pos {self.dir} {self.id} {self.volume}"
     
     def _update_fees(self, price, volume):
         self.fees_abs += price*volume*self.fee_rate/100
@@ -91,7 +91,7 @@ class Position:
     
     @property
     def id(self):
-        return f"{self.open_indx}-{self.str_dir}-{self.open_price:.2f}"
+        return f"{self.open_indx}-{self.str_dir}-{self.open_price:.2f}-{self.volume}"
     
     def close(self, price, date, indx):
         self.close_price = abs(price)
@@ -144,10 +144,22 @@ class Broker:
     def set_active_orders(self, h, new_orders_list: List[Order]):
         if len(new_orders_list):
             self.close_orders(h.Id[-1])
-        self.active_orders = new_orders_list
+            self.active_orders = new_orders_list
+    
+    def update_state(self, h, new_orders_list: List[Order]):
+        t0 = perf_counter()
+        closed_position = self.update(h)
+        self.set_active_orders(h, new_orders_list)
+        closed_position_new = self.update(h)
+        if closed_position is None:
+            if closed_position_new is not None:
+                closed_position = closed_position_new
+        elif closed_position_new is not None:
+            raise ValueError("closed positions disagreement!")
+        self.trailing_stop(h)
+        return closed_position, perf_counter() - t0
         
     def update(self, h):
-        t0 = perf_counter()
         date = h.Date[-1]
         closed_position = None
         for i, order in enumerate(self.active_orders): 
@@ -173,15 +185,12 @@ class Broker:
 
                 if self.active_position is not None:
                     if self.active_position.dir*triggered_price < 0:
-                        if triggered_vol >= self.active_position.volume:
-                            self.active_position.close(triggered_price, triggered_date, triggered_id)
-                            closed_position = self.active_position
-                            triggered_vol -= closed_position.volume
-                            self.active_position = None
-                            self.positions.append(closed_position)
-                        else:
-                            # Частичное закрытие
-                            raise NotImplementedError()
+                        self.active_position.close(triggered_price, triggered_date, triggered_id)
+                        closed_position = self.active_position
+                        self.active_position = None
+                        self.positions.append(closed_position)
+                        if order.type == Order.TYPE.LIMIT:
+                            triggered_vol = 0
                     else:
                         # Добор позиции
                         raise NotImplementedError()
@@ -203,9 +212,7 @@ class Broker:
                                                     fee_rate=self.cfg.fee_rate,
                                                     sl=sl)
 
-                    
-        self.trailing_stop(h)
-        return closed_position, perf_counter() - t0
+        return closed_position
                 
                 
     def trailing_stop(self, h):

@@ -194,12 +194,10 @@ def backtest(cfg, loglevel = "INFO"):
                   disable=loglevel == "ERROR"):
         h, dt = mw(t)
         tdata += dt
-        texp += exp.update(h, broker.active_position)
-        if len(exp.orders):
-            broker.set_active_orders(h, exp.orders)
-            exp.orders = []
+        texp += exp.update(h, broker.active_position)            
         
-        closed_pos, dt = broker.update(h)
+        closed_pos, dt = broker.update_state(h, exp.orders)
+        exp.orders = []
         tbrok += dt
         if closed_pos is not None:
         # if broker.active_position is None and exp.order_sent:
@@ -215,13 +213,15 @@ def backtest(cfg, loglevel = "INFO"):
                 colors = ["blue"]*(len(lines2plot)-1) + ["green" if closed_pos.profit > 0 else "red"]
                 widths = [1]*(len(lines2plot)-1) + [2]
                 
-                tplot_end = lines2plot[-1][-1][0]
-                tplot_start = min([e[0] for e in lines2plot[0]] + [closed_pos.lines[0][0] - cfg.hist_buffer_size])
-                hist2plot = hist_pd.iloc[tplot_start:tplot_end+1]
+                tplot_end = max([hist_pd.loc[t].Id if type(t) is pd.Timestamp else t for t in [line[-1][0] for line in lines2plot]])#lines2plot[-1][-1][0]
+                tplot_start = min([hist_pd.loc[e[0]].Id if type(e[0]) is pd.Timestamp else e[0] for e in lines2plot[0]] + [closed_pos.lines[0][0] - cfg.hist_buffer_size])
+                hist2plot = hist_pd.iloc[int(tplot_start):int(tplot_end+1)]
                 min_id = hist2plot.Id.min()
                 for line in lines2plot:
                     for i, point in enumerate(line):
                         x, y = point
+                        if type(x) is pd.Timestamp:
+                            continue
                         x = max(x, min_id)
                         try:
                             y = y.item()

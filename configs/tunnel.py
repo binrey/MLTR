@@ -6,6 +6,9 @@ classifier.params.ncross = Param(None, [2, 3, 4, 5, 7, 9])
 
 stops_processor = stops_processors.stops_dynamic
 stops_processor.params.sl_active = Param(True, [True])
+# stops_processor = stops_processors.stops_fixed
+# stops_processor.params.sl = Param(3, [True])
+# stops_processor.params.tp = Param(3, [True])
 
 config = EasyDict(
     wallet=Param(100, [100]),
@@ -17,11 +20,11 @@ config = EasyDict(
     trailing_stop_type=Param(1, [1]),
     body_classifier=Param(classifier, [classifier]),
     stops_processor=Param(stops_processor, [stops_processor]),
-    wait_entry_point=Param(999, [999]),
+    wait_entry_point=Param(4, [32]),
     hist_buffer_size=Param(64, [64]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    period=Param("M1", ["M60"]),
+    period=Param("M60", ["M60"]),
     ticker=Param(None, ["BTCUSDT", "ETHUSDT"]),
     ticksize=Param(None, [None]),
     data_type=Param("bybit", ["bybit"]),
