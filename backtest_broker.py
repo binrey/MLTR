@@ -53,7 +53,7 @@ class Order:
 class Position:
     def __init__(self, price, date, indx, ticker="NoName", volume=1, period="M5", sl=None, fee_rate=0):
         self.volume = float(volume)
-        assert volume > 0
+        assert self.volume > 0
         self.ticker = ticker
         self.period = period
         self.open_price = abs(float(price))
@@ -63,7 +63,7 @@ class Position:
         self.open_risk = np.nan
         if self.sl is not None:
             self.open_risk = abs(self.open_price - self.sl)/self.open_price*100
-        self.dir = np.sign(price)
+        self.dir = np.sign(float(price))
         self.close_price = None
         self.close_date = None
         self.profit = None
