@@ -52,18 +52,18 @@ class Order:
 
 class Position:
     def __init__(self, price, date, indx, ticker="NoName", volume=1, period="M5", sl=None, fee_rate=0):
+        self.volume = float(volume)
         assert volume > 0
         self.ticker = ticker
         self.period = period
-        self.open_price = abs(price)
+        self.open_price = abs(float(price))
         self.open_date = date
-        self.open_indx = indx
-        self.sl = sl
+        self.open_indx = int(indx)
+        self.sl = float(sl)
         self.open_risk = np.nan
         if self.sl is not None:
             self.open_risk = abs(self.open_price - self.sl)/self.open_price*100
         self.dir = np.sign(price)
-        self.volume = volume
         self.close_price = None
         self.close_date = None
         self.profit = None
@@ -75,7 +75,7 @@ class Position:
         logger.debug(f"{date2str(date)} open position {self.id}")
     
     def __str__(self):
-        return f"pos {self.dir} {self.id} {self.volume}"
+        return f"pos {self.ticker} {self.dir} {self.volume} {self.id}"
     
     def _update_fees(self, price, volume):
         self.fees_abs += price*volume*self.fee_rate/100

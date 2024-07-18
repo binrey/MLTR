@@ -87,9 +87,11 @@ class BackTestResults:
     
     @property
     def ndeals_per_month(self):
-        return int(self.ndeals / self.num_years_on_trade / 12)
+        return int(self.ndeals / max(1, self.num_years_on_trade) / 12)
       
     def compute_n_years(self, backtest_broker):
+        if len(backtest_broker.positions) == 0:
+            return 0
         d0 = max(np.datetime64(self.date_start), backtest_broker.positions[0].open_date)
         d1 = min(np.datetime64(self.date_end), backtest_broker.positions[-1].close_date)
         return (d1-d0).astype("timedelta64[M]").item()/12
