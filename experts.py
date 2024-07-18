@@ -49,19 +49,12 @@ class ExtensionBase:
 
 class ExpertFormation(ExpertBase):
     def __init__(self, cfg):
-        self.cfg = cfg
-        self.trend_maxsize = 1  
+        self.cfg = cfg 
         super(ExpertFormation, self).__init__()  
         self.body_cls = cfg.body_classifier.func
         self.stops_processor = cfg.stops_processor.func
-        self.wait_length = cfg.wait_entry_point
-        self.reset_state()
+        self._reset_state()
         self.order_sent = False
-        self.wait_entry_point = 0
-        
-        self.lprice = None
-        self.sprice = None
-        self.cprice = None
         
         if self.cfg.run_model_device is not None:
             from ml import Net, Net2
@@ -71,13 +64,12 @@ class ExpertFormation(ExpertBase):
             self.model.eval()
             self.model.to(self.cfg.run_model_device)
         
-    def reset_state(self):
-        self.order_dir = 0
+    def _reset_state(self):
+        self.lprice = None
+        self.sprice = None
+        self.cprice = None
         self.formation_found = False
-        # self.wait_entry_point = 0
-        # self.lprice = None
-        # self.sprice = None
-        # self.cprice = None
+        self.order_dir = 0
             
     def estimate_volume(self, h):
         volume = self.cfg.wallet/h.Open[-1]*self.cfg.leverage
@@ -89,48 +81,43 @@ class ExpertFormation(ExpertBase):
             
     def get_body(self, h):
         self.body_cls.update_inner_state(h)
-        # if self.active_position is not None:
-        #     return
+        if not self.cfg.allow_overturn and self.active_position is not None:
+            return
         
         self.order_sent = False
-        # if self.wait_entry_point >= 0:
-        #     self.wait_entry_point -= 1
-        # else:
-        #     self.lprice = None
-        #     self.sprice = None
-        #     self.cprice = None
-        self.formation_found = False
-        self.formation_found = self.body_cls(self, h)
-        if self.formation_found:
-            self.wait_entry_point = self.wait_length        
+        self.order_dir = 0
+        
+        if self.cfg.allow_overturn or not self.formation_found:
+            self.formation_found = self.body_cls(self, h)   
             
         logger.debug(f"{h.Id[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, open: {h.Open[-1]}")
         
-        self.order_dir = 0
         if self.lprice:
             if h.Open[-1] >= self.lprice or h.Close[-2] > self.lprice:
                 self.order_dir = 1
             if self.cprice and h.Open[-1] < self.cprice:
-                self.reset_state()
+                self._reset_state()
                 return
+            
         if self.sprice:
             if h.Open[-1] <= self.sprice or h.Close[-2] < self.sprice:
                 self.order_dir = -1
             if self.cprice and h.Open[-1] > self.cprice:
-                self.reset_state()
+                self._reset_state()
                 return            
         
         if h.Date[-1] in self.cfg.no_trading_days:
-            self.reset_state()
+            self._reset_state()
             
-        y = None
-        if self.cfg.run_model_device and self.order_dir != 0:
-            x = build_features(h, 
-                               self.order_dir, 
-                               self.stops_processor.cfg.sl,
-                               self.cfg.trailing_stop_rate)
-            x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.cfg.run_model_device)
-            y = [0.5, 1, 2, 4, 8][self.model.predict(x).item()]
+        # y = None
+        # if self.cfg.run_model_device and self.order_dir != 0:
+        #     x = build_features(h, 
+        #                        self.order_dir, 
+        #                        self.stops_processor.cfg.sl,
+        #                        self.cfg.trailing_stop_rate
+        #                        )
+        #     x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.cfg.run_model_device)
+        #     y = [0.5, 1, 2, 4, 8][self.model.predict(x).item()]
             
         
         if self.order_dir != 0:
@@ -138,7 +125,8 @@ class ExpertFormation(ExpertBase):
                 tp, sl = self.stops_processor(self, h)
                 self.create_orders(h.Id[-1], self.order_dir, self.estimate_volume(h), tp, sl)
                 self.order_sent = True
-                self.reset_state()
+                if not self.cfg.allow_overturn:
+                    self._reset_state()
 
             
 class BacktestExpert(ExpertFormation):
@@ -234,8 +222,8 @@ class ClsTunnel(ExtensionBase):
             "line_below": None,
         }
         for i in range(4, h.Id.shape[0], 1):
-            line_above = h.High[-i:].max()
-            line_below = h.Low[-i:].min()
+            line_above = h.High[-i:].mean()
+            line_below = h.Low[-i:].mean()
             middle_line = (line_above + line_below) / 2
             
             if h.Close[-1] < line_above and h.Close[-1] > line_below:
@@ -280,52 +268,37 @@ class ClsTunZigZag(ExtensionBase):
         self.zigzag = ZigZagNew(self.cfg.period)
         
     def __call__(self, common, h) -> bool:
-        trend_type = 0
+        trend_type = 1
 
-        zz_ids, values, types = self.zigzag.update(h)
-        std_min = np.Inf
-        piks_upper = []
-        piks_bottom = []
-        for i in range(-2, -len(zz_ids), -1):
-            if types[i] > 0:
-                piks_upper.append(values[i])
-                last_pik_upper = zz_ids[i]
-            if types[i] < 0:
-                piks_bottom.append(values[i])
-                last_pik_bottom = zz_ids[i]
-            if len(piks_upper) == len(piks_bottom):      
-                std_up = (np.array(piks_upper).std()+1)/len(piks_upper) 
-                std_bot = (np.array(piks_bottom).std()+1)/len(piks_bottom) 
-                  
-                level_tmp, sl_tmp, tp_tmp = np.array(piks_upper).mean(), max(piks_upper), min(piks_bottom)    
-                if tp_tmp < h.Close[-2] < level_tmp and std_up < std_min:
-                    std_min = std_up
-                    trend_type = -1
-                    level = level_tmp
-                    last_id = last_pik_upper
-                    sl = sl_tmp
-                    tp = tp_tmp
+        zz_ids, zz_values, zz_types = self.zigzag.update(h)
+        mid_line = sum(zz_values[-3:-1])/2
+        last_id = zz_ids[-3]
+        ncross = 1
+        for i in range(-4, -len(zz_ids)+1, -1):
+            new_cross = False
+            new_cross += zz_types[i] > 0 and zz_values[i] >= mid_line and zz_values[i+1] < mid_line
+            new_cross += zz_types[i] < 0 and zz_values[i] <= mid_line and zz_values[i+1] > mid_line
+
+            if new_cross:
+                ncross += 1
+                mid_line = sum(zz_values[i:-1])/(-1-i)
+                last_id = abs(i)
+            else:
+                break
                 
-                level_tmp = np.array(piks_bottom).mean()
-                sl_tmp, tp_tmp = min(piks_bottom), max(piks_upper)                    
-                if level_tmp < h.Close[-2] < tp_tmp and std_bot < std_min:
-                    std_min = std_bot
-                    trend_type = 1  
-                    level = level_tmp      
-                    last_id = last_pik_bottom
-                    sl = sl_tmp
-                    tp = tp_tmp
-            
-        is_fig = trend_type != 0 and std_min < self.cfg.ncross
+        is_fig = False   
+        if ncross >= self.cfg.ncross:
+            trend_type = 1 if h.Close[-2] > mid_line else -1
+            is_fig = True
 
         if is_fig:
-            common.lines = [[(x, y) for x, y in zip(zz_ids, values)]]
-            common.lprice = values[-1] if trend_type > 0 else None
-            common.sprice = values[-1] if trend_type < 0 else None
-            common.cprice = sl
-            common.sl = {1: sl, -1: sl}  
-            common.tp = {1: tp, -1: tp}
-            common.lines += [[(last_id, level), (h.Id[-1], level)]]
+            common.lines = [[(x, y) for x, y in zip(zz_ids, zz_values)]]
+            common.lprice = mid_line if trend_type > 0 else None
+            common.sprice = mid_line if trend_type < 0 else None
+            # common.cprice = sl
+            common.sl = {1: min(zz_values[-last_id:]), -1: max(zz_values[-last_id:])}  
+            # common.tp = {1: tp, -1: tp}
+            common.lines += [[(last_id, mid_line), (h.Id[-1], mid_line)]]
         return is_fig
 
 
