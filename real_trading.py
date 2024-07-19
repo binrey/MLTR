@@ -214,9 +214,9 @@ class BybitTrading:
         self.get_open_orders_positions()    
         if cfg.save_plots:
             if self.hist2plot is not None:
-                self.h = pd.DataFrame(self.h).iloc[-2:-1]
-                self.h.index = pd.to_datetime(self.h.Date)
-                self.hist2plot = pd.concat([self.hist2plot, self.h])
+                h = pd.DataFrame(self.h).iloc[-2:-1]
+                h.index = pd.to_datetime(h.Date)
+                self.hist2plot = pd.concat([self.hist2plot, h])
                 self.lines2plot[-1].append((pd.to_datetime(self.hist2plot.iloc[-1].Date), self.sl))
                 log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
                             
