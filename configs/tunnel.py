@@ -19,6 +19,7 @@ config = EasyDict(
     trailing_stop_rate=Param(None, [0.003, 0.004, 0.005, 0.006, 0.007]),
     trailing_stop_type=Param(1, [1]),
     body_classifier=Param(classifier, [classifier]),
+    allow_overturn=Param(False, [False]),
     stops_processor=Param(stops_processor, [stops_processor]),
     wait_entry_point=Param(4, [32]),
     hist_buffer_size=Param(64, [64]),
