@@ -59,7 +59,7 @@ class Position:
         self.open_price = abs(float(price))
         self.open_date = date
         self.open_indx = int(indx)
-        self.sl = float(sl)
+        self.sl = float(sl) if sl is not None else sl
         self.open_risk = np.nan
         if self.sl is not None:
             self.open_risk = abs(self.open_price - self.sl)/self.open_price*100
@@ -71,7 +71,7 @@ class Position:
         self.fee_rate  = fee_rate
         self.fees = 0
         self.fees_abs = 0
-        self._update_fees(self.open_price, volume)
+        self._update_fees(self.open_price, self.volume)
         logger.debug(f"{date2str(date)} open position {self.id}")
     
     def __str__(self):
