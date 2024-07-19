@@ -1,7 +1,15 @@
+from dataclasses import dataclass
 import numpy as np
 from loguru import logger
 from time import perf_counter
 from typing import List
+
+
+@dataclass
+class Side:
+    BUY = 1
+    SELL = -1
+    UNDEF = 0
 
 
 def date2str(date):

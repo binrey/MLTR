@@ -93,14 +93,14 @@ class ExpertFormation(ExpertBase):
         logger.debug(f"{h.Id[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, open: {h.Open[-1]}")
         
         if self.lprice:
-            if h.Open[-1] >= self.lprice or h.Close[-2] > self.lprice:
+            if (self.sprice is None and h.Open[-1] >= self.lprice) or h.Close[-2] > self.lprice:
                 self.order_dir = 1
             if self.cprice and h.Open[-1] < self.cprice:
                 self._reset_state()
                 return
             
         if self.sprice:
-            if h.Open[-1] <= self.sprice or h.Close[-2] < self.sprice:
+            if (self.lprice is None and h.Open[-1] <= self.sprice) or h.Close[-2] < self.sprice:
                 self.order_dir = -1
             if self.cprice and h.Open[-1] > self.cprice:
                 self._reset_state()
@@ -268,7 +268,7 @@ class ClsTunZigZag(ExtensionBase):
         self.zigzag = ZigZagNew(self.cfg.period)
         
     def __call__(self, common, h) -> bool:
-        trend_type = 1
+        # trend_type = 1
 
         zz_ids, zz_values, zz_types = self.zigzag.update(h)
         mid_line = sum(zz_values[-3:-1])/2
@@ -288,13 +288,13 @@ class ClsTunZigZag(ExtensionBase):
                 
         is_fig = False   
         if ncross >= self.cfg.ncross:
-            trend_type = 1 if h.Close[-2] > mid_line else -1
+            # trend_type = 1 if h.Close[-2] > mid_line else -1
             is_fig = True
 
         if is_fig:
             common.lines = [[(x, y) for x, y in zip(zz_ids, zz_values)]]
-            common.lprice = mid_line if trend_type > 0 else None
-            common.sprice = mid_line if trend_type < 0 else None
+            common.lprice = mid_line
+            common.sprice = mid_line
             # common.cprice = sl
             common.sl = {1: min(zz_values[-last_id:]), -1: max(zz_values[-last_id:])}  
             # common.tp = {1: tp, -1: tp}
@@ -509,7 +509,7 @@ class ClsDummy(ExtensionBase):
     def __call__(self, common, h) -> bool:
         common.lprice = h.Close[-2] #max(h.High[-2], h.Low[-2])
         common.sprice = h.Close[-2] #min(h.High[-2], h.Low[-2])
-        common.sl = {1: common.sprice, -1: common.lprice}  
+        common.sl = {1: h.Low[-2], -1: h.High[-2]}  
         common.lines = [[(h.Id[-5], common.lprice), (h.Id[-1], common.lprice)], [(h.Id[-5], common.sprice), (h.Id[-1], common.sprice)]]
         return True
         

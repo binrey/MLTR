@@ -210,6 +210,8 @@ def backtest(cfg, loglevel = "INFO"):
                 ords_lines = [order.lines for order in broker.orders if order.open_indx >= closed_pos.open_indx]
                 lines2plot = exp.lines + ords_lines + [closed_pos.lines]
                 for line in lines2plot:
+                    if type(line[0][0]) is pd.Timestamp:
+                        continue
                     while len(line) > 2 and line[0][0] < closed_pos.lines[0][0] - cfg.hist_buffer_size:
                         line.pop(0)
                 colors = ["blue"]*(len(lines2plot)-1) + ["green" if closed_pos.profit > 0 else "red"]

@@ -21,6 +21,7 @@ from multiprocessing import Process
 import stackprinter
 from pybit.unified_trading import HTTP, WebSocket
 from backtest_broker import Position
+from typing import Optional
 
 
 stackprinter.set_excepthook(style='color')
@@ -80,7 +81,7 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
             point = (point[0], float(point[1]))
             assert type(point[0]) is pd.Timestamp, f"point[0]={point[0]} in line {i}, must be pd.Timestamp, but has type {type(point[0])}"
             assert type(point[1]) is float, f"point[1]={point[1]} in line {i}, must be float, but has type {type(point[1])}"
-            assert point[0] >= hist2plot.index[0]
+            # assert point[0] >= hist2plot.index[0]
             assert point[0] <= hist2plot.index[-1]
     mystyle=mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
     kwargs = dict(
@@ -97,8 +98,8 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
 
     fig, axlist = mpf.plot(data=hist2plot, **kwargs)
     
-    if side in ["Buy", "Sell"]:
-        side_int = 1 if side == "Buy" else -1
+    if side.lower() in ["buy", "sell"]:
+        side_int = 1 if side.lower() == "buy" else -1
         x = hist2plot.index.get_loc(t)
         if type(x) is slice:
             x = x.start
@@ -136,7 +137,7 @@ class BybitTrading:
         self.t0 = 0
         self.my_telebot = Telebot(credentials["bot_token"])
         self.h = None
-        self.open_position = None
+        self.open_position: Optional[Position] = None
         self.session = HTTP(
             testnet=False,
             api_key=credentials["api_key"],
@@ -168,7 +169,7 @@ class BybitTrading:
         if time_rounded > self.t0:
             if self.t0:
                 self.update()
-                actpos = f"{self.active_position['symbol']} {self.exp.active_position['side']} {self.exp.active_position['size']}" if self.exp.active_position is not None else "пока нету"
+                actpos = f"{self.open_position.ticker} {self.open_position.dir} {self.open_position.volume}" if self.open_position is not None else "пока нету"
                 msg = f"{datetime.fromtimestamp(int(self.time/1000))}: processed new candle. Current pos: {actpos}"
                 logger.info(msg)
                 print()
@@ -176,10 +177,11 @@ class BybitTrading:
             self.t0 = time_rounded
 
         
-    def trailing_sl(self, pos):
-        sl = float(pos["stopLoss"])
+    def trailing_sl(self, pos:Position):
+        sl = float(pos.sl)
         # try:
-        sl = float(sl + self.cfg.trailing_stop_rate*(self.h.Open[-1] - sl))
+        sl_new = float(sl + self.cfg.trailing_stop_rate*(self.h.Open[-1] - sl))
+        sl = sl_new if abs(sl_new - self.h.Open[-1]) - self.cfg.ticksize > 0 else sl
         resp = self.session.set_trading_stop(
             category="linear",
             symbol=self.cfg.ticker,
@@ -187,7 +189,7 @@ class BybitTrading:
             slTriggerB="IndexPrice",
             positionIdx=0,
         )
-        logger.debug(resp)
+        # logger.debug(resp)
         # except Exception as ex:
         #     print(ex)
         return float(sl)       
@@ -204,7 +206,8 @@ class BybitTrading:
                                                   indx=0,
                                                   ticker=pos["symbol"],
                                                   volume=pos["size"], 
-                                                  period=self.cfg.period)
+                                                  period=self.cfg.period,
+                                                  sl=pos["stopLoss"])
 
     def update(self):
         # try:
@@ -233,9 +236,9 @@ class BybitTrading:
                         x = min(self.hist2plot.Id.iloc[-1], x)
                         line[i] = (self.hist2plot.index[self.hist2plot.Id==x][0], y)    
                 self.open_time = pd.to_datetime(self.hist2plot.iloc[-1].Date)
-                self.side = self.open_position["side"]
-                self.lines2plot.append([(self.open_time, float(self.open_position["avgPrice"])), (self.open_time, float(self.open_position["avgPrice"]))])
-                self.lines2plot.append([(self.open_time, float(self.open_position["stopLoss"])), (self.open_time, float(self.open_position["stopLoss"]))])
+                self.side = self.open_position.str_dir
+                self.lines2plot.append([(self.open_time, self.open_position.open_price), (self.open_time, self.open_position.open_price)])
+                self.lines2plot.append([(self.open_time, self.open_position.sl), (self.open_time, self.open_position.sl)])
                 log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
                 p = Process(target=plot_fig, args=(self.hist2plot, self.lines2plot, self.save_path, None, self.open_time, self.side, cfg.ticker))
                 p.start()
@@ -282,7 +285,7 @@ if __name__ == "__main__":
     import argparse
     
     logger.remove()
-    logger.add(sys.stderr, level="INFO")
+    logger.add(sys.stderr, level="DEBUG")
     
     parser = argparse.ArgumentParser()
     parser.add_argument("config", help="path to configuration file")
@@ -292,6 +295,7 @@ if __name__ == "__main__":
     cfg = PyConfig(args.config).test()
     demo = args.demo
     cfg.save_plots = True
+    print(cfg)
     
     with open("./configs/api.yaml", "r") as f:
         creds = yaml.safe_load(f)
@@ -307,6 +311,8 @@ if __name__ == "__main__":
     bybit_trading = BybitTrading(cfg, creds)
     bybit_trading.test_connection()
     public.trade_stream(symbol=cfg.ticker, callback=bybit_trading.handle_trade_message)
+    
+    print()
     while True:
         sleep(1)
     
