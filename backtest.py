@@ -16,13 +16,14 @@ from backtest_broker import Broker
 from experts import BacktestExpert
 from real_trading import plot_fig
 from multiprocessing import Process
+from typing import Iterable
 # logger.remove()
 
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen
 
 class BackTestResults:
-    def __init__(self, date_start, date_end):
+    def __init__(self, date_start, date_end, wallet=100):
         self.date_start = date_start
         self.date_end = date_end   
         self.target_dates = [pd.to_datetime(d).date() for d in 
@@ -32,23 +33,27 @@ class BackTestResults:
                              ]
         self.daily_hist = pd.DataFrame({"days": self.target_dates})
         self.buy_and_hold = None
-        self.cfg = None
-        
+        self.wallet = wallet
+    
     def process_backtest(self, backtest_broker: Broker):
         t0 = perf_counter()
-        self.cfg = backtest_broker.cfg
-        self.profits = backtest_broker.profits_abs
-        profit_cumsum = self.profits.cumsum()
-        self.ndeals = len(self.profits)
+        self.wallet = backtest_broker.cfg.wallet if self.wallet is None else self.wallet
+        profits = backtest_broker.profits_abs
         dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
-        profit_nofees = profit_cumsum + backtest_broker.fees.cumsum()
+        self.process_profits(dates, profits, backtest_broker.fees)
+        self.num_years_on_trade = self.compute_n_years(backtest_broker.positions)
+        # self.mean_pos_duration = np.array([pos.duration for pos in backtest_broker.positions]).mean()
+        return perf_counter() - t0 
+    
+    def process_profits(self, dates: Iterable, profits: Iterable, fees: Iterable):
+        profit_cumsum = np.array(profits).cumsum()
+        self.ndeals = len(profits)
+        profit_nofees = profit_cumsum + np.array(fees).cumsum()
         self.deal_hist = pd.DataFrame({"dates": dates, "profit": profit_cumsum, "profit_nofees": profit_nofees})
-        self.mean_pos_duration = np.array([pos.duration for pos in backtest_broker.positions]).mean()
         # self.open_risks = np.array([pos.open_risk for pos in backtest_broker.positions])
-        self.num_years_on_trade = self.compute_n_years(backtest_broker)
         self.update_daily_profit(self._convert_hist(profit_cumsum, dates))
-        self.fees = sum(backtest_broker.fees)
-        return perf_counter() - t0
+        self.fees = sum(fees)
+        
 
     def compute_buy_and_hold(self, closes, dates, fuse=False):
         t0  = perf_counter()
@@ -59,7 +64,7 @@ class BackTestResults:
                                        freq="W")
                          ]
         bh = self._convert_hist(closes, dates, monthly_dates)
-        bh = np.hstack([0, ((bh[1:] - bh[:-1])*self.cfg.wallet/bh[:-1])]).cumsum()
+        bh = np.hstack([0, ((bh[1:] - bh[:-1])*self.wallet/bh[:-1])]).cumsum()
         self.daily_hist["buy_and_hold"] = self._convert_hist(bh, monthly_dates)
         if fuse:
             self.update_daily_profit(self.daily_hist["profit"] + self.daily_hist["buy_and_hold"])  
@@ -68,7 +73,7 @@ class BackTestResults:
     def update_daily_profit(self, daily_profit):
         self.daily_hist["profit"] = daily_profit
         profit_stair, self.metrics = self._calc_metrics(self.daily_hist["profit"].values)
-        self.deposit = self.cfg.wallet + self.metrics["loss_max"]
+        self.deposit = self.wallet + self.metrics["loss_max"]
         self.daily_hist["deposit"] = self.deposit - (profit_stair - self.daily_hist["profit"].values)
         self.metrics["loss_max_rel"] = self.metrics["loss_max"]/self.deposit*100
         
@@ -89,11 +94,11 @@ class BackTestResults:
     def ndeals_per_month(self):
         return int(self.ndeals / max(1, self.num_years_on_trade) / 12)
       
-    def compute_n_years(self, backtest_broker):
-        if len(backtest_broker.positions) == 0:
+    def compute_n_years(self, positions):
+        if len(positions) == 0:
             return 0
-        d0 = max(np.datetime64(self.date_start), backtest_broker.positions[0].open_date)
-        d1 = min(np.datetime64(self.date_end), backtest_broker.positions[-1].close_date)
+        d0 = max(np.datetime64(self.date_start), positions[0].open_date)
+        d1 = min(np.datetime64(self.date_end), positions[-1].close_date)
         return (d1-d0).astype("timedelta64[M]").item()/12
     
     @staticmethod
@@ -146,7 +151,7 @@ class BackTestResults:
     
     def metrics_from_profit(self, profit_curve):
         loss_max, wait_max = [self._calc_metrics(profit_curve)[1][k] for k in ("loss_max", "maxwait")]
-        deposit = self.cfg.wallet + loss_max
+        deposit = self.wallet + loss_max
         final_profit_rel = profit_curve[-1]/deposit*100
         return final_profit_rel/self.num_years_on_trade, wait_max
 
@@ -266,7 +271,7 @@ def backtest(cfg, loglevel = "INFO"):
     logger.info(sformat(1).format("MAXLOSS", backtest_results.metrics["loss_max_rel"]) + " %")
     logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["recovery"])) 
     logger.info(sformat(1).format("MAXWAIT", backtest_results.metrics["maxwait"]) + " days")
-    logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.mean_pos_duration) + " \n")        
+    # logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.mean_pos_duration) + " \n")        
     return backtest_results
     
     

@@ -65,7 +65,7 @@ class Position:
         self.ticker = ticker
         self.period = period
         self.open_price = abs(float(price))
-        self.open_date = date
+        self.open_date = np.datetime64(date)
         self.open_indx = int(indx)
         self.sl = float(sl) if sl is not None else sl
         self.open_risk = np.nan
@@ -85,8 +85,11 @@ class Position:
     def __str__(self):
         return f"pos {self.ticker} {self.dir} {self.volume} {self.id}"
     
+    def order_fees(self, price, volume):
+        return price*volume*self.fee_rate/100
+    
     def _update_fees(self, price, volume):
-        self.fees_abs += price*volume*self.fee_rate/100
+        self.fees_abs += self.order_fees(price, volume)
         self.fees = self.fees_abs/self.volume/self.open_price*100
     
     @property
@@ -103,7 +106,7 @@ class Position:
     
     def close(self, price, date, indx):
         self.close_price = abs(price)
-        self.close_date = date
+        self.close_date = np.datetime64(date)
         self.close_indx = indx
         self._update_fees(self.close_price, self.volume)
         self.profit_abs = (self.close_price - self.open_price)*self.dir*self.volume
@@ -221,8 +224,7 @@ class Broker:
                                                     sl=sl)
 
         return closed_position
-                
-                
+                   
     def trailing_stop(self, h):
         date, p = h.Id[-1], h.Close[-1]
         position = self.active_position
