@@ -3,10 +3,10 @@ import numpy as np
 from loguru import logger
 from time import perf_counter
 from typing import List
+from enum import Enum
 
 
-@dataclass
-class Side:
+class Side(Enum):
     BUY = 1
     SELL = -1
     UNDEF = 0
@@ -102,7 +102,7 @@ class Position:
     
     @property
     def id(self):
-        return f"{self.open_indx}-{self.str_dir}-{self.open_price:.2f}-{self.volume}"
+        return f"{self.open_indx}-{self.str_dir}-{self.open_price:.2f}-{self.volume:.2f}"
     
     def close(self, price, date, indx):
         self.close_price = abs(price)
@@ -113,7 +113,7 @@ class Position:
         self.profit = self.profit_abs/self.open_price*100 - self.fees
         self.profit_abs -= self.fees_abs
         
-        logger.debug(f"{date2str(date)} close position {self.id} at {self.close_price:.2f}, profit: {self.profit:.2f}")
+        logger.debug(f"{date2str(date)} close position {self.id} at {self.close_price:.2f}, profit: {self.profit_abs:.2f} ({self.profit:.2f}%)")
     
     @property
     def lines(self):
