@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import mplfinance as mpf
 import pandas as pd
 import numpy as np
-# import yfinance as yf
+from datetime import timedelta
 from loguru import logger
 from tqdm import tqdm
 from dataloading import MovingWindow, DataParser
@@ -51,11 +51,11 @@ class BackTestResults:
         profit_nofees = profit_cumsum + np.array(fees).cumsum()
         self.deal_hist = pd.DataFrame({"dates": dates, "profit": profit_cumsum, "profit_nofees": profit_nofees})
         # self.open_risks = np.array([pos.open_risk for pos in backtest_broker.positions])
-        self.update_daily_profit(self._convert_hist(profit_cumsum, dates))
+        self.update_daily_profit(self._convert_hist(dates, profit_cumsum))
         self.fees = sum(fees)
         
 
-    def compute_buy_and_hold(self, closes, dates, fuse=False):
+    def compute_buy_and_hold(self, dates, closes, fuse=False):
         t0  = perf_counter()
         dates = [d.date() for d in pd.to_datetime(dates)]
         monthly_dates = [pd.to_datetime(d).date() for d in 
@@ -63,9 +63,9 @@ class BackTestResults:
                                        end="/".join([self.date_end.split("-")[i] for i in [1, 2, 0]]), 
                                        freq="W")
                          ]
-        bh = self._convert_hist(closes, dates, monthly_dates)
+        bh = self._convert_hist(dates, closes, monthly_dates)
         bh = np.hstack([0, ((bh[1:] - bh[:-1])*self.wallet/bh[:-1])]).cumsum()
-        self.daily_hist["buy_and_hold"] = self._convert_hist(bh, monthly_dates)
+        self.daily_hist["buy_and_hold"] = self._convert_hist(monthly_dates, bh)
         if fuse:
             self.update_daily_profit(self.daily_hist["profit"] + self.daily_hist["buy_and_hold"])  
         return perf_counter() - t0
@@ -128,15 +128,20 @@ class BackTestResults:
                    "loss_max": max_loss}
         return h, metrics
 
-    def _convert_hist(self, vals, dates, target_dates=None):
+    def _convert_hist(self, dates, vals, target_dates=None):
         if target_dates is None:
             target_dates = self.target_dates
         daily_vals = np.zeros(len(target_dates))
         unbias=False
         darray = np.array(dates)
-        for i, date_terget in enumerate(target_dates):
+        for i, date_target in enumerate(target_dates):
             # Select vals records with same day
-            day_profs = vals[darray == date_terget]
+            for _ in range(10):
+                mask = darray == date_target
+                if sum(mask):
+                    break
+                date_target -= timedelta(days=1)
+            day_profs = vals[mask]
             # If there are records for currend day, store latest of them, else fill days with no records with latest sored record
             if len(day_profs):
                 daily_vals[i] = day_profs[-1]

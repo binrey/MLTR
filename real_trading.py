@@ -314,7 +314,16 @@ if __name__ == "__main__":
     
     print()
     while True:
-        sleep(1)
+        sleep(60)
+        if not public.is_connected():
+            logger.warning("Connection lost! Reconnect...")
+            public.exit()
+            public = WebSocket(channel_type='linear', testnet=False)
+            public.trade_stream(symbol=cfg.ticker, callback=bybit_trading.handle_trade_message)
+            sleep(1)
+            msg = f"Request connection status: is_connected={public.is_connected()}\n"
+            logger.warning(msg)
+            bybit_trading.my_telebot.send_text(msg)
     
 
     

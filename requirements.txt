@@ -7,3 +7,6 @@ matplotlib==3.8.0
 mplfinance==0.12.10b0
 pyyaml==6.0.1
 stackprinter==0.2.12
+stackprinter
+telebot
+pybit
