@@ -33,6 +33,7 @@ class BackTestResults:
                              ]
         self.daily_hist = pd.DataFrame({"days": self.target_dates})
         self.buy_and_hold = None
+        self.tickers = None
         self.wallet = wallet
     
     def process_backtest(self, backtest_broker: Broker):
@@ -40,6 +41,7 @@ class BackTestResults:
         self.wallet = backtest_broker.cfg.wallet if self.wallet is None else self.wallet
         profits = backtest_broker.profits_abs
         dates = [pd.to_datetime(pos.close_date).date() for pos in backtest_broker.positions]
+        self.tickers = "+".join(set([pos.ticker for pos in backtest_broker.positions]))
         self.process_profits(dates, profits, backtest_broker.fees)
         self.num_years_on_trade = self.compute_n_years(backtest_broker.positions)
         # self.mean_pos_duration = np.array([pos.duration for pos in backtest_broker.positions]).mean()
@@ -222,8 +224,6 @@ def backtest(cfg, loglevel = "INFO"):
                 for line in lines2plot:
                     if type(line[0][0]) is pd.Timestamp:
                         continue
-                    while len(line) > 2 and line[0][0] < closed_pos.lines[0][0] - cfg.hist_buffer_size:
-                        line.pop(0)
                 colors = ["blue"]*(len(lines2plot)-1) + ["green" if closed_pos.profit > 0 else "red"]
                 widths = [1]*(len(lines2plot)-1) + [2]
                 
@@ -256,8 +256,8 @@ def backtest(cfg, loglevel = "INFO"):
     backtest_results = BackTestResults(cfg.date_start, cfg.date_end)
     tpost = backtest_results.process_backtest(broker)
     if cfg.eval_buyhold:
-        tbandh = backtest_results.compute_buy_and_hold(hist.Close[id2start: id2end], 
-                                                       hist.Date[id2start: id2end],
+        tbandh = backtest_results.compute_buy_and_hold(hist.Date[id2start: id2end],
+                                                       hist.Close[id2start: id2end], 
                                                        fuse=cfg.fuse_buyhold)
     ttotal = perf_counter() - t0
     

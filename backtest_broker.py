@@ -124,7 +124,7 @@ class Broker:
         self.cfg = cfg
         self.active_orders = []
         self.active_position = None
-        self.positions = []
+        self.positions: List[Position] = []
         self.orders = []
         
         self.best_profit = 0

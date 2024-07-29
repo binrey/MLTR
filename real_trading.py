@@ -22,6 +22,7 @@ import stackprinter
 from pybit.unified_trading import HTTP, WebSocket
 from backtest_broker import Position
 from typing import Optional
+from collections import defaultdict
 
 
 stackprinter.set_excepthook(style='color')
@@ -74,20 +75,25 @@ def date2save_format(date, prefix=None):
 
      
 def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=None, ticker="X"):
+    lines_in_range = [[] for _ in range(len(lines2plot))]
     for i, line in enumerate(lines2plot):
         assert len(line) >= 2, "line must have more than 1 point"
-        for point in line:
+        for point_id, point in enumerate(line):
             assert len(point) == 2
             point = (point[0], float(point[1]))
             assert type(point[0]) is pd.Timestamp, f"point[0]={point[0]} in line {i}, must be pd.Timestamp, but has type {type(point[0])}"
             assert type(point[1]) is float, f"point[1]={point[1]} in line {i}, must be float, but has type {type(point[1])}"
-            # assert point[0] >= hist2plot.index[0]
+            if point[0] >= hist2plot.index[0]:
+                lines_in_range[i].append(point)
+            elif len(line) == 2:
+                lines_in_range[i].append((hist2plot.index[-1], point[1]))
+                
             assert point[0] <= hist2plot.index[-1]
     mystyle=mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
     kwargs = dict(
         type='candle', 
         block=False,
-        alines=dict(alines=lines2plot, linewidths=[1]*len(lines2plot)),
+        alines=dict(alines=lines_in_range, linewidths=[1]*len(lines2plot)),
         volume=True,
         figscale=1.5,
         style=mystyle,

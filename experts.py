@@ -95,14 +95,14 @@ class ExpertFormation(ExpertBase):
         if self.lprice:
             if (self.sprice is None and h.Open[-1] >= self.lprice) or h.Close[-2] > self.lprice:
                 self.order_dir = 1
-            if self.cprice and h.Open[-1] < self.cprice:
+            if self.cprice is not None and h.Open[-1] < self.cprice[1]:
                 self._reset_state()
                 return
             
         if self.sprice:
             if (self.lprice is None and h.Open[-1] <= self.sprice) or h.Close[-2] < self.sprice:
                 self.order_dir = -1
-            if self.cprice and h.Open[-1] > self.cprice:
+            if self.cprice and h.Open[-1] > self.cprice[-1]:
                 self._reset_state()
                 return            
         
@@ -135,10 +135,7 @@ class BacktestExpert(ExpertFormation):
         super(BacktestExpert, self).__init__(cfg)
         
     def create_orders(self, time_id, dir, volume, tp, sl):
-        market_vol = volume
-        # if self.active_position is not None:
-        #     market_vol = self.normalize_volume(volume + self.active_position.volume)
-        self.orders = [Order(dir, Order.TYPE.MARKET, market_vol, time_id, time_id)]
+        self.orders = [Order(dir, Order.TYPE.MARKET, volume, time_id, time_id)]
         log_message = f"{time_id} send order {self.orders[0]}"
         if sl:
             self.orders.append(Order(sl, Order.TYPE.LIMIT, volume, time_id, time_id))
@@ -268,13 +265,16 @@ class ClsTunZigZag(ExtensionBase):
         self.zigzag = ZigZagNew(self.cfg.period)
         
     def __call__(self, common, h) -> bool:
-        # trend_type = 1
-
+        is_fig = False 
         zz_ids, zz_values, zz_types = self.zigzag.update(h)
+        zz_types, zz_values = np.array(zz_types), np.array(zz_values)
+        if len(zz_ids) < 3:
+            return is_fig
         mid_line = sum(zz_values[-3:-1])/2
-        last_id = zz_ids[-3]
-        ncross = 1
+        last_id = -3
+        ncross, metric = 1, np.Inf
         for i in range(-4, -len(zz_ids)+1, -1):
+            mid_line = sum(zz_values[-3:-1])/2
             new_cross = False
             new_cross += zz_types[i] > 0 and zz_values[i] >= mid_line and zz_values[i+1] < mid_line
             new_cross += zz_types[i] < 0 and zz_values[i] <= mid_line and zz_values[i+1] > mid_line
@@ -286,19 +286,28 @@ class ClsTunZigZag(ExtensionBase):
             else:
                 break
                 
-        is_fig = False   
-        if ncross >= self.cfg.ncross:
-            # trend_type = 1 if h.Close[-2] > mid_line else -1
+          
+        # if ncross >= self.cfg.ncross:
+        #     is_fig = True
+
+        lprice = zz_values[-last_id+1:-1][zz_types[-last_id+1:-1]>0].mean()
+        sprice = zz_values[-last_id+1:-1][zz_types[-last_id+1:-1]<0].mean()
+        metric = (zz_ids[-2] - zz_ids[-last_id]) / ((lprice - sprice) / mid_line) / 100
+        if metric > self.cfg.ncross:# and ncross>1:
             is_fig = True
+
 
         if is_fig:
             common.lines = [[(x, y) for x, y in zip(zz_ids, zz_values)]]
-            common.lprice = mid_line
-            common.sprice = mid_line
-            # common.cprice = sl
-            common.sl = {1: min(zz_values[-last_id:]), -1: max(zz_values[-last_id:])}  
+            common.lprice = zz_values[-last_id+1:-1][zz_types[-last_id+1:-1]>0].mean()
+            common.sprice = zz_values[-last_id+1:-1][zz_types[-last_id+1:-1]<0].mean()
+            common.sl = {1: min(zz_values[-last_id:-1]), -1: max(zz_values[-last_id:-1])}  
             # common.tp = {1: tp, -1: tp}
-            common.lines += [[(last_id, mid_line), (h.Id[-1], mid_line)]]
+            # common.cprice = {-1: min(zz_values[-last_id:]), 1: max(zz_values[-last_id:])} 
+            common.lines += [[(zz_ids[-last_id], common.lprice), (h.Id[-1], common.lprice)],
+                             [(zz_ids[-last_id], common.sprice), (h.Id[-1], common.sprice)],
+                             [(zz_ids[-last_id], mid_line), (h.Id[-1], mid_line)]
+                             ]
         return is_fig
 
 

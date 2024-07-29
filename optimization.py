@@ -27,7 +27,7 @@ def plot_daily_balances_with_av(btests: List[BackTestResults], test_ids: List[in
       for test_id in test_ids:
             btest = btests[test_id]
             plt.plot(btest.daily_hist["days"], btest.daily_hist["profit"])
-            legend.append(f"{btest.cfg.ticker} profit={btest.final_profit:.0f} ({btest.ndeals}) APR={btest.APR:.2f} mwait={btest.metrics['maxwait']:.0f}")
+            legend.append(f"{btest.tickers} profit={btest.final_profit:.0f} ({btest.ndeals}) APR={btest.APR:.2f} mwait={btest.metrics['maxwait']:.0f}")
       plt.plot(btests[0].daily_hist["days"], profit_av, linewidth=3, color="black")
       legend_item = f"AV profit={profit_av[-1]:.0f},"
       for (name, val) in metrics_av:
@@ -49,7 +49,7 @@ class Optimizer:
             locnum = 0
             while True:
                   btest = backtest(cfg, loglevel="INFO")
-                  if len(btest.profits) == 0:
+                  if btest.ndeals == 0:
                         break
                   # cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
                   locnum += 1
