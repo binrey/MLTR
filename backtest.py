@@ -269,9 +269,9 @@ def backtest(cfg, loglevel = "INFO"):
     logger.info(sformat(1).format("broker updates", tbrok/ttotal*100) + " %")
     logger.info(sformat(1).format("postproc. broker", tpost/ttotal*100) + " %")
     if cfg.eval_buyhold:
-        logger.info(sformat(1).format("But & Hold", tbandh/ttotal*100) + " %")
+        logger.info(sformat(1).format("Buy & Hold", tbandh/ttotal*100) + " %")
 
-    logger.info("-"*30)
+    logger.info("-"*40)
     logger.info(sformat(1).format("APR", backtest_results.APR) + f" % ({backtest_results.ndeals_per_month} deals/month)" + f" ({backtest_results.fees/backtest_results.final_profit*100:.1f}% fees)") 
     logger.info(sformat(1).format("MAXLOSS", backtest_results.metrics["loss_max_rel"]) + " %")
     logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["recovery"])) 
