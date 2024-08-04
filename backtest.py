@@ -9,7 +9,7 @@ import numpy as np
 from datetime import timedelta
 from loguru import logger
 from tqdm import tqdm
-from dataloading import MovingWindow, DataParser
+from data_processing.dataloading import MovingWindow, DataParser
 pd.options.mode.chained_assignment = None
 from utils import PyConfig
 from backtest_broker import Broker
@@ -278,8 +278,8 @@ def backtest(cfg, loglevel = "INFO"):
     logger.info(sformat(1).format("MAXWAIT", backtest_results.metrics["maxwait"]) + " days")
     # logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.mean_pos_duration) + " \n")        
     return backtest_results
-    
-    
+
+
 if __name__ == "__main__":
     cfg = PyConfig(sys.argv[1]).test()
     btest_results = backtest(cfg, loglevel="INFO")

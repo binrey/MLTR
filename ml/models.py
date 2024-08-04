@@ -5,24 +5,23 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torchinfo import summary
-from dataloading import CustomImageDataset
 from sklearn.metrics import roc_auc_score
 from torch.utils.data import Dataset
 import numpy as np
+import matplotlib.pyplot as plt
 
+# class CustomImageDataset(Dataset):
+#     def __init__(self, X, y):
+#         self.img_labels = y
+#         self.imgs = X
 
-class CustomImageDataset(Dataset):
-    def __init__(self, X, y):
-        self.img_labels = y
-        self.imgs = X
+#     def __len__(self):
+#         return len(self.img_labels)
 
-    def __len__(self):
-        return len(self.img_labels)
-
-    def __getitem__(self, idx):
-        image = self.imgs[idx]
-        label = self.img_labels[idx]
-        return image, label
+#     def __getitem__(self, idx):
+#         image = self.imgs[idx]
+#         label = self.img_labels[idx]
+#         return image, label
 
 
 class Net(nn.Module):
@@ -60,7 +59,6 @@ class Net(nn.Module):
     
     def forward_thresholded(self, x):
         return (self.forward(x).squeeze() > self.threshold).cpu().numpy()
-    
     
 class Net2(nn.Module):
     def __init__(self, nf, nl, threshold=0):
@@ -149,14 +147,74 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
         #     break  
     return model, loss_hist[:epoch+1]
     
+class E2EModel(nn.Module):
+    def __init__(self, inp_shape, nh):
+        self.nh = nh
+        inp_shape = inp_shape      
+        super(E2EModel, self).__init__()
 
+        self.fc_features_in = nn.Linear(inp_shape[1], nh)
+        self.fc_hid = nn.Linear(nh, nh)
+        self.fc_out = nn.Linear(nh, 1)
+
+        self.norm_hid = nn.InstanceNorm1d((nh, nh))
+        self.norm_in = nn.LayerNorm(inp_shape)
+        self.norm_out = nn.InstanceNorm1d(1)        
+        self.relu = nn.ReLU()
+        self.tanh = nn.Tanh()
+    
+    def forward(self, x):
+        
+        features = self.norm_in(x)
+
+        features = self.fc_features_in(features)
+        features = self.relu(self.norm_hid(features))
+        features = self.fc_hid(features)
+        features = self.relu(self.norm_hid(features))
+        features = self.fc_out(features)
+        
+        output = self.tanh(features)
+        return output
+    
+    
+def autoregress_sequense(model, p, dp, features, epoch=0, output_sequense=False, device="cpu"):
+    output_seq, result_seq, fee_seq = np.zeros(dp.shape[0]+1), np.zeros(dp.shape[0]+1), np.zeros(dp.shape[0]+1)
+    loss = torch.zeros((1, 1), device=device)
+    profit = torch.zeros((1, 1), device=device)
+    output = torch.zeros((1, 1, 1), device=device)
+    output_last = torch.zeros((1, 1, 1), device=device)
+    pred_result = torch.zeros((1, 1, 1), device=device)
+    for i in range(dp.shape[0]):
+        output = model(features[i:i+1])
+        
+        fees = (output - output_last).abs() * p[i] * 0.001
+        pred_result = dp[i] * output -  fees
+        if output_sequense:
+            output_seq[i+1] = output.item()
+            result_seq[i+1] = pred_result.item()
+            fee_seq[i] = fees.item()
+        else:
+            # print(f"{epoch + 1:03} {i + 1:04}: profit += {output.item():7.2f} * {dp[i]:7.2f} - {fees.item():7.3f} = {pred_result.item():7.2f}", end=" ")
+            profit += pred_result.squeeze()
+            loss = profit# - hold[i+1]
+            
+            # print(f"| loss: {loss.item():9.3f}")   
+        output_last = output         
+    if output_sequense:
+        return output_seq, result_seq, fee_seq
+    else:
+        return -loss, output
+    
+       
 if __name__ == "__main__":
     import numpy as np
     torch.manual_seed(0)
-    device = "cpu"
-    model = Net2(4, 32)
-    model.eval()
-    print(summary(model, (10, 1, 4, 64)))
+    device = torch.device("mps")
+    model = E2EModel((1, 4), 32)
+    model.to(device)
+    # model.eval()
+    print(model(torch.randn(2, 1, 4).to(device)).shape)
+    print(summary(model, (1, 4), device="cpu"))
     # model.to(device)
     # x = torch.tensor(np.zeros((1, 1, 6, 64))).float().to(device)
     # with torch.no_grad():
