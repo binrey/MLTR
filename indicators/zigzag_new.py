@@ -4,9 +4,16 @@ from loguru import logger
 
 
 class ZigZagNew:
-    def __init__(self, period):
+    def __init__(self, period, size=16):
         self.period = period
-        self.mask, self.min_last, self.max_last, self.last_close, self.last_id = None, None, None, None, 0
+        self.mask, self.min_last, self.max_last, self.last_close = None, None, None, None
+        self.last_id = 0
+        self.size = size
+        
+        self.ids = np.zeros(size, dtype=int)
+        self.values = np.zeros(size, dtype=np.float32)
+        self.types = np.zeros(size, dtype=int)
+        self.n = 0
 
     def _get_mask(self, h):
         self.mask = None
@@ -37,13 +44,18 @@ class ZigZagNew:
     def update(self, h):
         self._get_mask(h)
         return self.mask2zigzag(h, self.mask, use_min_max=True)
-    
-    def mask2zigzag(self, h, mask, use_min_max=False):
-        ids, values, types = [], [], []
-        def upd_buffers(i, v, t):
-            ids.append(i)
-            values.append(v)
-            types.append(t)
+
+    def upd_buffers(self, i, v, t):
+        self.ids[self.n] = i
+        self.values[self.n] = v
+        self.types[self.n] = t
+        self.n += 1
+        
+    def mask2zigzag(self, h, mask, use_min_max=False):        
+        self.ids[:] = 0
+        self.values[:] = 0
+        self.types[:] = 0
+        self.n = 0
         for i in range(mask.shape[0]):
             if use_min_max:
                 y = h.Low[i] if mask[i] > 0 else h.High[i]
@@ -51,13 +63,15 @@ class ZigZagNew:
                 y = h.Close[i]
             if i > 0: 
                 if mask[i] != node:
-                    upd_buffers(h.Id[i], y, node)
+                    self.upd_buffers(h.Id[i], y, node)
                     node = mask[i]
             else:
                 node = mask[i]
-                upd_buffers(h.Id[i], y, -node)
-        upd_buffers(h.Id[i]+1, h.Close[-1], mask[i])
-        return ids, values, types   
+                self.upd_buffers(h.Id[i], y, -node)
+            if self.n == self.size - 1:
+                break
+        self.upd_buffers(h.Id[i]+1, h.Close[-1], mask[i])
+        return self.ids[self.types!=0], self.values[self.types!=0], self.types[self.types!=0] 
 
     
 
