@@ -29,10 +29,10 @@ class ClsZigZag(ExtensionBase):
             is_fig = True
         
         if is_fig:
-            self.last_zz_type = zz_types[-1]
-            common.lines = [[(x, y) for x, y in zip(zz_ids, zz_values)]]
-            common.lprice = h.Open[-1] if zz_types[-1] == 1 else None
-            common.sprice = h.Open[-1] if zz_types[-1] == -1 else None
+            self.last_zz_type = self.zigzag.types[-1]
+            common.lines = [[(x, y) for x, y in zip(self.zigzag.ids, self.zigzag.values)]]
+            common.lprice = h.Open[-1] if self.zigzag.types[-1] == 1 else None
+            common.sprice = h.Open[-1] if self.zigzag.types[-1] == -1 else None
             # common.sl = {1: min(peaks_bottom), -1: max(peaks_upper)}  
             # common.tp = {1: tp, -1: tp}
             # common.cprice = {-1: min(zz_values[-last_id:]), 1: max(zz_values[-last_id:])} 

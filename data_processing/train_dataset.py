@@ -27,8 +27,8 @@ def next_price_prediction(cfg):
         if classifier.check_status(hist_window):
             p.append(hist_window.Open[-1])
             features.append(classifier.getfeatures())
-            if len(p) > 50:
-                break
+            # if len(p) >= 2000:
+            #     break
   
     features = np.array(features).astype(np.float32)
     p = np.array(p).astype(np.float32)

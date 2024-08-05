@@ -170,6 +170,10 @@ def find_available_date(hist: pd.DataFrame, date_start: pd.Timestamp):
     return date_test
 
 
+def find_nearest_date_indx(array, target):
+    idx = (np.abs(array - target)).argmin()
+    return idx
+
 
 def backtest(cfg, loglevel = "INFO"):
     logger.remove()
@@ -183,22 +187,20 @@ def backtest(cfg, loglevel = "INFO"):
     if cfg.save_plots:
         # save_path = Path("backtests") / f"{cfg.body_classifier.func.name}-{cfg.ticker}-{cfg.period}"
         save_path = Path("backtests") / f"{cfg.ticker}"
-
         if save_path.exists():
             rmtree(save_path)
         save_path.mkdir()
-    date_start = np.datetime64(cfg.date_start)
-    mask = hist.Date == date_start
-    id2start = 0
-    if sum(mask) == 1:
-        id2start = hist.Id[mask][0]
-    else:
-        logger.warning(f"!!! Date start {date_start} not found, current dates range {hist.Date[0]} - {hist.Date[-1]}")
         
+    date_start = np.datetime64(cfg.date_start)
+    id2start = find_nearest_date_indx(hist.Date, date_start)
+    if id2start == hist.Id[-1]:
+        logger.error(f"Date start {pd.to_datetime(date_start)} is equal or higher than latest range date {pd.to_datetime(hist.Date[-1])}")
+        return
+    
     if id2start < cfg.hist_buffer_size:
         logger.warning(f"Not enough history, shift start id from {id2start} to {cfg.hist_buffer_size}")
         id2start = cfg.hist_buffer_size
-        logger.warning(f"!!! Switch to {hist.Date[id2start]}")
+        logger.warning(f"Switch to {pd.to_datetime(hist.Date[id2start])}")
         
     id2end = cfg.tend if cfg.tend is not None else hist.Id.shape[0]
     t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0

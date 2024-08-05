@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torchinfo import summary
-from sklearn.metrics import roc_auc_score
+# from sklearn.metrics import roc_auc_score
 from torch.utils.data import Dataset
 import numpy as np
 import matplotlib.pyplot as plt
@@ -179,16 +179,16 @@ class E2EModel(nn.Module):
     
 def autoregress_sequense(model, p, dp, features, epoch=0, output_sequense=False, device="cpu"):
     output_seq, result_seq, fee_seq = np.zeros(dp.shape[0]+1), np.zeros(dp.shape[0]+1), np.zeros(dp.shape[0]+1)
-    loss = torch.zeros((1, 1), device=device)
     profit = torch.zeros((1, 1), device=device)
     output = torch.zeros((1, 1, 1), device=device)
     output_last = torch.zeros((1, 1, 1), device=device)
     pred_result = torch.zeros((1, 1, 1), device=device)
     for i in range(dp.shape[0]):
+        # print(f"t={i + 1:04}", end=" ")
         output = model(features[i:i+1])
-        
         fees = (output - output_last).abs() * p[i] * 0.001
         pred_result = dp[i] * output -  fees
+        # print(f"profit={pred_result.item():7.2f}")
         if output_sequense:
             output_seq[i+1] = output.item()
             result_seq[i+1] = pred_result.item()
@@ -196,14 +196,13 @@ def autoregress_sequense(model, p, dp, features, epoch=0, output_sequense=False,
         else:
             # print(f"{epoch + 1:03} {i + 1:04}: profit += {output.item():7.2f} * {dp[i]:7.2f} - {fees.item():7.3f} = {pred_result.item():7.2f}", end=" ")
             profit += pred_result.squeeze()
-            loss = profit# - hold[i+1]
             
-            # print(f"| loss: {loss.item():9.3f}")   
+            # print(f"| profit: {profit.item():9.3f}")   
         output_last = output         
     if output_sequense:
         return output_seq, result_seq, fee_seq
     else:
-        return -loss, output
+        return profit, output
     
        
 if __name__ == "__main__":
