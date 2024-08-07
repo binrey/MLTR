@@ -13,7 +13,8 @@ def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=Non
     fc = f.Close/f.Open[-1]
     fh = f.High/f.Open[-1]
     fl = f.Low/f.Open[-1]
-    fv = f.Volume[:-2]/f.Volume[-2] if f.Volume[-2] != 0 else np.ones_like(f.Volume[:-2])
+    fv = f.Volume[:-2] / \
+        f.Volume[-2] if f.Volume[-2] != 0 else np.ones_like(f.Volume[:-2])
 
     if dir > 0:
         x = np.vstack([fc, fo, fl, fh])
@@ -25,7 +26,7 @@ def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=Non
     # x = np.vstack([x, np.ones(x.shape[1])*trailing_stop_rate*1000])
     if open_date is not None:
         odate = pd.to_datetime(open_date)
-        odate = odate.year*10000 + odate.month*100 + odate.day       
+        odate = odate.year*10000 + odate.month*100 + odate.day
         x = np.vstack([x, np.ones(x.shape[1])*odate])
     if timeframe is not None:
         x = np.vstack([x, np.ones(x.shape[1])*timeframe])
@@ -33,14 +34,15 @@ def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=Non
 
 
 def sigmoid(x):
-  return 1 / (1 + np.exp(-x))
+    return 1 / (1 + np.exp(-x))
 
 
 def get_data(X, y, test_split=0.25, n1_split=0, n2_split=1, period2process=0):
     ids = np.arange(X.shape[0])
     # np.random.shuffle(ids)
-    
-    ids_test, periods_test, odates_testset, odates, periods = [], [], set(), X[:, 0, -2, 0], X[:, 0, -1, 0]
+
+    ids_test, periods_test, odates_testset, odates, periods = [
+    ], [], set(), X[:, 0, -2, 0], X[:, 0, -1, 0]
     odates_set = sorted(list(set(odates.astype(int))))
     dates_count = len(odates_set)
     test_size = int(dates_count*test_split)
@@ -62,23 +64,24 @@ def get_data(X, y, test_split=0.25, n1_split=0, n2_split=1, period2process=0):
     ids_train = [ix for ix in ids if ix not in ids_test]
     ids_test = ids_test[periods_test == period2process]
     periods_test = periods_test[periods_test == period2process]
-    np.random.shuffle(ids_train) 
-    np.random.shuffle(ids_test) 
-        
-    X_train, X_test, y_train, y_test, profs_train, profs_test = X[ids_train], X[ids_test], y[ids_train], y[ids_test], y[ids_train].copy(), y[ids_test].copy()
+    np.random.shuffle(ids_train)
+    np.random.shuffle(ids_test)
+
+    X_train, X_test, y_train, y_test, profs_train, profs_test = X[ids_train], X[
+        ids_test], y[ids_train], y[ids_test], y[ids_train].copy(), y[ids_test].copy()
     X_train = X_train[:, :, :-2, :].astype(np.uint8)
     X_test = X_test[:, :, :-2, :].astype(np.uint8)
-    
+
     # y_train = np.eye(3)[np.argmax(y_train, 1).reshape(-1)].astype(np.float32)
     # y_test = np.eye(3)[np.argmax(y_test, 1).reshape(-1)].astype(np.float32)
-    
+
     return X_train, X_test, y_train, y_test, profs_train, profs_test, periods_test, (str(odates_set[di0]), str(odates_set[di1]))
-    
+
 
 class DataParser():
     def __init__(self, cfg):
-        self.cfg = cfg     
-        
+        self.cfg = cfg
+
     def load(self):
         p = Path("data") / self.cfg.data_type / self.cfg.period
         flist = [f for f in p.glob("*") if self.cfg.ticker in f.stem]
@@ -89,28 +92,28 @@ class DataParser():
                     "yahoo": self.yahoo,
                     "bybit": self.bybit
                     }.get(self.cfg.data_type, None)(flist[0])
-        elif len(flist) ==  0:
+        elif len(flist) == 0:
             raise FileNotFoundError(f"No data for {self.cfg.ticker} in {p}")
         else:
-            raise FileNotFoundError(f"Too many data for {self.cfg.ticker} in {p}")
-            
-    
+            raise FileNotFoundError(f"Too many data for {
+                                    self.cfg.ticker} in {p}")
+
     def _trim_by_date(self, hist):
         # if self.cfg.date_start is not None:
         #     date_start = pd.to_datetime(self.cfg.date_start, utc=True)
         #     for i, d in enumerate(hist.Date):
         #         if d >= date_start:
         #             break
-        #     hist = hist.iloc[i:]   
-            
+        #     hist = hist.iloc[i:]
+
         # if self.cfg.date_end is not None:
         #     date_end = pd.to_datetime(self.cfg.date_end, utc=True)
         #     for i, d in enumerate(hist.Date):
         #         if d >= date_end:
         #             break
-        #     hist = hist.iloc[:i]   
-        return hist           
-        
+        #     hist = hist.iloc[:i]
+        return hist
+
     def bybit(self, data_file):
         pd.options.mode.chained_assignment = None
         hist = pd.read_csv(data_file, sep=",")
@@ -121,30 +124,31 @@ class DataParser():
         columns = list(hist.columns)
         hist.columns = columns
         hist["Id"] = list(range(hist.shape[0]))
-        hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
+        hist_dict = EasyDict({c: hist[c].values for c in hist.columns})
         # hist_dict["Date"] = hist["Date"].values
         hist.set_index("Date", inplace=True, drop=True)
-        return hist, hist_dict        
-        
+        return hist, hist_dict
+
     def metatrader(self, data_file):
         pd.options.mode.chained_assignment = None
         hist = pd.read_csv(data_file, sep="\t")
-        hist.columns = map(lambda x:x[1:-1], hist.columns)
+        hist.columns = map(lambda x: x[1:-1], hist.columns)
         hist.columns = map(str.capitalize, hist.columns)
         if "Time" not in hist.columns:
             hist["Time"] = ["00:00:00"]*hist.shape[0]
-        hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(hist.Date.values, hist.Time.values)], utc=True)
+        hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(
+            hist.Date.values, hist.Time.values)], utc=True)
         hist = self._trim_by_date(hist)
         hist.drop("Time", axis=1, inplace=True)
         columns = list(hist.columns)
         columns[-2] = "Volume"
         hist.columns = columns
         hist["Id"] = list(range(hist.shape[0]))
-        hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
+        hist_dict = EasyDict({c: hist[c].values for c in hist.columns})
         # hist_dict["Date"] = hist["Date"].values
         hist.set_index("Date", inplace=True, drop=True)
         return hist, hist_dict
-    
+
     def bitfinex(self, data_file):
         hist = pd.read_csv(data_file, header=1)
         hist = hist[::-1]
@@ -155,18 +159,18 @@ class DataParser():
         hist.drop(["unix", "symbol", "date"], axis=1, inplace=True)
         hist.columns = map(str.capitalize, hist.columns)
         hist["Volume"] = hist.iloc[:, -3]
-        hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
+        hist_dict = EasyDict({c: hist[c].values for c in hist.columns})
         return hist, hist_dict
-    
+
     def yahoo(self, data_file):
         hist = pd.read_csv(data_file)
         hist["Date"] = pd.to_datetime(hist.Date, utc=True)
         hist = self._trim_by_date(hist)
         hist["Id"] = list(range(hist.shape[0]))
-        hist_dict = EasyDict({c:hist[c].values for c in hist.columns})
+        hist_dict = EasyDict({c: hist[c].values for c in hist.columns})
         hist.set_index("Date", inplace=True, drop=True)
         return hist, hist_dict
-        
+
 
 def collect_train_data(dir, fsize=64, glob="*.pickle"):
     cfgs, btests = [], []
@@ -176,7 +180,7 @@ def collect_train_data(dir, fsize=64, glob="*.pickle"):
         btests.append(btest)
     print(len(btests))
 
-    tfdict = {"M5":0, "M15":1, "H1":2}
+    tfdict = {"M5": 0, "M15": 1, "H1": 2}
     X, y = [], []
     for btest in tqdm(btests, "Load pickles"):
         # print(btest.cfg.ticker, end=" ")
@@ -185,19 +189,20 @@ def collect_train_data(dir, fsize=64, glob="*.pickle"):
         # print(len(btest.positions))
         for pos in btest.positions:
             f, _ = mw(pos.open_indx)
-            x = build_features(f, 
-                            pos.dir, 
-                            btest.cfg.stops_processor.func.cfg.sl, 
-                            btest.cfg.trailing_stop_rate,
-                            pos.open_date, 
-                            tfdict[btest.cfg.period])
+            x = build_features(f,
+                               pos.dir,
+                               btest.cfg.stops_processor.func.cfg.sl,
+                               btest.cfg.trailing_stop_rate,
+                               pos.open_date,
+                               tfdict[btest.cfg.period])
             X.append([x])
             y.append(pos.profit)
-            
+
     X, y = np.array(X), np.array(y, dtype=np.float32)
     print(X.shape, y.shape)
     print(f"{X[0, 0, -2, 0]:8.0f} -> {X[-1, 0, -2, 0]:8.0f}")
     return X, y
+
 
 def collect_train_data2(dir, fsize=64, nparams=4):
     cfgs, btests = [], []
@@ -207,7 +212,7 @@ def collect_train_data2(dir, fsize=64, nparams=4):
         btests.append(btest)
     print(len(btests))
 
-    tfdict = {"M5":0, "M15":1, "H1":2}
+    tfdict = {"M5": 0, "M15": 1, "H1": 2}
     X, y = [], []
     posdict = {}
     for btest in tqdm(btests, "Load pickles"):
@@ -220,8 +225,8 @@ def collect_train_data2(dir, fsize=64, nparams=4):
                 posdict[k]["dir"].append(dir)
                 posdict[k]["id"].append(pos_id)
             else:
-                posdict[k] = {"sl":[sl], "prof":[profit], "dir":[dir], "id":[pos_id]}
-    
+                posdict[k] = {"sl": [sl], "prof": [
+                    profit], "dir": [dir], "id": [pos_id]}
 
     btest = btests[0]
     hist_pd, hist = DataParser(btest.cfg).load()
@@ -229,15 +234,15 @@ def collect_train_data2(dir, fsize=64, nparams=4):
     for open_date, pos in posdict.items():
         if len(set(pos["sl"])) == nparams and len(set(pos["dir"])) == 1:
             f, _ = mw(pos["id"][0])
-            x = build_features(f, 
-                            pos["dir"][0],
-                            0, 
-                            btest.cfg.trailing_stop_rate,
-                            open_date, 
-                            tfdict[btest.cfg.period])
+            x = build_features(f,
+                               pos["dir"][0],
+                               0,
+                               btest.cfg.trailing_stop_rate,
+                               open_date,
+                               tfdict[btest.cfg.period])
             X.append([x])
             y.append(pos["prof"])
-    
+
     X, y = np.array(X), np.array(y, dtype=np.float32)
     print(X.shape, y.shape)
     print(f"{X[0, 0, -2, 0]:8.0f} -> {X[-1, 0, -2, 0]:8.0f}")
@@ -247,7 +252,10 @@ def collect_train_data2(dir, fsize=64, nparams=4):
 class MovingWindow():
     def __init__(self, hist, cfg):
         self.hist = hist
+        self.date_start = pd.to_datetime(cfg["date_start"])
+        self.date_end = pd.to_datetime(cfg["date_end"])
         self.size = cfg["hist_buffer_size"]
+
         self.data = EasyDict(Date=np.empty(self.size, dtype=np.datetime64),
                              Id=np.zeros(self.size, dtype=np.int64),
                              Open=np.zeros(self.size, dtype=np.float32),
@@ -256,25 +264,29 @@ class MovingWindow():
                              Low=np.zeros(self.size, dtype=np.float32),
                              Volume=np.zeros(self.size, dtype=np.int64)
                              )
-        
-        date_start = np.datetime64(cfg["date_start"])
-        self.id2start = self.find_nearest_date_indx(hist.Date, date_start)
+
+        self.id2start = self.find_nearest_date_indx(
+            hist.Date, np.datetime64(self.date_start))
         if self.id2start == hist.Id[-1]:
-            logger.error(f"Date start {pd.to_datetime(date_start)} is equal or higher than latest range date {pd.to_datetime(hist.Date[-1])}")
-            return
-        
-        if self.id2start < cfg.hist_buffer_size:
-            logger.warning(f"Not enough history, shift start id from {self.id2start} to {cfg.hist_buffer_size}")
-            self.id2start = cfg.hist_buffer_size
-            logger.warning(f"Switch to {pd.to_datetime(hist.Date[self.id2start])}")
-            
-        self.id2end = hist.Id.shape[0]
-    
+            logger.error(f"Date start {self.date_start} is equal or higher than latest range date {
+                         pd.to_datetime(hist.Date[-1])}")
+            raise ValueError()
+
+        if self.id2start < self.size:
+            logger.warning(f"Not enough history, shift start id from {
+                           self.id2start} to {self.size}")
+            self.id2start = self.size
+            logger.warning(
+                f"Switch to {pd.to_datetime(hist.Date[self.id2start])}")
+
+        self.id2end = self.find_nearest_date_indx(
+            hist.Date, np.datetime64(self.date_end))
+
     @staticmethod
     def find_nearest_date_indx(array, target):
         idx = (np.abs(array - target)).argmin()
         return idx
-        
+
     def __getitem__(self, t):
         t0 = perf_counter()
         self.data.Date = self.hist.Date[t-self.size+1:t+1]
@@ -287,13 +299,15 @@ class MovingWindow():
         self.data.Low[:-1] = self.hist.Low[t-self.size+1:t]
         self.data.Low[-1] = self.data.Open[-1]
         self.data.Volume[:-1] = self.hist.Volume[t-self.size+1:t]
-        self.data.Volume[-1] = 0      
+        self.data.Volume[-1] = 0
         return self.data, perf_counter() - t0
-    
+
     def __call__(self, output_time=True):
-        for t in range(self.id2start, self.id2end): 
+        logger.info(f"Start generate data from {self.date_start}{
+                    self.id2start} to {self.date_end}{self.id2end}")
+        for t in range(self.id2start, self.id2end):
             yield self[t] if output_time else self[t][0]
-    
+
 
 if __name__ == "__main__":
     from dataloading import collect_train_data

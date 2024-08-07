@@ -2,8 +2,8 @@ from configs.library import *
 
 
 classifier = body_classifiers.zigzag
-classifier.params.feature_size = Param(10, [3, 5, 8, 12])
-classifier.params.period = Param(8, [3, 5, 8])
+classifier.params.feature_size = Param(16, [3, 5, 8, 12])
+classifier.params.period = Param(16, [3, 5, 8])
 
 # stops_processor = stops_processors.stops_fixed
 # stops_processor.params.sl = Param(2, [2, 3, 4])
@@ -16,7 +16,7 @@ stops_processor = stops_processors.stops_dynamic
 config = EasyDict(
     wallet=Param(100, [100]),
     leverage=Param(1, [1]),
-    date_start=Param("2017-09-01T00:00:00", ["2017-09-01"]),
+    date_start=Param("2000-01-01T00:00:00", ["2017-09-01"]),
     date_end=Param("2024-08-01T00:00:00", ["2025-01-01"]),
     no_trading_days=Param(set(), [set()]),
     trailing_stop_rate=Param(0.003, [0.002, 0.004, 0.006]),
@@ -28,12 +28,12 @@ config = EasyDict(
     hist_buffer_size=Param(128, [128]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
-    
+
     period=Param("M60", ["M60"]),
-    ticker=Param("BTCUSDT", ["BTCUSDT", "ETHUSDT"]),
+    ticker=Param("SBER", ["BTCUSDT", "ETHUSDT"]),
     ticksize=Param(0.001, [0.001]),
-    data_type=Param("bybit", ["bybit"]),
-    
+    data_type=Param("metatrader", ["bybit"]),
+
     save_plots=Param(False, [False]),
     run_model_device=Param(None, [None]),
     fee_rate=Param(0.1, [0.1]),

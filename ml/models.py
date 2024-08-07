@@ -28,7 +28,7 @@ class Net(nn.Module):
     def __init__(self, nf, nl, threshold=0):
         super().__init__()
         self.nf = nf
-        self.nl = {8:1, 16:2, 32:3, 64:4, 128:5}.get(nl)
+        self.nl = {8: 1, 16: 2, 32: 3, 64: 4, 128: 5}.get(nl)
         self.set_threshold(threshold)
         self.f = nn.Sequential()
         n = (1, 4)
@@ -53,19 +53,21 @@ class Net(nn.Module):
         # x = x + p
         # x = self.softmax(self.fc(x))
         return x
-    
+
     def set_threshold(self, threshold):
-        self.threshold = nn.Parameter(torch.FloatTensor([threshold]), requires_grad=False)
-    
+        self.threshold = nn.Parameter(
+            torch.FloatTensor([threshold]), requires_grad=False)
+
     def forward_thresholded(self, x):
         return (self.forward(x).squeeze() > self.threshold).cpu().numpy()
-    
+
+
 class Net2(nn.Module):
     def __init__(self, nf, nl, threshold=0):
         super().__init__()
         self.nf = nf
         self.nl = nl
-        nl = {8:1, 16:2, 32:3, 64:4, 128:5}.get(nl)
+        nl = {8: 1, 16: 2, 32: 3, 64: 4, 128: 5}.get(nl)
         self.set_threshold(threshold)
         self.f = nn.Sequential()
         n = (4, 4)
@@ -86,32 +88,36 @@ class Net2(nn.Module):
         ma8 = nn.AvgPool2d((1, 8), (1, 1))(x)
         ma16 = nn.AvgPool2d((1, 16), (1, 1))(x)
         ma32 = nn.AvgPool2d((1, 32), (1, 1))(x)
-        x = torch.concat((x[:, :, :, -self.nl:], ma8[:, :, :, -self.nl:], ma16[:, :, :, -self.nl:], ma32[:, :, :, -self.nl:]), dim=1)
-        #x = x[:, :, :, :self.nl]
+        x = torch.concat((x[:, :, :, -self.nl:], ma8[:, :, :, -self.nl:],
+                         ma16[:, :, :, -self.nl:], ma32[:, :, :, -self.nl:]), dim=1)
+        # x = x[:, :, :, :self.nl]
         x = self.f(x)
         x = self.dropout(x)
         x = self.conv_valid(x)
         x = torch.flatten(x, 1)
         x = self.softmax(x)
         return x
-    
+
     def set_threshold(self, threshold):
-        self.threshold = nn.Parameter(torch.FloatTensor([threshold]), requires_grad=False)
-    
+        self.threshold = nn.Parameter(
+            torch.FloatTensor([threshold]), requires_grad=False)
+
     def forward_thresholded(self, x):
         return (self.forward(x).squeeze() > self.threshold).cpu().numpy()
-    
+
+
 def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=True, device="cuda"):
-    trainloader = torch.utils.data.DataLoader(CustomImageDataset(X_train, y_train), 
-                                              batch_size=batch_size, 
+    trainloader = torch.utils.data.DataLoader(CustomImageDataset(X_train, y_train),
+                                              batch_size=batch_size,
                                               shuffle=True
                                               )
-    
-    model = Net2(X_train.shape[2], 32).to(device).float() #32-3, 16-2, 8-1
+
+    model = Net2(X_train.shape[2], 32).to(device).float()  # 32-3, 16-2, 8-1
     if calc_test:
         y_test_tensor = torch.tensor(y_test).float().to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    criterion = nn.CrossEntropyLoss(weight=10000/torch.tensor(y_train).float().to(device).sum(0))
+    criterion = nn.CrossEntropyLoss(
+        weight=10000/torch.tensor(y_train).float().to(device).sum(0))
     loss_hist = np.zeros((epochs, 2))
     for epoch in range(epochs):  # loop over the dataset multiple times
         running_loss = 0
@@ -133,24 +139,28 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
             # print statistics
             running_loss += loss.item()
             # running_roc_train += roc_train
-        
+
         loss_test = 0
         if calc_test:
             assert X_test.shape[0] > 0, "No test data"
             test_out = model(X_test)
-            roc_test = roc_auc_score(y_test[:, 0], test_out[:, 0].cpu().detach().numpy())
-            loss_test = criterion(y_test_tensor, test_out).detach().cpu().numpy()
-            print(f"{epoch + 1:03d} loss train: {running_loss/(i+1):.4f} | test: {loss_test:.4f}   ROC train: {running_roc_train/(i+1):.4f} | test: {roc_test:.4f}")
+            roc_test = roc_auc_score(
+                y_test[:, 0], test_out[:, 0].cpu().detach().numpy())
+            loss_test = criterion(
+                y_test_tensor, test_out).detach().cpu().numpy()
+            print(f"{epoch + 1:03d} loss train: {running_loss/(i+1):.4f} | test: {
+                  loss_test:.4f}   ROC train: {running_roc_train/(i+1):.4f} | test: {roc_test:.4f}")
             loss_hist[epoch] = np.array([running_loss/(i+1), loss_test/3])
         running_loss = 0.0
         # if loss_hist[epoch, 0] <= loss_hist[epoch, 1]:
-        #     break  
+        #     break
     return model, loss_hist[:epoch+1]
-    
+
+
 class E2EModel(nn.Module):
     def __init__(self, inp_shape, nh):
         self.nh = nh
-        self.inp_shape = inp_shape      
+        self.inp_shape = inp_shape
         super(E2EModel, self).__init__()
 
         self.fc_features_in = nn.Linear(self.inp_shape[1], nh)
@@ -159,29 +169,30 @@ class E2EModel(nn.Module):
 
         self.norm_hid = nn.InstanceNorm1d((nh, nh))
         self.norm_in = nn.LayerNorm(self.inp_shape)
-        self.norm_out = nn.InstanceNorm1d(1)        
+        self.norm_out = nn.InstanceNorm1d(1)
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
-    
+
     def forward(self, x):
         features = self.norm_in(x)
         features = self.fc_features_in(features)
         features = self.relu(self.norm_hid(features))
-        features = self.fc_hid(features)
-        features = self.relu(self.norm_hid(features))
+        # features = self.fc_hid(features)
+        # features = self.relu(self.norm_hid(features))
         features = self.fc_out(features)
-        
+
         output = self.tanh(features)
         return output
-    
-    
-def autoregress_sequense(model, p, features, epoch=0, output_sequense=False, device="cpu"):
+
+
+def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"):
     if type(p) is np.ndarray:
         p = torch.from_numpy(p).to(device)
     if type(features) is np.ndarray:
         features = torch.from_numpy(features).to(device)
     dp = p[1:] - p[:-1]
-    output_seq, result_seq, fee_seq = np.zeros(dp.shape[0]+1), np.zeros(dp.shape[0]+1), np.zeros(dp.shape[0]+1)
+    output_seq, result_seq, fee_seq = np.zeros(
+        dp.shape[0]+1), np.zeros(dp.shape[0]+1), np.zeros(dp.shape[0]+1)
     profit = torch.zeros((1, 1), device=device)
     output = torch.zeros((1, 1, 1), device=device)
     output_last = torch.zeros((1, 1, 1), device=device)
@@ -190,7 +201,7 @@ def autoregress_sequense(model, p, features, epoch=0, output_sequense=False, dev
         # print(f"t={i + 1:04}", end=" ")
         output = model(features[i:i+1])
         fees = (output - output_last).abs() * p[i] * 0.001
-        pred_result = dp[i] * output -  fees
+        pred_result = dp[i] * output - fees
         # print(f"profit={pred_result.item():7.2f}")
         if output_sequense:
             output_seq[i+1] = output.item()
@@ -199,15 +210,15 @@ def autoregress_sequense(model, p, features, epoch=0, output_sequense=False, dev
         else:
             # print(f"{epoch + 1:03} {i + 1:04}: profit += {output.item():7.2f} * {dp[i]:7.2f} - {fees.item():7.3f} = {pred_result.item():7.2f}", end=" ")
             profit += pred_result.squeeze()
-            
-            # print(f"| profit: {profit.item():9.3f}")   
-        output_last = output         
+
+            # print(f"| profit: {profit.item():9.3f}")
+        output_last = output
     if output_sequense:
         return output_seq, result_seq, fee_seq
     else:
         return profit, output
-    
-       
+
+
 if __name__ == "__main__":
     import numpy as np
     torch.manual_seed(0)
