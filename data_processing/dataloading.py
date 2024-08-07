@@ -245,19 +245,37 @@ def collect_train_data2(dir, fsize=64, nparams=4):
 
 
 class MovingWindow():
-    def __init__(self, hist, size):
+    def __init__(self, hist, cfg):
         self.hist = hist
-        self.size = size
-        self.data = EasyDict(Date=np.empty(size, dtype=np.datetime64),
-                             Id=np.zeros(size, dtype=np.int64),
-                             Open=np.zeros(size, dtype=np.float32),
-                             Close=np.zeros(size, dtype=np.float32),
-                             High=np.zeros(size, dtype=np.float32),
-                             Low=np.zeros(size, dtype=np.float32),
-                             Volume=np.zeros(size, dtype=np.int64)
+        self.size = cfg["hist_buffer_size"]
+        self.data = EasyDict(Date=np.empty(self.size, dtype=np.datetime64),
+                             Id=np.zeros(self.size, dtype=np.int64),
+                             Open=np.zeros(self.size, dtype=np.float32),
+                             Close=np.zeros(self.size, dtype=np.float32),
+                             High=np.zeros(self.size, dtype=np.float32),
+                             Low=np.zeros(self.size, dtype=np.float32),
+                             Volume=np.zeros(self.size, dtype=np.int64)
                              )
         
-    def __call__(self, t):
+        date_start = np.datetime64(cfg["date_start"])
+        self.id2start = self.find_nearest_date_indx(hist.Date, date_start)
+        if self.id2start == hist.Id[-1]:
+            logger.error(f"Date start {pd.to_datetime(date_start)} is equal or higher than latest range date {pd.to_datetime(hist.Date[-1])}")
+            return
+        
+        if self.id2start < cfg.hist_buffer_size:
+            logger.warning(f"Not enough history, shift start id from {self.id2start} to {cfg.hist_buffer_size}")
+            self.id2start = cfg.hist_buffer_size
+            logger.warning(f"Switch to {pd.to_datetime(hist.Date[self.id2start])}")
+            
+        self.id2end = hist.Id.shape[0]
+    
+    @staticmethod
+    def find_nearest_date_indx(array, target):
+        idx = (np.abs(array - target)).argmin()
+        return idx
+        
+    def __getitem__(self, t):
         t0 = perf_counter()
         self.data.Date = self.hist.Date[t-self.size+1:t+1]
         self.data.Id[:] = self.hist.Id[t-self.size+1:t+1]
@@ -271,6 +289,10 @@ class MovingWindow():
         self.data.Volume[:-1] = self.hist.Volume[t-self.size+1:t]
         self.data.Volume[-1] = 0      
         return self.data, perf_counter() - t0
+    
+    def __call__(self, output_time=True):
+        for t in range(self.id2start, self.id2end): 
+            yield self[t] if output_time else self[t][0]
     
 
 if __name__ == "__main__":

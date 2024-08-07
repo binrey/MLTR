@@ -17,7 +17,7 @@ config = EasyDict(
     wallet=Param(100, [100]),
     leverage=Param(1, [1]),
     date_start=Param("2017-09-01T00:00:00", ["2017-09-01"]),
-    date_end=Param("2024-08-01", ["2025-01-01"]),
+    date_end=Param("2024-08-01T00:00:00", ["2025-01-01"]),
     no_trading_days=Param(set(), [set()]),
     trailing_stop_rate=Param(0.003, [0.002, 0.004, 0.006]),
     trailing_stop_type=Param(1, [1]),
@@ -38,5 +38,5 @@ config = EasyDict(
     run_model_device=Param(None, [None]),
     fee_rate=Param(0.1, [0.1]),
     eval_buyhold=Param(True, [False]),
-    fuse_buyhold=Param(True, [False]),
+    fuse_buyhold=Param(False, [False]),
 )

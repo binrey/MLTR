@@ -170,11 +170,6 @@ def find_available_date(hist: pd.DataFrame, date_start: pd.Timestamp):
     return date_test
 
 
-def find_nearest_date_indx(array, target):
-    idx = (np.abs(array - target)).argmin()
-    return idx
-
-
 def backtest(cfg, loglevel = "INFO"):
     logger.remove()
     logger.add(sys.stderr, level=loglevel)
@@ -182,7 +177,7 @@ def backtest(cfg, loglevel = "INFO"):
     exp = BacktestExpert(cfg)
     broker = Broker(cfg)
     hist_pd, hist = DataParser(cfg).load()
-    mw = MovingWindow(hist, cfg.hist_buffer_size)
+    mw = MovingWindow(hist, cfg)
 
     if cfg.save_plots:
         # save_path = Path("backtests") / f"{cfg.body_classifier.func.name}-{cfg.ticker}-{cfg.period}"
@@ -191,24 +186,13 @@ def backtest(cfg, loglevel = "INFO"):
             rmtree(save_path)
         save_path.mkdir()
         
-    date_start = np.datetime64(cfg.date_start)
-    id2start = find_nearest_date_indx(hist.Date, date_start)
-    if id2start == hist.Id[-1]:
-        logger.error(f"Date start {pd.to_datetime(date_start)} is equal or higher than latest range date {pd.to_datetime(hist.Date[-1])}")
-        return
-    
-    if id2start < cfg.hist_buffer_size:
-        logger.warning(f"Not enough history, shift start id from {id2start} to {cfg.hist_buffer_size}")
-        id2start = cfg.hist_buffer_size
-        logger.warning(f"Switch to {pd.to_datetime(hist.Date[id2start])}")
-        
-    id2end = cfg.tend if cfg.tend is not None else hist.Id.shape[0]
     t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0
     
-    for t in tqdm(range(id2start, id2end), 
-                  desc=f"back test {cfg.body_classifier.func.name}",
-                  disable=loglevel == "ERROR"):
-        h, dt = mw(t)
+    # for t in tqdm(range(id2start, id2end), 
+    #               desc=f"back test {cfg.body_classifier.func.name}",
+    #               disable=loglevel == "ERROR"):
+    for (h, dt) in mw():
+        t = h.Id[-1]
         tdata += dt
         texp += exp.update(h, broker.active_position)            
         
@@ -258,8 +242,8 @@ def backtest(cfg, loglevel = "INFO"):
     backtest_results = BackTestResults(cfg.date_start, cfg.date_end)
     tpost = backtest_results.process_backtest(broker)
     if cfg.eval_buyhold:
-        tbandh = backtest_results.compute_buy_and_hold(hist.Date[id2start: id2end],
-                                                       hist.Close[id2start: id2end], 
+        tbandh = backtest_results.compute_buy_and_hold(hist.Date[mw.id2start: mw.id2end],
+                                                       hist.Close[mw.id2start: mw.id2end], 
                                                        fuse=cfg.fuse_buyhold)
     ttotal = perf_counter() - t0
     

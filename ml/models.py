@@ -150,23 +150,21 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
 class E2EModel(nn.Module):
     def __init__(self, inp_shape, nh):
         self.nh = nh
-        inp_shape = inp_shape      
+        self.inp_shape = inp_shape      
         super(E2EModel, self).__init__()
 
-        self.fc_features_in = nn.Linear(inp_shape[1], nh)
+        self.fc_features_in = nn.Linear(self.inp_shape[1], nh)
         self.fc_hid = nn.Linear(nh, nh)
         self.fc_out = nn.Linear(nh, 1)
 
         self.norm_hid = nn.InstanceNorm1d((nh, nh))
-        self.norm_in = nn.LayerNorm(inp_shape)
+        self.norm_in = nn.LayerNorm(self.inp_shape)
         self.norm_out = nn.InstanceNorm1d(1)        
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
     
     def forward(self, x):
-        
         features = self.norm_in(x)
-
         features = self.fc_features_in(features)
         features = self.relu(self.norm_hid(features))
         features = self.fc_hid(features)
@@ -177,7 +175,12 @@ class E2EModel(nn.Module):
         return output
     
     
-def autoregress_sequense(model, p, dp, features, epoch=0, output_sequense=False, device="cpu"):
+def autoregress_sequense(model, p, features, epoch=0, output_sequense=False, device="cpu"):
+    if type(p) is np.ndarray:
+        p = torch.from_numpy(p).to(device)
+    if type(features) is np.ndarray:
+        features = torch.from_numpy(features).to(device)
+    dp = p[1:] - p[:-1]
     output_seq, result_seq, fee_seq = np.zeros(dp.shape[0]+1), np.zeros(dp.shape[0]+1), np.zeros(dp.shape[0]+1)
     profit = torch.zeros((1, 1), device=device)
     output = torch.zeros((1, 1, 1), device=device)

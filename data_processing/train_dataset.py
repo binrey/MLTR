@@ -11,24 +11,15 @@ from tqdm import tqdm
 
 
 
-
-def next_price_prediction(cfg):
-    data_pd, data_np = DataParser(cfg).load()
-    wsize = cfg.hist_buffer_size
-    classifier = cfg.body_classifier.func
-    fsize = classifier.cfg.feature_size
-    
-    mw = MovingWindow(data_np, wsize)
+def next_price_prediction(mw: MovingWindow, classifier, hist_buffer_size, max_size=100):
     last_type = 0
     p, features = [], []
-    for t in range(wsize-1, data_np.Close.shape[0]):
-    # for t in range(3000, data_np.Close.shape[0]): # best - 1500
-        hist_window = mw(t)[0]
+    for hist_window in mw(output_time=False):
         if classifier.check_status(hist_window):
             p.append(hist_window.Open[-1])
             features.append(classifier.getfeatures())
-            # if len(p) >= 2000:
-            #     break
+            if len(p) >= max_size - 1:
+                break
   
     features = np.array(features).astype(np.float32)
     p = np.array(p).astype(np.float32)
