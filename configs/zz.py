@@ -30,9 +30,9 @@ config = EasyDict(
     tend=Param(None, [None]),
 
     period=Param("M60", ["M60"]),
-    ticker=Param("SBER", ["BTCUSDT", "ETHUSDT"]),
+    ticker=Param("BTCUSDT", ["BTCUSDT", "ETHUSDT"]),
     ticksize=Param(0.001, [0.001]),
-    data_type=Param("metatrader", ["bybit"]),
+    data_type=Param("bybit", ["bybit"]),
 
     save_plots=Param(False, [False]),
     run_model_device=Param(None, [None]),

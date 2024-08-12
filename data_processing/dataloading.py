@@ -82,8 +82,8 @@ class DataParser():
     def __init__(self, cfg):
         self.cfg = cfg
 
-    def load(self):
-        p = Path("data") / self.cfg.data_type / self.cfg.period
+    def load(self, database="data"):
+        p = Path(database) / self.cfg.data_type / self.cfg.period
         flist = [f for f in p.glob("*") if self.cfg.ticker in f.stem]
         if len(flist) == 1:
             return {"metatrader": self.metatrader,
@@ -95,8 +95,7 @@ class DataParser():
         elif len(flist) == 0:
             raise FileNotFoundError(f"No data for {self.cfg.ticker} in {p}")
         else:
-            raise FileNotFoundError(f"Too many data for {
-                                    self.cfg.ticker} in {p}")
+            raise FileNotFoundError(f"Too many data for {self.cfg.ticker} in {p}")
 
     def _trim_by_date(self, hist):
         # if self.cfg.date_start is not None:
@@ -268,13 +267,11 @@ class MovingWindow():
         self.id2start = self.find_nearest_date_indx(
             hist.Date, np.datetime64(self.date_start))
         if self.id2start == hist.Id[-1]:
-            logger.error(f"Date start {self.date_start} is equal or higher than latest range date {
-                         pd.to_datetime(hist.Date[-1])}")
+            logger.error(f"Date start {self.date_start} is equal or higher than latest range date {pd.to_datetime(hist.Date[-1])}")
             raise ValueError()
 
         if self.id2start < self.size:
-            logger.warning(f"Not enough history, shift start id from {
-                           self.id2start} to {self.size}")
+            logger.warning(f"Not enough history, shift start id from {self.id2start} to {self.size}")
             self.id2start = self.size
             logger.warning(
                 f"Switch to {pd.to_datetime(hist.Date[self.id2start])}")
@@ -303,8 +300,7 @@ class MovingWindow():
         return self.data, perf_counter() - t0
 
     def __call__(self, output_time=True):
-        logger.info(f"Start generate data from {self.date_start}{
-                    self.id2start} to {self.date_end}{self.id2end}")
+        logger.info(f"Start generate data from {self.date_start}{self.id2start} to {self.date_end}{self.id2end}")
         for t in range(self.id2start, self.id2end):
             yield self[t] if output_time else self[t][0]
 

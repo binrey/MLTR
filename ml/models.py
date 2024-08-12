@@ -148,8 +148,7 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
                 y_test[:, 0], test_out[:, 0].cpu().detach().numpy())
             loss_test = criterion(
                 y_test_tensor, test_out).detach().cpu().numpy()
-            print(f"{epoch + 1:03d} loss train: {running_loss/(i+1):.4f} | test: {
-                  loss_test:.4f}   ROC train: {running_roc_train/(i+1):.4f} | test: {roc_test:.4f}")
+            print(f"{epoch + 1:03d} loss train: {running_loss/(i+1):.4f} | test: {loss_test:.4f}   ROC train: {running_roc_train/(i+1):.4f} | test: {roc_test:.4f}")
             loss_hist[epoch] = np.array([running_loss/(i+1), loss_test/3])
         running_loss = 0.0
         # if loss_hist[epoch, 0] <= loss_hist[epoch, 1]:
@@ -161,6 +160,7 @@ class E2EModel(nn.Module):
     def __init__(self, inp_shape, nh):
         self.nh = nh
         self.inp_shape = inp_shape
+        self.train_info = {}
         super(E2EModel, self).__init__()
 
         self.fc_features_in = nn.Linear(self.inp_shape[1], nh)
@@ -172,13 +172,15 @@ class E2EModel(nn.Module):
         self.norm_out = nn.InstanceNorm1d(1)
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
+        self.dropout = nn.Dropout(0.5)
 
     def forward(self, x):
         features = self.norm_in(x)
         features = self.fc_features_in(features)
         features = self.relu(self.norm_hid(features))
-        # features = self.fc_hid(features)
-        # features = self.relu(self.norm_hid(features))
+        features = self.fc_hid(features)
+        features = self.relu(self.norm_hid(features))
+        features = self.dropout(features)
         features = self.fc_out(features)
 
         output = self.tanh(features)
@@ -216,7 +218,7 @@ def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"
     if output_sequense:
         return output_seq, result_seq, fee_seq
     else:
-        return profit, output
+        return profit
 
 
 if __name__ == "__main__":
