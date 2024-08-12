@@ -20,7 +20,7 @@ class E2ETrain:
     def init_model(self):
         inp_shape = (1, self.features.shape[1])
         self.model = E2EModel(inp_shape, 16)
-        logger.debug("\n" + str(summary(self.model, inp_shape, device="cpu")))
+        logger.debug("\n" + str(summary(self.model, [inp_shape, (1, self.model.nh)], device="cpu")))
 
     def load_data(self, max_size=np.Inf):
         mw = MovingWindow(DataParser(self.cfg).load()[1], self.cfg)

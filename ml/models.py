@@ -173,16 +173,16 @@ class E2EModel(nn.Module):
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
 
-    def forward(self, x):
+    def forward(self, x, h_last):
         features = self.norm_in(x)
         features = self.fc_features_in(features)
         features = self.relu(self.norm_hid(features))
-        # features = self.fc_hid(features)
-        # features = self.relu(self.norm_hid(features))
-        features = self.fc_out(features)
+        features = self.fc_hid(features)
+        h = self.relu(self.norm_hid(features))
+        features = self.fc_out(h+h_last)
 
         output = self.tanh(features)
-        return output
+        return output, h
 
 
 def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"):
@@ -196,13 +196,14 @@ def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"
     profit = torch.zeros((1, 1), device=device)
     output = torch.zeros((1, 1, 1), device=device)
     output_last = torch.zeros((1, 1, 1), device=device)
+    h_last = torch.zeros((1, 1, model.nh), device=device)
     pred_result = torch.zeros((1, 1, 1), device=device)
     for i in range(dp.shape[0]):
         # print(f"t={i + 1:04}", end=" ")
-        output = model(features[i:i+1])
+        output, h_last = model(features[i:i+1], h_last)
         fees = (output - output_last).abs() * p[i] * 0.001
         pred_result = dp[i] * output - fees
-        # print(f"profit={pred_result.item():7.2f}")
+        output_last = output
         if output_sequense:
             output_seq[i+1] = output.item()
             result_seq[i+1] = pred_result.item()
@@ -212,7 +213,6 @@ def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"
             profit += pred_result.squeeze()
 
             # print(f"| profit: {profit.item():9.3f}")
-        output_last = output
     if output_sequense:
         return output_seq, result_seq, fee_seq
     else:
@@ -222,12 +222,15 @@ def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"
 if __name__ == "__main__":
     import numpy as np
     torch.manual_seed(0)
-    device = torch.device("mps")
+    device = torch.device("cpu")
     model = E2EModel((1, 4), 32)
     model.to(device)
     # model.eval()
-    print(model(torch.randn(2, 1, 4).to(device)).shape)
-    print(summary(model, (1, 4), device="cpu"))
+    f = torch.randn(2, 1, 4).to(device)
+    h = torch.randn(2, 1, model.nh).to(device)
+    out, h = model(f, h)
+    print(out.shape, h.shape)
+    print(summary(model, [(1, 4), (1, model.nh)], device="cpu"))
     # model.to(device)
     # x = torch.tensor(np.zeros((1, 1, 6, 64))).float().to(device)
     # with torch.no_grad():
