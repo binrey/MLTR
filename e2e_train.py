@@ -1,16 +1,16 @@
-import torch
-import numpy as np
 import matplotlib.pyplot as plt
-from utils import PyConfig
-from data_processing.train_dataset import next_price_prediction
-from data_processing.dataloading import MovingWindow, DataParser
-from tqdm import tqdm
-from ml.models import autoregress_sequense, batch_sequense
-from ml.models import E2EModel
-from torchinfo import summary
-from torch.utils.tensorboard import SummaryWriter
-from torch.optim.lr_scheduler import ExponentialLR
+import numpy as np
+import torch
 from loguru import logger
+from torch.optim.lr_scheduler import ExponentialLR
+from torch.utils.tensorboard import SummaryWriter
+from torchinfo import summary
+from tqdm import tqdm
+
+from data_processing.dataloading import DataParser, MovingWindow
+from data_processing.train_dataset import next_price_prediction
+from ml.models import E2EModel, autoregress_sequense, batch_sequense
+from utils import PyConfig
 
 
 class E2ETrain:

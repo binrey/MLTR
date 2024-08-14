@@ -173,7 +173,7 @@ class E2EModel(nn.Module):
         self.norm_out = nn.LayerNorm(1)
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
-        self.dropout = nn.Dropout(0.15)
+        self.dropout = nn.Dropout(0.25)
 
     def forward(self, x):
         features = self.norm_in(x)
@@ -182,14 +182,15 @@ class E2EModel(nn.Module):
         
         features = self.fc_hid(features)
         features = self.relu(self.norm_hid(features))
-        # features = self.dropout(features)        
+        features = self.dropout(features)      
+          
         # out_prev = self.fc_out_prev_in(out_prev)
         # out_prev = self.relu(self.norm_hid(out_prev))
         # features = self.fc_hid(features + out_prev)
         
         features = self.fc_hid(features)
         features = self.relu(self.norm_hid(features))
-        # features = self.dropout(features)
+        features = self.dropout(features)
                         
         features = self.fc_out(features)
         output = self.tanh(features)
