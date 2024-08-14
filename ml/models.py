@@ -164,25 +164,34 @@ class E2EModel(nn.Module):
         super(E2EModel, self).__init__()
 
         self.fc_features_in = nn.Linear(self.inp_shape[1], nh)
+        self.fc_out_prev_in = nn.Linear(1, nh)
         self.fc_hid = nn.Linear(nh, nh)
         self.fc_out = nn.Linear(nh, 1)
 
-        self.norm_hid = nn.InstanceNorm1d((nh, nh))
+        self.norm_hid = nn.LayerNorm(nh)
         self.norm_in = nn.LayerNorm(self.inp_shape)
-        self.norm_out = nn.InstanceNorm1d(1)
+        self.norm_out = nn.LayerNorm(1)
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(0.15)
 
     def forward(self, x):
         features = self.norm_in(x)
         features = self.fc_features_in(features)
         features = self.relu(self.norm_hid(features))
+        
         features = self.fc_hid(features)
         features = self.relu(self.norm_hid(features))
-        features = self.dropout(features)
+        # features = self.dropout(features)        
+        # out_prev = self.fc_out_prev_in(out_prev)
+        # out_prev = self.relu(self.norm_hid(out_prev))
+        # features = self.fc_hid(features + out_prev)
+        
+        features = self.fc_hid(features)
+        features = self.relu(self.norm_hid(features))
+        # features = self.dropout(features)
+                        
         features = self.fc_out(features)
-
         output = self.tanh(features)
         return output
 
@@ -196,6 +205,7 @@ def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"
     output_seq, result_seq, fee_seq = np.zeros(
         dp.shape[0]+1), np.zeros(dp.shape[0]+1), np.zeros(dp.shape[0]+1)
     profit = torch.zeros((1, 1), device=device)
+    pred_result = torch.zeros((1, 1), device=device)
     output = torch.zeros((1, 1, 1), device=device)
     output_last = torch.zeros((1, 1, 1), device=device)
     pred_result = torch.zeros((1, 1, 1), device=device)
@@ -204,31 +214,48 @@ def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"
         output = model(features[i:i+1])
         fees = (output - output_last).abs() * p[i] * 0.001
         pred_result = dp[i] * output - fees
-        # print(f"profit={pred_result.item():7.2f}")
+        output_last = output
         if output_sequense:
             output_seq[i+1] = output.item()
             result_seq[i+1] = pred_result.item()
-            fee_seq[i] = fees.item()
+            fee_seq[i+1] = fees.item()
         else:
             # print(f"{epoch + 1:03} {i + 1:04}: profit += {output.item():7.2f} * {dp[i]:7.2f} - {fees.item():7.3f} = {pred_result.item():7.2f}", end=" ")
             profit += pred_result.squeeze()
 
             # print(f"| profit: {profit.item():9.3f}")
-        output_last = output
     if output_sequense:
         return output_seq, result_seq, fee_seq
     else:
         return profit
 
+def batch_sequense(model, p, features, output_sequense=False, device="cpu"):
+    if type(p) is np.ndarray:
+        p = torch.from_numpy(p).to(device)
+    if type(features) is np.ndarray:
+        features = torch.from_numpy(features).to(device)
+    dp = p[1:] - p[:-1]
+    output = model(features).squeeze()
+    fees = (output[1:] - output[:-1]).abs() * p[:-1] * 0.001
+    pred_results = dp * output[:-1] - fees
+    if output_sequense:
+        with torch.no_grad():
+            pred_results = np.append(np.zeros(1), pred_results.cpu().numpy())
+            return output.cpu().numpy(), pred_results, fees.cpu().numpy()
+    else:
+        return pred_results.sum()
 
 if __name__ == "__main__":
     import numpy as np
     torch.manual_seed(0)
-    device = torch.device("mps")
+    device = torch.device("cpu")
     model = E2EModel((1, 4), 32)
     model.to(device)
     # model.eval()
-    print(model(torch.randn(2, 1, 4).to(device)).shape)
+    f = torch.randn(10, 1, 4).to(device)
+    p = torch.randn(1, 1, 1).to(device)
+    out = model(f)
+    print(out.shape)
     print(summary(model, (1, 4), device="cpu"))
     # model.to(device)
     # x = torch.tensor(np.zeros((1, 1, 6, 64))).float().to(device)
