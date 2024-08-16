@@ -38,5 +38,5 @@ config = EasyDict(
     run_model_device=Param(None, [None]),
     fee_rate=Param(0.1, [0.1]),
     eval_buyhold=Param(True, [False]),
-    fuse_buyhold=Param(True, [False]),
+    fuse_buyhold=Param(False, [False]),
 )

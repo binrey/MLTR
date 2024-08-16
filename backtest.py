@@ -1,22 +1,27 @@
 import sys
+from datetime import timedelta
 from pathlib import Path
 from shutil import rmtree
 from time import perf_counter
+
 import matplotlib.pyplot as plt
 import mplfinance as mpf
-import pandas as pd
 import numpy as np
-from datetime import timedelta
+import pandas as pd
 from loguru import logger
 from tqdm import tqdm
-from data_processing.dataloading import MovingWindow, DataParser
+
+from data_processing.dataloading import DataParser, MovingWindow
+
 pd.options.mode.chained_assignment = None
-from utils import PyConfig
+from multiprocessing import Process
+from typing import Iterable
+
 from backtest_broker import Broker
 from experts import BacktestExpert
 from real_trading import plot_fig
-from multiprocessing import Process
-from typing import Iterable
+from utils import PyConfig
+
 # logger.remove()
 
 # Если проблемы с отрисовкой графиков
@@ -27,8 +32,8 @@ class BackTestResults:
         self.date_start = date_start
         self.date_end = date_end   
         self.target_dates = [pd.to_datetime(d).date() for d in 
-                             pd.date_range(start="/".join([date_start.split("-")[i] for i in [1, 2, 0]]), 
-                                   end="/".join([date_end.split("-")[i] for i in [1, 2, 0]]), 
+                             pd.date_range(start=date_start, 
+                                   end=date_end, 
                                    freq="D")
                              ]
         self.daily_hist = pd.DataFrame({"days": self.target_dates})
@@ -61,8 +66,8 @@ class BackTestResults:
         t0  = perf_counter()
         dates = [d.date() for d in pd.to_datetime(dates)]
         monthly_dates = [pd.to_datetime(d).date() for d in 
-                         pd.date_range(start="/".join([self.date_start.split("-")[i] for i in [1, 2, 0]]), 
-                                       end="/".join([self.date_end.split("-")[i] for i in [1, 2, 0]]), 
+                         pd.date_range(start=self.date_start, 
+                                       end=self.date_end, 
                                        freq="W")
                          ]
         bh = self._convert_hist(dates, closes, monthly_dates)
@@ -176,7 +181,7 @@ def backtest(cfg, loglevel = "INFO"):
     
     exp = BacktestExpert(cfg)
     broker = Broker(cfg)
-    hist_pd, hist = DataParser(cfg).load()
+    hist_pd, hist = DataParser(cfg).load("/Users/andrybin/Yandex.Disk.localized/fin_data/")
     mw = MovingWindow(hist, cfg)
 
     if cfg.save_plots:
@@ -239,11 +244,11 @@ def backtest(cfg, loglevel = "INFO"):
             closed_pos = None
     
     
-    backtest_results = BackTestResults(cfg.date_start, cfg.date_end)
+    backtest_results = BackTestResults(mw.date_start, mw.date_end)
     tpost = backtest_results.process_backtest(broker)
     if cfg.eval_buyhold:
-        tbandh = backtest_results.compute_buy_and_hold(hist.Date[mw.id2start: mw.id2end],
-                                                       hist.Close[mw.id2start: mw.id2end], 
+        tbandh = backtest_results.compute_buy_and_hold(dates=hist.Date[mw.id2start:mw.id2end],
+                                                       closes=hist.Close[mw.id2start:mw.id2end], 
                                                        fuse=cfg.fuse_buyhold)
     ttotal = perf_counter() - t0
     

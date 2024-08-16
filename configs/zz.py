@@ -1,9 +1,8 @@
 from configs.library import *
 
-
 classifier = body_classifiers.zigzag
 classifier.params.feature_size = Param(16, [3, 5, 8, 12])
-classifier.params.period = Param(16, [3, 5, 8])
+classifier.params.period = Param(8, [3, 5, 8])
 
 # stops_processor = stops_processors.stops_fixed
 # stops_processor.params.sl = Param(2, [2, 3, 4])

@@ -21,13 +21,13 @@ class E2ETrain:
 
     def init_model(self):
         inp_shape = (1, self.features.shape[-1])
-        self.model = E2EModel(inp_shape, 8)
+        self.model = E2EModel(inp_shape, 8, cls_head=False)
         logger.debug("\n" + str(summary(self.model, [inp_shape], device="cpu")))
 
     def load_data(self, dataset_root="data", max_size=np.Inf):
         mw = MovingWindow(DataParser(self.cfg).load(dataset_root)[1], self.cfg)
         self.features, self.p = next_price_prediction(
-            mw, self.cfg.body_classifier.func, self.cfg.hist_buffer_size, max_size + 1
+            mw, self.cfg.body_classifier.func, max_size + 1
         )
 
     def compute_hold(self, p=None):
@@ -65,7 +65,7 @@ class E2ETrain:
         self.model.to(device)
 
         optimizer = torch.optim.Adam(self.model.parameters(), maximize=True, lr=0.005)
-        scheduler = ExponentialLR(optimizer, gamma=0.99)
+        scheduler = ExponentialLR(optimizer, gamma=0.999)
 
         # Training loop
         pbar = tqdm(start_epoch + np.arange(num_epochs), desc="Training")
@@ -84,7 +84,7 @@ class E2ETrain:
             if (epoch - 1) % 10 == 0:
                 with torch.no_grad():
                     self.model.eval()
-                    loss_val = autoregress_sequense(
+                    loss_val = batch_sequense(
                         self.model, p_val, features_val, device=device
                     )
                     loss_val -= hold_val
