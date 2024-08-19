@@ -1,14 +1,13 @@
-import torch.optim as optim
-import torch.nn as nn
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-from torchinfo import summary
+import torch.optim as optim
+
 # from sklearn.metrics import roc_auc_score
 from torch.utils.data import Dataset
-import numpy as np
-import matplotlib.pyplot as plt
+from torchinfo import summary
 
 # class CustomImageDataset(Dataset):
 #     def __init__(self, X, y):
@@ -157,23 +156,31 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
 
 
 class E2EModel(nn.Module):
-    def __init__(self, inp_shape, nh):
+    def __init__(self, inp_shape, nh, cls_head=True):
         self.nh = nh
         self.inp_shape = inp_shape
         self.train_info = {}
         super(E2EModel, self).__init__()
 
+        nout = 3 if cls_head else 1
         self.fc_features_in = nn.Linear(self.inp_shape[1], nh)
         self.fc_out_prev_in = nn.Linear(1, nh)
         self.fc_hid = nn.Linear(nh, nh)
-        self.fc_out = nn.Linear(nh, 1)
+        self.fc_out = nn.Linear(nh, nout)
 
         self.norm_hid = nn.LayerNorm(nh)
         self.norm_in = nn.LayerNorm(self.inp_shape)
-        self.norm_out = nn.LayerNorm(1)
+
+        self.norm_out = nn.LayerNorm(nout)
         self.relu = nn.ReLU()
-        self.tanh = nn.Tanh()
-        self.dropout = nn.Dropout(0.25)
+        self.out_func = self.cls_head if cls_head else nn.Tanh()
+        self.dropout = nn.Dropout(0.5)
+        self.softmax = nn.Softmax(dim=1)
+        self.states = torch.tensor([-1, 0, 1])
+
+    def cls_head(self, x):
+        x = self.softmax(x)
+        return (self.states*x).sum(dim=1)
 
     def forward(self, x):
         features = self.norm_in(x)
@@ -183,17 +190,17 @@ class E2EModel(nn.Module):
         features = self.fc_hid(features)
         features = self.relu(self.norm_hid(features))
         features = self.dropout(features)      
-          
-        # out_prev = self.fc_out_prev_in(out_prev)
-        # out_prev = self.relu(self.norm_hid(out_prev))
-        # features = self.fc_hid(features + out_prev)
-        
         features = self.fc_hid(features)
         features = self.relu(self.norm_hid(features))
-        features = self.dropout(features)
+        features = self.dropout(features)            
+        # out_prev = self.fc_out_prev_in(out_prev)
+        # out_prev = self.relu(self.norm_hid(out_prev))
+        # features = self.fc_hid(features + out_prev)   
                         
         features = self.fc_out(features)
-        output = self.tanh(features)
+        features = nn.Flatten()(features)
+        output = self.out_func(features)
+        
         return output
 
 
@@ -256,7 +263,7 @@ if __name__ == "__main__":
     f = torch.randn(10, 1, 4).to(device)
     p = torch.randn(1, 1, 1).to(device)
     out = model(f)
-    print(out.shape)
+    print(out.shape, out)
     print(summary(model, (1, 4), device="cpu"))
     # model.to(device)
     # x = torch.tensor(np.zeros((1, 1, 6, 64))).float().to(device)

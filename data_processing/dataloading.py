@@ -278,6 +278,9 @@ class MovingWindow():
 
         self.id2end = self.find_nearest_date_indx(
             hist.Date, np.datetime64(self.date_end))
+        
+        self.date_start = pd.to_datetime(hist.Date[self.id2start])
+        self.date_end = pd.to_datetime(hist.Date[self.id2end])
 
     @staticmethod
     def find_nearest_date_indx(array, target):
@@ -300,7 +303,7 @@ class MovingWindow():
         return self.data, perf_counter() - t0
 
     def __call__(self, output_time=True):
-        logger.info(f"Start generate data from {self.date_start}{self.id2start} to {self.date_end}{self.id2end}")
+        logger.info(f"Start generate data from {self.date_start} (id:{self.id2start}) to {self.date_end} (id:{self.id2end})")
         for t in range(self.id2start, self.id2end):
             yield self[t] if output_time else self[t][0]
 

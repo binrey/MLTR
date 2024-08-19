@@ -13,8 +13,8 @@ class ClsZigZag(ExtensionBase):
             self.model = torch.jit.load("model.pt")
             # self.model = torch.load("model.pt")
 
-    def getfeatures(self):
-        zz_values = self.zigzag.values
+    def getfeatures(self, h):
+        zz_values = self.zigzag.values/h.Close[-1]
         features = np.zeros(self.cfg.feature_size)
         features[-zz_values.shape[0]:] = zz_values
         return features
@@ -23,7 +23,6 @@ class ClsZigZag(ExtensionBase):
         zz_ids, zz_values, zz_types = self.zigzag.update(h)
         if self.last_zz_type != zz_types[-1]:
             self.last_zz_type = zz_types[-1]
-            features = self.getfeatures
             return True
         return False
 

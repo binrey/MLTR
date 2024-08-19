@@ -3,12 +3,12 @@ from backtest import MovingWindow
 from loguru import logger
 
 
-def next_price_prediction(mw: MovingWindow, classifier, hist_buffer_size, max_size=100):
+def next_price_prediction(mw: MovingWindow, classifier, max_size=100):
     p, features = [], []
     for hist_window in mw(output_time=False):
         if classifier.check_status(hist_window):
             p.append(hist_window.Open[-1])
-            features.append(classifier.getfeatures())
+            features.append(classifier.getfeatures(hist_window))
             if len(p) >= max_size - 1:
                 break
 
