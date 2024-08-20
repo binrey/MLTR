@@ -1,4 +1,5 @@
 from easydict import EasyDict
+from utils import FeeRate
 from experts import *
 
 

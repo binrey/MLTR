@@ -1,9 +1,11 @@
-import mplfinance as mpf
 from datetime import datetime
+from pathlib import Path
+
+import mplfinance as mpf
 import numpy as np
 import pandas as pd
 from pybit.unified_trading import HTTP
-from pathlib import Path
+
 
 class BybitDownloader:
     def __init__(self, symbol, period, start_date=None, init_data=None):
@@ -76,7 +78,7 @@ class BybitDownloader:
 if __name__ == "__main__":
     symbol = "BTCUSDT"
     period = 60
-    init_data = f"data/bybit/M{period}/{symbol}_M{period}.csv"
+    init_data = f"/Users/andrybin/Yandex.Disk.localized/fin_data/bybit/M{period}/{symbol}_M{period}.csv"
     bb_loader = BybitDownloader(symbol=symbol, 
                                 period=period, 
                                 start_date="2000-01-01",

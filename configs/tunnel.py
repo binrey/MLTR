@@ -30,7 +30,7 @@ config = EasyDict(
     data_type=Param("bybit", ["bybit"]),
     save_plots=Param(False, [False]),
     run_model_device=Param(None, [None]),
-    fee_rate=Param(0.1, [0.1]),
+    fee_rate=Param(FeeRate(0.1, 0.00016), [FeeRate(0.1, 0.00016)]),
     eval_buyhold=Param(True, [False]),
     fuse_buyhold=Param(False, [False]),
 )

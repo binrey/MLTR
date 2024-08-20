@@ -1,6 +1,5 @@
 from configs.library import *
 
-
 classifier = body_classifiers.tunzigzag
 classifier.params.ncross = Param(8, [3, 5, 8, 12])
 classifier.params.period = Param(5, [3, 5, 8])
@@ -36,7 +35,7 @@ config = EasyDict(
     
     save_plots=Param(False, [False]),
     run_model_device=Param(None, [None]),
-    fee_rate=Param(0.1, [0.1]),
+    fee_rate=Param(FeeRate(0.1, 0.00016), [FeeRate(0.1, 0.00016)]),
     eval_buyhold=Param(True, [False]),
     fuse_buyhold=Param(False, [False]),
 )

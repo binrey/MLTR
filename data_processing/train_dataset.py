@@ -1,8 +1,10 @@
 import numpy as np
 from backtest import MovingWindow
 from loguru import logger
+from utils import cache_result
 
 
+@cache_result
 def next_price_prediction(mw: MovingWindow, classifier, max_size=100):
     p, features = [], []
     for hist_window in mw(output_time=False):

@@ -1,6 +1,24 @@
 import importlib.util
 from easydict import EasyDict
 from copy import deepcopy
+from dataclasses import dataclass
+import numpy as np
+from diskcache import Cache
+
+cache = Cache(".tmp")
+
+def cache_result(func):
+    def wrapper(*args, **kwargs):
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        if key in cache:
+            print("Using cached result")
+            return cache[key]
+        
+        result = func(*args, **kwargs)
+        cache[key] = result
+        return result
+    
+    return wrapper
 
 class PyConfig():
     def __init__(self, config_file) -> None:
@@ -55,3 +73,16 @@ class Config(EasyDict):
             else:
                 out += f"{k}: {v}\n"
         return out
+    
+    
+@dataclass
+class FeeRate:
+    order_execution_rate: float = 0
+    position_suply_rate: float = 0
+    
+    def order_execution_fee(self, price, volume):
+        return price * volume * self.order_execution_rate / 100
+    
+    def position_suply_fee(self, open_date, close_date, mean_price, volume):
+        h8_count = np.diff([open_date, close_date]).astype('timedelta64[h]').astype(np.float32).item()/8
+        return self.position_suply_rate / 100 * h8_count * mean_price * volume
