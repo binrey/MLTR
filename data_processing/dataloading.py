@@ -83,35 +83,21 @@ class DataParser():
         self.cfg = cfg
 
     def load(self, database="data"):
+        t0 = perf_counter()
         p = Path(database) / self.cfg.data_type / self.cfg.period
         flist = [f for f in p.glob("*") if self.cfg.ticker in f.stem]
-        if len(flist) == 1:
-            return {"metatrader": self.metatrader,
+        if len(flist):
+            fpath = flist[np.argmin([len(f.name) for f in flist])]
+            data = {"metatrader": self.metatrader,
                     "FORTS": self.metatrader,
                     "bitfinex": self.bitfinex,
                     "yahoo": self.yahoo,
                     "bybit": self.bybit
-                    }.get(self.cfg.data_type, None)(flist[0])
-        elif len(flist) == 0:
-            raise FileNotFoundError(f"No data for {self.cfg.ticker} in {p}")
+                    }.get(self.cfg.data_type, None)(fpath)
+            logger.info(f"Loaded {self.cfg.data_type} data from {fpath} in {perf_counter() - t0:.1f} sec")
+            return data
         else:
-            raise FileNotFoundError(f"Too many data for {self.cfg.ticker} in {p}")
-
-    def _trim_by_date(self, hist):
-        # if self.cfg.date_start is not None:
-        #     date_start = pd.to_datetime(self.cfg.date_start, utc=True)
-        #     for i, d in enumerate(hist.Date):
-        #         if d >= date_start:
-        #             break
-        #     hist = hist.iloc[i:]
-
-        # if self.cfg.date_end is not None:
-        #     date_end = pd.to_datetime(self.cfg.date_end, utc=True)
-        #     for i, d in enumerate(hist.Date):
-        #         if d >= date_end:
-        #             break
-        #     hist = hist.iloc[:i]
-        return hist
+            raise FileNotFoundError(f"No data for {self.cfg.ticker} in {p}")
 
     def bybit(self, data_file):
         pd.options.mode.chained_assignment = None
@@ -119,7 +105,6 @@ class DataParser():
         # hist.columns = map(lambda x:x[1:-1], hist.columns)
         # hist.columns = map(str.capitalize, hist.columns)
         hist["Date"] = pd.to_datetime(hist.Date.values, utc=True)
-        hist = self._trim_by_date(hist)
         columns = list(hist.columns)
         hist.columns = columns
         hist["Id"] = list(range(hist.shape[0]))
@@ -130,18 +115,14 @@ class DataParser():
 
     def metatrader(self, data_file):
         pd.options.mode.chained_assignment = None
-        hist = pd.read_csv(data_file, sep="\t")
-        hist.columns = map(lambda x: x[1:-1], hist.columns)
+        hist = pd.read_csv(data_file, sep=",", converters={"TIME": pd.to_datetime})
         hist.columns = map(str.capitalize, hist.columns)
-        if "Time" not in hist.columns:
-            hist["Time"] = ["00:00:00"]*hist.shape[0]
-        hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(
-            hist.Date.values, hist.Time.values)], utc=True)
-        hist = self._trim_by_date(hist)
-        hist.drop("Time", axis=1, inplace=True)
-        columns = list(hist.columns)
-        columns[-2] = "Volume"
-        hist.columns = columns
+        # if "Time" not in hist.columns:
+        #     hist["Time"] = ["00:00:00"]*hist.shape[0]
+        # hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(
+        #     hist.Date.values, hist.Time.values)], utc=True)
+        hist.drop(["Tick_volume", "Spread"], axis=1, inplace=True)
+        hist.rename(columns={"Real_volume": "Volume", "Time": "Date"}, inplace=True)
         hist["Id"] = list(range(hist.shape[0]))
         hist_dict = EasyDict({c: hist[c].values for c in hist.columns})
         # hist_dict["Date"] = hist["Date"].values
@@ -254,6 +235,7 @@ class MovingWindow():
         self.date_start = pd.to_datetime(cfg["date_start"])
         self.date_end = pd.to_datetime(cfg["date_end"])
         self.size = cfg["hist_buffer_size"]
+        self.ticker = cfg["ticker"]
 
         self.data = EasyDict(Date=np.empty(self.size, dtype=np.datetime64),
                              Id=np.zeros(self.size, dtype=np.int64),
@@ -303,7 +285,7 @@ class MovingWindow():
         return self.data, perf_counter() - t0
 
     def __call__(self, output_time=True):
-        logger.info(f"Start generate data from {self.date_start} (id:{self.id2start}) to {self.date_end} (id:{self.id2end})")
+        logger.info(f"Start generate {self.ticker} data from {self.date_start} (id:{self.id2start}) to {self.date_end} (id:{self.id2end})")
         for t in range(self.id2start, self.id2end):
             yield self[t] if output_time else self[t][0]
 

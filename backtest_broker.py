@@ -61,17 +61,7 @@ class Order:
 
 
 class Position:
-    def __init__(
-        self,
-        price,
-        date,
-        indx,
-        ticker="NoName",
-        volume=1,
-        period="M5",
-        sl=None,
-        fee_rate=FeeRate,
-    ):
+    def __init__(self, price, date, indx, ticker="NoName", volume=1, period="M5", sl=None, fee_rate=0):
         self.volume = float(volume)
         assert self.volume > 0
         self.ticker = ticker

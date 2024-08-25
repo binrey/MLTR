@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -8,6 +10,8 @@ import torch.optim as optim
 # from sklearn.metrics import roc_auc_score
 from torch.utils.data import Dataset
 from torchinfo import summary
+
+from utils import FeeRate
 
 # class CustomImageDataset(Dataset):
 #     def __init__(self, X, y):
@@ -174,7 +178,7 @@ class E2EModel(nn.Module):
         self.norm_out = nn.LayerNorm(nout)
         self.relu = nn.ReLU()
         self.out_func = self.cls_head if cls_head else nn.Tanh()
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(0.25)
         self.softmax = nn.Softmax(dim=1)
         self.states = torch.tensor([-1, 0, 1])
 
@@ -202,6 +206,45 @@ class E2EModel(nn.Module):
         output = self.out_func(features)
         
         return output
+
+@dataclass
+class SeqOutput:
+    model_ans: torch.Tensor
+    price: torch.Tensor
+    fees: torch.Tensor
+    
+    @property
+    def profits(self):
+        return self.model_ans[:-1] * (self.price[1:] - self.price[:-1])
+    
+    @property
+    def profits_with_fees(self):
+        return self.profits - self.fees
+    
+    @property
+    def profits_with_fees_relative(self):
+        return self.profits_with_fees / self.price[:-1]
+    
+    def sum_profit(self, include_fees=True):
+        profit = self.profit.sum(dim=0)
+        if include_fees:
+            profit -= self.sum_fees
+        return profit
+      
+    def sum_profit_relative(self):
+        return self.profits_with_fees_relative.sum(dim=0)
+    
+    def sum_fees(self):
+        return self.fees.sum(dim=0)
+    
+    def profit_curve(self, relative=True, include_fees=True):
+        if relative and include_fees:
+            profit_curve = self.profits_with_fees_relative.cumsum(dim=0)
+        if not relative:
+            profit_curve = self.profits.cumsum(dim=0)
+            if include_fees:
+                profit_curve -= self.fees.cumsum(dim=0)
+        return torch.concat([torch.Tensor([0], device=profit_curve.device), profit_curve])
 
 
 def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"):
@@ -237,21 +280,15 @@ def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"
     else:
         return profit
 
-def batch_sequense(model, p, features, output_sequense=False, device="cpu"):
+def batch_sequense(model, p, features, fee_rate:FeeRate, device="cpu") -> SeqOutput:
     if type(p) is np.ndarray:
         p = torch.from_numpy(p).to(device)
     if type(features) is np.ndarray:
         features = torch.from_numpy(features).to(device)
-    dp = p[1:] - p[:-1]
     output = model(features).squeeze()
-    fees = (output[1:] - output[:-1]).abs() * p[:-1] * 0.001
-    pred_results = dp * output[:-1] - fees
-    if output_sequense:
-        with torch.no_grad():
-            pred_results = np.append(np.zeros(1), pred_results.cpu().numpy())
-            return output.cpu().numpy(), pred_results, fees.cpu().numpy()
-    else:
-        return pred_results.sum()
+    return SeqOutput(model_ans=output,
+                     price=p,
+                     fees=fee_rate.order_execution_fee(p[:-1], (output[1:] - output[:-1]).abs()))
 
 if __name__ == "__main__":
     import numpy as np
