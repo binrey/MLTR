@@ -1,4 +1,5 @@
 from easydict import EasyDict
+
 from experts import *
 
 
@@ -9,23 +10,23 @@ class Param:
         
 
 body_classifiers = EasyDict(
-    dummy = EasyDict( 
-        func=ClsDummy,
-        params=EasyDict()
-            ),
+    # dummy = EasyDict( 
+    #     func=ClsDummy,
+    #     params=EasyDict()
+    #         ),
     
-    trngl_simp = EasyDict(
-        func=ClsTriangle,
-        params=EasyDict(
-            npairs=Param(None, [None]))
-        ),
-    trend = EasyDict( 
-        func=ClsTrend,
-        params=EasyDict(
-            npairs=Param(None, [None]),
-            maxdrop=Param(None, [None])
-            )
-        ),    
+    # trngl_simp = EasyDict(
+    #     func=ClsTriangle,
+    #     params=EasyDict(
+    #         npairs=Param(None, [None]))
+    #     ),
+    # trend = EasyDict( 
+    #     func=ClsTrend,
+    #     params=EasyDict(
+    #         npairs=Param(None, [None]),
+    #         maxdrop=Param(None, [None])
+    #         )
+    #     ),    
     tunzigzag = EasyDict( 
         func=ClsTunZigZag,
         params=EasyDict(
@@ -38,28 +39,28 @@ body_classifiers = EasyDict(
             ncross=Param(None, [None])
             )
         ), 
-    tunnel = EasyDict( 
-        func=ClsTunnel,
-        params=EasyDict(
-            ncross=Param(None, [None])
-            )
-        ),
+    # tunnel = EasyDict( 
+    #     func=ClsTunnel,
+    #     params=EasyDict(
+    #         ncross=Param(None, [None])
+    #         )
+    #     ),
     tunnel2 = EasyDict( 
         func=ClsTunZigZag,
         params=EasyDict(
             ncross=Param(None, [None])
             )
         ),
-    bb = EasyDict( 
-        func=ClsBB,
-        params=EasyDict()
-        ),
-    levels = EasyDict(
-        func=ClsLevels,
-        params=EasyDict()
-        ),
+    # bb = EasyDict( 
+    #     func=ClsBB,
+    #     params=EasyDict()
+    #     ),
+    # levels = EasyDict(
+    #     func=ClsLevels,
+    #     params=EasyDict()
+    #     ),
     custom = EasyDict( 
-        func=ClsCustom,
+        func=FileReader,
         params=EasyDict(
             ncross=Param(None, [None])
             )

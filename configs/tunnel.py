@@ -1,5 +1,5 @@
 from configs.library import *
-
+from utils import FeeRate
 
 classifier = body_classifiers.tunnel
 classifier.params.ncross = Param(5, [2, 3, 4, 5, 7, 9])

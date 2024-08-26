@@ -315,60 +315,7 @@ class ClsDummy(ExtensionBase):
         return True
         
 
-class ClsCustom(ExtensionBase):
-    def __init__(self, cfg):
-        self.cfg = cfg
-        super(ClsCustom, self).__init__(cfg, name="custom")
-        folder = "data/handmade_test/AAPL_H1"
-        self.signals, self.props, self.features = {}, {}, {}
-        for fname in sorted(Path(folder).rglob("*.xlsx")):
-            # d = str(fname.stem).split("___")[1]
-            df = pd.read_excel(fname)
-            side = -1 if "min" in df.Analyze.iloc[1] else 1
-            k = np.array(str(df.Date.iloc[0])[:11] + df.Time.iloc[0], dtype='datetime64[ns]').item()
-            self.signals[k] = side
-            
-            self.props[k] = []
-            for i in range(df.shape[0]):
-                row = df.iloc[i]
-                x = np.array(str(row.Date)[:11] + row.Time, dtype="datetime64[ns]")
-                y = {"real_peak_max": row.High,
-                        "real_peak_min": row.Low}.get(row.Analyze, row.Close)
-                self.props[k] += [(x, y)]
-                
-            df.Date = pd.to_datetime(df.Date)
-            dt = np.array([(df.iloc[0].Date - df.iloc[i].Date).days for i in range(0, df.shape[0])])
-            dy = [df.iloc[0].Close]
-            dy += [df.iloc[i].High if df.iloc[i].Analyze == "real_peak_max" else df.iloc[i].Low for i in range(1, df.shape[0])]
-            dy = (np.array(dy) - df.iloc[0].Close)/df.iloc[0].Close*100
-            self.features[k] = np.hstack([dt, dy])
-        
-        from joblib import load
-        self.model = load('random_forest_model.joblib')
-        
-    def __call__(self, common, h) -> bool:
-        t = h.Date[-1].astype("datetime64").item()
-        side = self.signals.get(t, 0)
-        if side != 0:
-            prediction = self.model.predict(self.features[t].reshape(1, -1))[0]
-            if prediction[0] == 0:
-                return False
-            if side == 1:
-                common.lprice = h.Open[-1] #max(h.High[-2], h.Low[-2])
-            if side == -1:
-                common.sprice = h.Open[-1] #min(h.High[-2], h.Low[-2])
-            common.lines = [[]]    
-            for i, pt in enumerate(self.props[t]):
-                found_date = h.Id[h.Date == pt[0]]
-                if len(found_date):
-                    common.lines[0].append((found_date[0], pt[1]))
-                if i == 2:
-                    common.sl = {1: pt[1], -1: pt[1]} 
-                    common.tp = {1: h.Close[-1] + abs(h.Close[-1] - pt[1])*3, 
-                                 -1: h.Close[-1] - abs(h.Close[-1] - pt[1])*3} 
-            return True
-            
-        return False
+
     
     
 if __name__ == "__main__":

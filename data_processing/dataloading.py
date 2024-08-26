@@ -1,11 +1,12 @@
+import pickle
+from pathlib import Path
+from time import perf_counter
+
 import numpy as np
 import pandas as pd
 from easydict import EasyDict
-from pathlib import Path
-from time import perf_counter
 from loguru import logger
 from tqdm import tqdm
-import pickle
 
 
 def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=None):
@@ -133,7 +134,6 @@ class DataParser():
         hist = pd.read_csv(data_file, header=1)
         hist = hist[::-1]
         hist["Date"] = pd.to_datetime(hist.date.values)
-        hist = self._trim_by_date(hist)
         hist.set_index("Date", inplace=True, drop=False)
         hist["Id"] = list(range(hist.shape[0]))
         hist.drop(["unix", "symbol", "date"], axis=1, inplace=True)
@@ -145,7 +145,6 @@ class DataParser():
     def yahoo(self, data_file):
         hist = pd.read_csv(data_file)
         hist["Date"] = pd.to_datetime(hist.Date, utc=True)
-        hist = self._trim_by_date(hist)
         hist["Id"] = list(range(hist.shape[0]))
         hist_dict = EasyDict({c: hist[c].values for c in hist.columns})
         hist.set_index("Date", inplace=True, drop=True)
