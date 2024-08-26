@@ -28,7 +28,7 @@ from utils import PyConfig
 # export QT_QPA_PLATFORM=offscreen
 
 class BackTestResults:
-    def __init__(self, date_start, date_end, wallet=100):
+    def __init__(self, date_start, date_end, wallet=None):
         self.date_start = date_start
         self.date_end = date_end   
         self.target_dates = [pd.to_datetime(d).date() for d in 
@@ -89,9 +89,12 @@ class BackTestResults:
         return self.daily_hist["profit"].values[-1] if len(self.daily_hist["profit"].values) > 0 else 0    
     
     @property
+    def final_profit_rel(self):
+        return self.final_profit/self.deposit*100
+    
+    @property
     def APR(self):
-        final_profit_rel = self.final_profit/self.deposit*100
-        return final_profit_rel/self.num_years_on_trade    
+        return self.final_profit_rel/self.num_years_on_trade    
     
     @property
     def ndeals_per_year(self):
@@ -181,7 +184,7 @@ def backtest(cfg, loglevel = "INFO"):
     
     exp = BacktestExpert(cfg)
     broker = Broker(cfg)
-    hist_pd, hist = DataParser(cfg).load("/Users/andrybin/Yandex.Disk.localized/fin_data/")
+    hist_pd, hist = DataParser(cfg).load("fin_data/")
     mw = MovingWindow(hist, cfg)
 
     if cfg.save_plots:
@@ -244,17 +247,17 @@ def backtest(cfg, loglevel = "INFO"):
             closed_pos = None
     
     
-    backtest_results = BackTestResults(mw.date_start, mw.date_end)
-    tpost = backtest_results.process_backtest(broker)
+    bt_res = BackTestResults(mw.date_start, mw.date_end)
+    tpost = bt_res.process_backtest(broker)
     if cfg.eval_buyhold:
-        tbandh = backtest_results.compute_buy_and_hold(dates=hist.Date[mw.id2start:mw.id2end],
+        tbandh = bt_res.compute_buy_and_hold(dates=hist.Date[mw.id2start:mw.id2end],
                                                        closes=hist.Close[mw.id2start:mw.id2end], 
                                                        fuse=cfg.fuse_buyhold)
     ttotal = perf_counter() - t0
     
-    sformat = lambda type: {1:"{:>30}: {:>5.0f}", 2: "{:>30}: {:5.2f}"}.get(type)
+    sformat = lambda nd: "{:>30}: {:>5.@f}".replace("@", str(nd))
     logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}")
-    logger.info(sformat(2).format("total backtest", ttotal) + " sec")
+    logger.info(sformat(1).format("total backtest", ttotal) + " sec")
     logger.info(sformat(1).format("data loadings", tdata/ttotal*100) + " %")    
     logger.info(sformat(1).format("expert updates", texp/ttotal*100) + " %")
     logger.info(sformat(1).format("broker updates", tbrok/ttotal*100) + " %")
@@ -263,12 +266,14 @@ def backtest(cfg, loglevel = "INFO"):
         logger.info(sformat(1).format("Buy & Hold", tbandh/ttotal*100) + " %")
 
     logger.info("-"*40)
-    logger.info(sformat(1).format("APR", backtest_results.APR) + f" % ({backtest_results.ndeals_per_month} deals/month)" + f" ({backtest_results.fees/backtest_results.final_profit*100:.1f}% fees)") 
-    logger.info(sformat(1).format("MAXLOSS", backtest_results.metrics["loss_max_rel"]) + " %")
-    logger.info(sformat(1).format("RECOVRY FACTOR", backtest_results.metrics["recovery"])) 
-    logger.info(sformat(1).format("MAXWAIT", backtest_results.metrics["maxwait"]) + " days")
-    # logger.info(sformat(1).format("MEAN POS. DURATION", backtest_results.mean_pos_duration) + " \n")        
-    return backtest_results
+    logger.info(sformat(0).format("APR", bt_res.APR) + f" %") 
+    logger.info(sformat(0).format("FINAL PROFIT", bt_res.final_profit_rel) + f" %" + f" ({bt_res.fees/bt_res.final_profit*100:.1f}% fees)")
+    logger.info(sformat(1).format("DEALS/MONTH", bt_res.ndeals_per_month))    
+    logger.info(sformat(0).format("MAXLOSS", bt_res.metrics["loss_max_rel"]) + " %")
+    logger.info(sformat(0).format("RECOVRY FACTOR", bt_res.metrics["recovery"])) 
+    logger.info(sformat(0).format("MAXWAIT", bt_res.metrics["maxwait"]) + " days")
+    # logger.info(sformat(1).format("MEAN POS. DURATION", bt_res.mean_pos_duration) + " \n")        
+    return bt_res
 
 
 if __name__ == "__main__":
