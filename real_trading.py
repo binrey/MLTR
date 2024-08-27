@@ -1,29 +1,32 @@
 from pathlib import Path
 from shutil import rmtree
 from time import sleep
-import mplfinance as mpf
+
 import matplotlib.pyplot as plt
+import mplfinance as mpf
 import pandas as pd
 from loguru import logger
+
 pd.options.mode.chained_assignment = None
-from experts import ByBitExpert
-from utils import PyConfig
+import pickle
+from collections import defaultdict
+from copy import deepcopy
 from datetime import datetime
+from multiprocessing import Process
+from typing import Optional
+
 import numpy as np
 import pandas as pd
-from easydict import EasyDict
-from copy import deepcopy
+import stackprinter
 import telebot
 import yaml
+from easydict import EasyDict
 from PIL import Image
-import pickle
-from multiprocessing import Process
-import stackprinter
 from pybit.unified_trading import HTTP, WebSocket
-from backtest_broker import Position
-from typing import Optional
-from collections import defaultdict
 
+from backtest_broker import Position
+from experts import ByBitExpert
+from utils import PyConfig
 
 stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
@@ -287,8 +290,8 @@ class BybitTrading:
 
     
 if __name__ == "__main__":
-    import sys
     import argparse
+    import sys
     
     logger.remove()
     logger.add(sys.stderr, level="DEBUG")

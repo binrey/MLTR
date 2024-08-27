@@ -1,3 +1,4 @@
+import os
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -65,14 +66,15 @@ class BackTestResults:
     def compute_buy_and_hold(self, dates, closes, fuse=False):
         t0  = perf_counter()
         dates = [d.date() for d in pd.to_datetime(dates)]
-        monthly_dates = [pd.to_datetime(d).date() for d in 
+        yeld_dates = [pd.to_datetime(d).date() for d in 
                          pd.date_range(start=self.date_start, 
                                        end=self.date_end, 
-                                       freq="W")
+                                       freq="M")
                          ]
-        bh = self._convert_hist(dates, closes, monthly_dates)
+        bh = self._convert_hist(dates, closes, yeld_dates)
         bh = np.hstack([0, ((bh[1:] - bh[:-1])*self.wallet/bh[:-1])]).cumsum()
-        self.daily_hist["buy_and_hold"] = self._convert_hist(monthly_dates, bh)
+        self.daily_hist["buy_and_hold"] = self._convert_hist(yeld_dates, bh)
+        self.daily_hist["buy_and_hold_reinvest"] = self._convert_hist(dates, closes*self.wallet)
         if fuse:
             self.update_daily_profit(self.daily_hist["profit"] + self.daily_hist["buy_and_hold"])  
         return perf_counter() - t0
@@ -184,7 +186,7 @@ def backtest(cfg, loglevel = "INFO"):
     
     exp = BacktestExpert(cfg)
     broker = Broker(cfg)
-    hist_pd, hist = DataParser(cfg).load("fin_data/")
+    hist_pd, hist = DataParser(cfg).load(os.environ.get("FINDATA", "fin_data"))
     mw = MovingWindow(hist, cfg)
 
     if cfg.save_plots:
@@ -256,19 +258,19 @@ def backtest(cfg, loglevel = "INFO"):
     ttotal = perf_counter() - t0
     
     sformat = lambda nd: "{:>30}: {:>5.@f}".replace("@", str(nd))
-    logger.info(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}")
-    logger.info(sformat(1).format("total backtest", ttotal) + " sec")
-    logger.info(sformat(1).format("data loadings", tdata/ttotal*100) + " %")    
-    logger.info(sformat(1).format("expert updates", texp/ttotal*100) + " %")
-    logger.info(sformat(1).format("broker updates", tbrok/ttotal*100) + " %")
-    logger.info(sformat(1).format("postproc. broker", tpost/ttotal*100) + " %")
+    logger.debug(f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}")
+    logger.debug(sformat(1).format("total backtest", ttotal) + " sec")
+    logger.debug(sformat(1).format("data loadings", tdata/ttotal*100) + " %")    
+    logger.debug(sformat(1).format("expert updates", texp/ttotal*100) + " %")
+    logger.debug(sformat(1).format("broker updates", tbrok/ttotal*100) + " %")
+    logger.debug(sformat(1).format("postproc. broker", tpost/ttotal*100) + " %")
     if cfg.eval_buyhold:
-        logger.info(sformat(1).format("Buy & Hold", tbandh/ttotal*100) + " %")
+        logger.debug(sformat(1).format("Buy & Hold", tbandh/ttotal*100) + " %")
 
     logger.info("-"*40)
     logger.info(sformat(0).format("APR", bt_res.APR) + f" %") 
     logger.info(sformat(0).format("FINAL PROFIT", bt_res.final_profit_rel) + f" %" + f" ({bt_res.fees/bt_res.final_profit*100:.1f}% fees)")
-    logger.info(sformat(1).format("DEALS/MONTH", bt_res.ndeals_per_month))    
+    logger.info(sformat(2).format("DEALS/MONTH", bt_res.ndeals_per_month) + f"   ({bt_res.ndeals} total)")    
     logger.info(sformat(0).format("MAXLOSS", bt_res.metrics["loss_max_rel"]) + " %")
     logger.info(sformat(0).format("RECOVRY FACTOR", bt_res.metrics["recovery"])) 
     logger.info(sformat(0).format("MAXWAIT", bt_res.metrics["maxwait"]) + " days")
@@ -279,17 +281,22 @@ def backtest(cfg, loglevel = "INFO"):
 if __name__ == "__main__":
     cfg = PyConfig(sys.argv[1]).test()
     btest_results = backtest(cfg, loglevel="INFO")
-    fig, ax1 = plt.subplots(figsize=(15, 8))
+    fig, ax1 = plt.subplots(2, 1, height_ratios = [3, 1], figsize=(10, 8))
+    ax1 = plt.subplot(2, 1, 1)
     ax2 = ax1.twinx()
     ax1.plot(btest_results.daily_hist.days, btest_results.daily_hist.profit, linewidth=3, color="b", alpha=0.6)
     ax1.plot(btest_results.deal_hist.dates, btest_results.deal_hist.profit, linewidth=1, color="b", alpha=0.6)    
     ax1.plot(btest_results.deal_hist.dates, btest_results.deal_hist.profit_nofees, linewidth=1, color="r", alpha=0.6)
     if "buy_and_hold" in btest_results.daily_hist.columns:
-        ax1.plot(btest_results.daily_hist.days, btest_results.daily_hist.buy_and_hold, linewidth=1, alpha=0.6)  
+        ax1.plot(btest_results.daily_hist.days, btest_results.daily_hist.buy_and_hold, linewidth=2, alpha=0.6)  
     ax1.legend(["sum. profit", "profit from strategy", "profit without fees", "buy and hold"])
-    plt.grid("on")
-    ax2.plot(btest_results.daily_hist["days"], btest_results.daily_hist["deposit"], "-", linewidth=3, alpha=0.3)
-    ax2.legend(["deposit"])
+    ax2.plot(btest_results.daily_hist.days, btest_results.daily_hist.buy_and_hold_reinvest, linewidth=2, alpha=0.2)
+    ax2.legend([btest_results.tickers])
+    # plt.grid("on")
+
+    ax1 = plt.subplot(2, 1, 2)
+    ax1.plot(btest_results.daily_hist["days"], btest_results.daily_hist["deposit"], "-", linewidth=3, alpha=0.3)
+    ax1.legend(["deposit"])
     
     plt.tight_layout()
     plt.savefig("backtest.png")
