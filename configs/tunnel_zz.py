@@ -16,10 +16,10 @@ stops_processor.params.sl_active = Param(True, [True])
 config = EasyDict(
     wallet=Param(100, [100]),
     leverage=Param(1, [1]),
-    date_start=Param("2017-09-01T00:00:00", ["2017-09-01"]),
+    date_start=Param("2020-09-01T00:00:00", ["2017-09-01"]),
     date_end=Param("2024-08-01", ["2025-01-01"]),
     no_trading_days=Param(set(), [set()]),
-    trailing_stop_rate=Param(0.003, [0.002, 0.004, 0.006]),
+    trailing_stop_rate=Param(0.05, [0.002, 0.004, 0.006]),
     trailing_stop_type=Param(1, [1]),
     body_classifier=Param(classifier, [classifier]),
     allow_overturn=Param(False, [False]),
@@ -30,11 +30,11 @@ config = EasyDict(
     tend=Param(None, [None]),
     
     period=Param("M60", ["M60"]),
-    ticker=Param("BTCUSDT", ["BTCUSDT", "ETHUSDT"]),
+    ticker=Param("SBER", ["BTCUSDT", "ETHUSDT"]),
     ticksize=Param(0.001, [0.001]),
-    data_type=Param("bybit", ["bybit"]),
+    data_type=Param("metatrader", ["bybit"]),
     
-    save_plots=Param(False, [False]),
+    save_plots=Param(True, [False]),
     run_model_device=Param(None, [None]),
     fee_rate=Param(FeeRate(0.1, 0.00016), [FeeRate(0.1, 0.00016)]),
     eval_buyhold=Param(True, [False]),

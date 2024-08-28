@@ -1,21 +1,22 @@
 from abc import ABC, abstractmethod
-from time import perf_counter
+from collections import OrderedDict
 from copy import deepcopy
+from pathlib import Path
+from time import perf_counter
+
 import numpy as np
+import pandas as pd
 import yaml
 from easydict import EasyDict
 from loguru import logger
-from pathlib import Path
-import pandas as pd
-from collections import OrderedDict
 
-from indicators import *
-from backtest_broker import Order
 # import torch
-from backtest_broker import Broker, Position
+from backtest_broker import Broker, Order, Position
+from indicators import *
+
 from .base import *
 
-        
+
 class ClsTrend(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
@@ -47,59 +48,6 @@ class ClsTrend(ExtensionBase):
             common.lprice = values[-1] if trend_type > 0 else None
             common.sprice = values[-1] if trend_type < 0 else None
             common.cprice = common.lines[0][-2][1]
-        return is_fig
-
-
-class ClsTunnel(ExtensionBase):
-    def __init__(self, cfg):
-        self.cfg = cfg
-        super(ClsTunnel, self).__init__(cfg, name="tunnel")
-        
-    def __call__(self, common, h) -> bool:
-        is_fig = False
-        best_params = {
-            "metric": 0,
-            "i": 0,
-            "line_above": None,
-            "line_below": None,
-        }
-        for i in range(4, h.Id.shape[0], 1):
-            line_above = h.High[-i:].mean()
-            line_below = h.Low[-i:].mean()
-            middle_line = (line_above + line_below) / 2
-            
-            if h.Close[-1] < line_above and h.Close[-1] > line_below:
-                metric = i / ((line_above - line_below) / middle_line) / 100
-                                        
-                if metric > best_params["metric"]:
-                    best_params.update(
-                        {"metric": metric,
-                        "i": i,
-                        "line_above": line_above,
-                        "line_below": line_below,
-                        "middle_line": middle_line
-                        }
-                    )                   
-                    
-        if best_params["metric"] > self.cfg.ncross:
-            is_fig = True
-            # break
-
-        if is_fig:
-            i = best_params["i"]
-            common.sl = {1: h.Low[-i:].min(), -1: h.High[-i:].max()}   
-            # v1
-            common.lprice = best_params["line_above"]
-            common.sprice = best_params["line_below"] 
-            # v2
-            # if middle_line > h.Close.mean():
-            #     common.lprice = line_below
-            # else:
-            #     common.sprice = line_above
-            common.lines = [[(h.Id[-i], best_params["line_above"]), (h.Id[-1], best_params["line_above"])], 
-                            [(h.Id[-i], best_params["line_below"]), (h.Id[-1], best_params["line_below"])],
-                            [(h.Id[-i], best_params["middle_line"]), (h.Id[-1], best_params["middle_line"])]]
-
         return is_fig
 
 
@@ -313,28 +261,3 @@ class ClsDummy(ExtensionBase):
         common.sl = {1: h.Low[-2], -1: h.High[-2]}  
         common.lines = [[(h.Id[-5], common.lprice), (h.Id[-1], common.lprice)], [(h.Id[-5], common.sprice), (h.Id[-1], common.sprice)]]
         return True
-        
-
-
-    
-    
-if __name__ == "__main__":
-    import torch
-    from torchinfo import summary
-    from dataloading import MovingWindow, DataParser
-    
-    cfg = PyConfig().test()
-    expert = ExpertFormation(cfg)
-    dp = DataParser(cfg)
-    hist_pd, hist = DataParser(cfg).load()
-    mw = MovingWindow(hist, cfg.hist_buffer_size)
-    h, _ = mw(100)
-    # x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to("cuda")
-    x = torch.tensor(np.zeros((7, 64))).unsqueeze(0).unsqueeze(0).double().to("cuda")
-    m = expert.model.double()
-    m.eval()
-    with torch.no_grad():
-        for _ in range(10):
-            torch.random.seed = 0
-            print(m(x).sum())
-    # print(summary(m, (10, 1, 7, 32)))

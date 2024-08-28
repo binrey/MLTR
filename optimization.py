@@ -1,22 +1,25 @@
 import itertools
 import multiprocessing
 import pickle
+import sys
+from collections import defaultdict
+from copy import deepcopy
+from copy import deepcopy as copy
 from multiprocessing import Pool
 from pathlib import Path
 from shutil import rmtree
 from time import time
-import sys
+from typing import Dict, List, Tuple
+
 import numpy as np
 import pandas as pd
+from backtest_1 import backtest
 from easydict import EasyDict
 from loguru import logger
 from matplotlib import pyplot as plt
-from copy import deepcopy as copy
-from typing import List, Dict, Tuple
-from backtest import BackTestResults, backtest
+
+from backtesting.utils import BackTestResults
 from utils import PyConfig
-from collections import defaultdict
-from copy import deepcopy
 
 logger.remove()
 logger.add(sys.stderr, level="DEBUG") 
@@ -204,8 +207,8 @@ class Optimizer:
                
                   
 if __name__ == "__main__":  
-      import sys
       import argparse
+      import sys
 
       parser = argparse.ArgumentParser(description="Optimization")
 

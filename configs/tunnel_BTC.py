@@ -1,6 +1,4 @@
-from configs.tunnel import Param
-from configs.tunnel import config
-
+from configs.tunnel import Param, config
 
 config.ticker.test = "BTCUSDT"
 config.ticksize.test = 0.001

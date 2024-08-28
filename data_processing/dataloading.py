@@ -116,7 +116,8 @@ class DataParser():
 
     def metatrader(self, data_file):
         pd.options.mode.chained_assignment = None
-        hist = pd.read_csv(data_file, sep=",", converters={"TIME": pd.to_datetime})
+        hist = pd.read_csv(data_file, sep=",")
+        hist.TIME = pd.to_datetime(hist.TIME, utc=True)
         hist.columns = map(str.capitalize, hist.columns)
         # if "Time" not in hist.columns:
         #     hist["Time"] = ["00:00:00"]*hist.shape[0]

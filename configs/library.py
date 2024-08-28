@@ -39,12 +39,12 @@ body_classifiers = EasyDict(
             ncross=Param(None, [None])
             )
         ), 
-    # tunnel = EasyDict( 
-    #     func=ClsTunnel,
-    #     params=EasyDict(
-    #         ncross=Param(None, [None])
-    #         )
-    #     ),
+    tunnel = EasyDict( 
+        func=ClsTunnel,
+        params=EasyDict(
+            ncross=Param(None, [None])
+            )
+        ),
     tunnel2 = EasyDict( 
         func=ClsTunZigZag,
         params=EasyDict(

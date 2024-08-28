@@ -1,8 +1,10 @@
-import numpy as np
-from backtest import MovingWindow
-from loguru import logger
-from utils import cache_result
 from time import time
+
+import numpy as np
+from loguru import logger
+
+from run import MovingWindow
+from utils import cache_result
 
 
 # @cache_result
