@@ -268,11 +268,21 @@ class Broker:
         for order in self.active_orders:
             if date == order.open_date:
                 self.best_profit = 0
-                self.correction = 0
-                self.max_correction = 0
-                self.add_profit = 0
-                continue
-            t = h.Id[-1] - order.open_indx
-            sl_rate = self.cfg.trailing_stop_rate
-            dp = h.Open[-1] - order.price
-            order.change(date, order.price + sl_rate * dp)
+            else:
+                profit_cur = 0
+                if self.active_position.dir == 1:
+                    profit_cur = h.High[-2] - self.active_position.open_price
+                if self.active_position.dir == -1:
+                    profit_cur = self.active_position.open_price - h.Low[-2]       
+                if profit_cur >= self.best_profit:
+                    self.best_profit = profit_cur
+                    
+                dp = self.active_position.open_price + self.active_position.dir * self.best_profit
+                new_sl = dp * (1 - self.active_position.dir*self.cfg.trailing_stop_rate)
+                if (new_sl - order.price) * self.active_position.dir >= 0:
+                    order.change(date, new_sl)
+            
+                # order.change(date, order.price + self.cfg.trailing_stop_rate * (h.Open[-1] - order.price))
+            
+            
+            
