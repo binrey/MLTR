@@ -54,11 +54,13 @@ class ZigZag:
 
 
 if __name__ == "__main__":
-    from backtest import DataParser, MovingWindow
-    from experts import PyConfig
-    import mplfinance as mpf
     from pathlib import Path
     from shutil import rmtree
+
+    import mplfinance as mpf
+
+    from run import DataParser, MovingWindow
+    from experts import PyConfig
 
     
     cfg = PyConfig().test()

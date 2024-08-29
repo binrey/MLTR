@@ -1,9 +1,10 @@
 import importlib.util
-from easydict import EasyDict
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
 import numpy as np
 from diskcache import Cache
+from easydict import EasyDict
 
 cache = Cache(".tmp")
 
@@ -75,10 +76,11 @@ class Config(EasyDict):
         return out
     
     
+
 @dataclass
 class FeeRate:
-    order_execution_rate: float = 0
-    position_suply_rate: float = 0
+    order_execution_rate: float = field(default=0, hash=True)
+    position_suply_rate: float = field(default=0, hash=True)
     
     def order_execution_fee(self, price, volume):
         return price * volume * self.order_execution_rate / 100
@@ -86,3 +88,6 @@ class FeeRate:
     def position_suply_fee(self, open_date, close_date, mean_price, volume):
         h8_count = np.diff([open_date, close_date]).astype('timedelta64[h]').astype(np.float32).item()/8
         return self.position_suply_rate / 100 * h8_count * mean_price * volume
+    
+    def __hash__(self):
+        return hash((self.order_execution_rate, self.position_suply_rate))

@@ -13,11 +13,11 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
-from backtest_1 import backtest
 from easydict import EasyDict
 from loguru import logger
 from matplotlib import pyplot as plt
 
+from backtesting.backtest import backtest
 from backtesting.utils import BackTestResults
 from utils import PyConfig
 
