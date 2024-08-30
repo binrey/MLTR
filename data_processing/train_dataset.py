@@ -3,7 +3,7 @@ from time import time
 import numpy as np
 from loguru import logger
 
-from run import MovingWindow
+from data_processing.dataloading import MovingWindow
 from utils import cache_result
 
 
