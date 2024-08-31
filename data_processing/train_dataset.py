@@ -18,7 +18,9 @@ def next_price_prediction(mw: MovingWindow, classifier, max_size=100):
             if len(p) >= max_size - 1:
                 break
 
-    features = np.expand_dims(np.array(features), 1).astype(np.float32)
+    features = np.array(features)
+    if features.ndim == 2:
+        features = np.expand_dims(features, 1).astype(np.float32)
     p = np.array(p).astype(np.float32)
     logger.info(
         f"Generation completed in {time()-t0:.1f} sec, features: {features.shape}, prices: {p.shape}")

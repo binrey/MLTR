@@ -52,9 +52,11 @@ class E2ETrain:
         self.val_train = None
 
     def init_model(self):
-        inp_shape = (1, self.train_sets[self.ticker].features.shape[-1])
-        self.model = E2EModel(inp_shape, 4, cls_head=False)
-        logger.debug("\n" + str(summary(self.model, [inp_shape], device="cpu")))
+        n_indics, n_feats = self.train_sets[self.ticker].features.shape[-2:]
+        self.model = E2EModel(n_indicators=n_indics, 
+                              n_features=n_feats, 
+                              nh=8, cls_head=False)
+        logger.debug("\n" + str(summary(self.model, [1, n_indics, n_feats], device="cpu")))
 
     def load_data(self, dataset_root="data", max_size=np.Inf, val_size=0):
         self.val_size = val_size
@@ -87,7 +89,7 @@ class E2ETrain:
 
     @staticmethod
     def calculate_loss(seq_result:SeqOutput, hold_train, p0, activity_reduction_factor=0.9, ticker_factor=1):
-        act_mult = 1 - activity_reduction_factor * seq_result.model_ans.abs().sum()/seq_result.model_ans.shape[0]
+        act_mult = (1 - activity_reduction_factor * seq_result.model_ans.abs().sum()/seq_result.model_ans.shape[0])**2
         loss = seq_result.sum_profit_relative() * act_mult
         return loss * ticker_factor
         
@@ -116,7 +118,7 @@ class E2ETrain:
             start_epoch = self.model.train_info["last_epoch"] + 1
         self.model.to(device)
 
-        optimizer = torch.optim.Adam(self.model.parameters(), maximize=True, lr=0.0002)
+        optimizer = torch.optim.Adam(self.model.parameters(), maximize=True, lr=0.001)
         scheduler = ExponentialLR(optimizer, gamma=0.9995)
 
         # ticker_factors, hold_sum = {}, 0
@@ -137,7 +139,7 @@ class E2ETrain:
                     self.model, price, features, self.cfg.fee_rate, device=device
                 )
                 # hold_train, _ = self.compute_hold(price, output_last=True)
-                loss += self.calculate_loss(seq_result, hold_train, price[0], ticker_factors[ticker])
+                loss += self.calculate_loss(seq_result, hold_train, price[0], 1, ticker_factors.get(ticker, 1))
                 
             loss /= len(train_tickers)
             loss.backward()

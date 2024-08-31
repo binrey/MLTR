@@ -160,20 +160,22 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
 
 
 class E2EModel(nn.Module):
-    def __init__(self, inp_shape, nh, cls_head=True):
+    def __init__(self, n_indicators, n_features, nh, cls_head=False):
         self.nh = nh
-        self.inp_shape = inp_shape
+        self.ni = n_indicators
+        self.nf = n_features
         self.train_info = {}
         super(E2EModel, self).__init__()
 
         nout = 3 if cls_head else 1
-        self.fc_features_in = nn.Linear(self.inp_shape[1], nh)
+        self.features_merge = nn.Conv1d(in_channels=self.nf, out_channels=self.nf, kernel_size=self.ni, stride=self.ni)
+        self.fc_features_in = nn.Linear(self.nf, nh)
         self.fc_out_prev_in = nn.Linear(1, nh)
         self.fc_hid = nn.Linear(nh, nh)
         self.fc_out = nn.Linear(nh, nout)
 
         self.norm_hid = nn.LayerNorm(nh)
-        self.norm_in = nn.LayerNorm(self.inp_shape)
+        self.norm_in = nn.LayerNorm(self.nf)
 
         self.norm_out = nn.LayerNorm(nout)
         self.relu = nn.ReLU()
@@ -181,29 +183,27 @@ class E2EModel(nn.Module):
         self.dropout = nn.Dropout(0.25)
         self.softmax = nn.Softmax(dim=1)
         self.states = torch.tensor([-1, 0, 1])
+        self.flatten = nn.Flatten()
 
     def cls_head(self, x):
         x = self.softmax(x)
         return (self.states*x).sum(dim=1)
 
     def forward(self, x):
-        features = self.norm_in(x)
-        features = self.fc_features_in(features)
-        features = self.relu(self.norm_hid(features))
+        # x = self.norm_in(x)
+        x = x.permute(0, 2, 1)
+        x = self.features_merge(x)
+        x = x.permute(0, 2, 1)
+        x = self.fc_features_in(x)
+        x = self.relu(self.norm_hid(x))
         
-        features = self.fc_hid(features)
-        features = self.relu(self.norm_hid(features))
-        features = self.dropout(features)      
-        features = self.fc_hid(features)
-        features = self.relu(self.norm_hid(features))
-        features = self.dropout(features)            
-        # out_prev = self.fc_out_prev_in(out_prev)
-        # out_prev = self.relu(self.norm_hid(out_prev))
-        # features = self.fc_hid(features + out_prev)   
-                        
-        features = self.fc_out(features)
-        features = nn.Flatten()(features)
-        output = self.out_func(features)
+        x = self.fc_hid(x)
+        x = self.relu(x)
+        x = self.dropout(x)      
+ 
+        x = self.flatten(x)                
+        x = self.fc_out(x)
+        output = self.out_func(x)
         
         return output
 
@@ -284,7 +284,7 @@ def batch_sequense(model, p, features, fee_rate:FeeRate, device="cpu") -> SeqOut
     if type(p) is np.ndarray:
         p = torch.from_numpy(p).to(device)
     if type(features) is np.ndarray:
-        features = torch.from_numpy(features).to(device)
+        features = torch.from_numpy(features).float().to(device)
     output = model(features).squeeze()
     return SeqOutput(model_ans=output,
                      price=p,

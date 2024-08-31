@@ -1,5 +1,8 @@
-from .base import *
+from pathlib import Path
+
 import torch
+
+from .base import *
 
 
 class ClsZigZag(ExtensionBase):
@@ -14,9 +17,10 @@ class ClsZigZag(ExtensionBase):
             # self.model = torch.load("model.pt")
 
     def getfeatures(self, h):
-        zz_values = self.zigzag.values/h.Close[-1]
-        features = np.zeros(self.cfg.feature_size)
-        features[-zz_values.shape[0]:] = zz_values
+        zn = self.zigzag.values.shape[0]
+        features = np.zeros((2, self.cfg.feature_size))
+        features[-zn:] = self.zigzag.values/h.Close[-1]
+        features[-zn:] = -self.zigzag.ids + self.zigzag.ids[-1]
         return features
 
     def check_status(self, h):
