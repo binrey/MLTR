@@ -13,3 +13,4 @@ optimization/data/
 *.pkl
 
 .DS_Store
+.*
