@@ -4,102 +4,74 @@ from loguru import logger
 
 
 class ZigZag:
-    def __init__(self):
-        self.mask, self.min_last, self.max_last, self.last_close, self.last_id = None, None, None, None, 0
+    def __init__(self, period, out_size=16):
+        self.period = period
+        self.mask, self.min_last, self.max_last, self.last_close = None, None, None, None
+        self.last_id = 0
+        self.size = out_size
+        
+        self.ids = np.zeros(out_size, dtype=int)
+        self.values = np.zeros(out_size, dtype=np.float32)
+        self.types = np.zeros(out_size, dtype=int)
+        self.n = 0
 
     def _get_mask(self, h):
+        self.mask = None
         if self.mask is None or h.Id[-1] - self.last_id > 1:
-            self.min_last, self.max_last, self.last_close = h.Low[0], h.High[0], h.Close[0]
+            self.min_last = h.Low[:self.period].min()
+            self.max_last = h.High[:self.period].max()  
+            self.last_extr_ind = 0   
             self.mask = np.zeros(h.Id.shape[0] - 1)
-            self.mask[0] = 1 if h.High[1] > self.max_last else -1
         else:
             self.mask[:-1] = self.mask[1:]
             self.mask[-1] = 0
-        for i in range(2, h.Id.shape[0]):
-            if self.mask[i-1] != 0:
+            
+        for i in range(self.period, h.Id.shape[0]-1):
+            if self.mask[i] != 0:
                 continue
-            self.mask[i-1] = self.mask[i-2]
-            if h.Close[i] <= self.last_close:
-                self.mask[i-1] = -1
-            if h.Close[i] >= self.last_close:
-                self.mask[i-1] = 1
-            self.min_last, self.max_last, self.last_close = h.Low[i], h.High[i], h.Close[i]
+            self.mask[i] = self.mask[i-1]
+            if h.Low[i] <= self.min_last:
+                self.mask[self.last_extr_ind:i+1] = -1
+                self.last_extr_ind = i
+            if h.High[i] >= self.max_last:
+                self.mask[self.last_extr_ind:i+1] = 1
+                self.last_extr_ind = i
+            self.min_last = h.Low[i-self.period+1:i+1].min()
+            self.max_last = h.High[i-self.period+1:i+1].max()        
         self.last_id = h.Id[-1]
         return self.mask
 
     def update(self, h):
         self._get_mask(h)
         return self.mask2zigzag(h, self.mask, use_min_max=True)
-    
-    def mask2zigzag(self, h, mask, use_min_max=False):
-        ids, values, types = [], [], []
-        def upd_buffers(i, v, t):
-            ids.append(i)
-            values.append(v)
-            types.append(t)
-        for i in range(mask.shape[0]):
+
+    def upd_buffers(self, i, v, t):
+        self.ids[-self.n] = i
+        self.values[-self.n] = v
+        self.types[-self.n] = t
+        self.n += 1
+        
+    def mask2zigzag(self, h, mask, use_min_max=False):        
+        self.ids[:] = 0
+        self.values[:] = 0
+        self.types[:] = 0
+        self.n = 1
+        for i in range(-1, -mask.shape[0]-1, -1):
             if use_min_max:
-                y = h.Low[i] if mask[i] > 0 else h.High[i]
+                y = h.Low[i] if mask[i] < 0 else h.High[i]
             else:
                 y = h.Close[i]
-            if i > 0: 
+            if i != -1: 
                 if mask[i] != node:
-                    upd_buffers(h.Id[i], y, node)
+                    self.upd_buffers(h.Id[i], y, -node)
                     node = mask[i]
             else:
                 node = mask[i]
-                upd_buffers(h.Id[i], y, -node)
-        upd_buffers(h.Id[i]+1, h.Close[-1], mask[i])
-        return ids, values, types   
+                self.upd_buffers(h.Id[i], y, node)
+            if self.n - 1 == self.size:
+                break
+        return self.ids, self.values, self.types
 
-
-if __name__ == "__main__":
-    from pathlib import Path
-    from shutil import rmtree
-
-    import mplfinance as mpf
-
-    from run import DataParser, MovingWindow
-    from experts import PyConfig
-
-    
-    cfg = PyConfig().test()
-    
-    save_path = Path("zz_debug")
-    if save_path.exists():
-        rmtree(save_path)
-    save_path.mkdir()    
-    hist_pd, hist = DataParser(cfg).load()
-    mw = MovingWindow(hist, cfg.hist_buffer_size)
-    data_wind, _ = mw(700)
-    indc = ZigZagOpt(max_drop=0.01)
-    ids, values, types = indc.update(data_wind)
-    print(ids, types, values)
-    indc.plot(save_path)
-    
-    hist2plot = hist_pd.iloc[ids[0]:ids[-1]+1]
-
-    lines, thks = [], []
-    for m in np.array(indc.masks)[[0, -1]]:
-        ids, values, _ = indc.mask2zigzag(data_wind, m, True)
-        line = []
-        for t, y in zip(ids, values):
-            try:
-                y = y.item()
-            except:
-                pass
-            line.append((hist2plot.index[hist2plot.Id==t][0], y))
-        lines.append(line)
-        
-    thks = list(range(1, len(lines)+1))[::-1]
-    colors = [(i*0.2, i*0.2, i*0.2) for i in thks]
-    fig = mpf.plot(hist2plot, 
-                type='candle', 
-                block=False,
-                alines=dict(alines=lines, colors=colors, linewidths=thks),
-                # savefig=save_path / f"_final.jpg"
-                )
-    mpf.show()
     
 
         

@@ -22,7 +22,7 @@ class ClsTrend(ExtensionBase):
         self.cfg = cfg
         super(ClsTrend, self).__init__(cfg, name="trend")
         # self.zigzag = ZigZagOpt(max_drop=self.cfg.maxdrop)
-        self.zigzag = ZigZagNew(self.cfg.period)
+        self.zigzag = ZigZag(self.cfg.period)
         
     def __call__(self, common, h) -> bool:
         ids, values, types = self.zigzag.update(h)

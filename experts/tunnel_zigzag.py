@@ -5,11 +5,12 @@ class ClsTunZigZag(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsTunZigZag, self).__init__(cfg, name="tuntrend")
-        self.zigzag = ZigZagNew(self.cfg.period, 32)
+        self.zigzag = ZigZag(self.cfg.period, self.cfg.nzz)
         
     def __call__(self, common, h) -> bool:
         is_fig = False 
         zz_ids, zz_values, zz_types = self.zigzag.update(h)
+        zz_ids, zz_values, zz_types = zz_ids[zz_types!=0], zz_values[zz_types!=0], zz_types[zz_types!=0] 
         # zz_types, zz_values = np.array(zz_types), np.array(zz_values)
         # if len(zz_ids) < 3:
         #     return is_fig

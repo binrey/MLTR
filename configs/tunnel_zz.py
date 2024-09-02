@@ -4,6 +4,7 @@ from utils import FeeRate
 classifier = body_classifiers.tunzigzag
 classifier.params.ncross = Param(8, [3, 5, 8, 12])
 classifier.params.period = Param(5, [3, 5, 8])
+classifier.params.nzz = Param(32, [4])
 
 # stops_processor = stops_processors.stops_fixed
 # stops_processor.params.sl = Param(2, [2, 3, 4])
@@ -30,11 +31,11 @@ config = EasyDict(
     tend=Param(None, [None]),
     
     period=Param("M60", ["M60"]),
-    ticker=Param("SBER", ["BTCUSDT", "ETHUSDT"]),
+    ticker=Param("BTCUSDT", ["BTCUSDT", "ETHUSDT"]),
     ticksize=Param(0.001, [0.001]),
-    data_type=Param("metatrader", ["bybit"]),
+    data_type=Param("bybit", ["bybit"]),
     
-    save_plots=Param(True, [False]),
+    save_plots=Param(False, [False]),
     run_model_device=Param(None, [None]),
     fee_rate=Param(FeeRate(0.1, 0.00016), [FeeRate(0.1, 0.00016)]),
     eval_buyhold=Param(True, [False]),

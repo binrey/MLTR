@@ -9,7 +9,7 @@ class ClsZigZag(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsZigZag, self).__init__(cfg, name="zigzag")
-        self.zigzag = ZigZagNew(self.cfg.period, self.cfg.feature_size)
+        self.zigzag = ZigZag(self.cfg.period, self.cfg.feature_size)
         self.last_zz_type = 0
         self.model = None
         if Path("model.pt").exists():
@@ -17,10 +17,15 @@ class ClsZigZag(ExtensionBase):
             # self.model = torch.load("model.pt")
 
     def getfeatures(self, h):
-        zn = self.zigzag.values.shape[0]
-        features = np.zeros((2, self.cfg.feature_size))
-        features[-zn:] = self.zigzag.values/h.Close[-1]
-        features[-zn:] = -self.zigzag.ids + self.zigzag.ids[-1]
+        id_mask = self.zigzag.ids != 0
+        features = np.zeros((3, self.cfg.feature_size))
+        features[0, id_mask] = (self.zigzag.values[id_mask] - h.Close[-1])/h.Close[-1]
+        features[1, id_mask] = (-self.zigzag.ids[id_mask] + self.zigzag.ids[-1])/h.Close.shape[0]
+        # select volumes for ids in zigzag.ids
+        volumes_selected = h.Volume[np.in1d(h.Id, self.zigzag.ids)]
+        # if volumes_selected.shape[0] != self.cfg.feature_size:
+        #     print("#")
+        features[2, id_mask] = volumes_selected/volumes_selected.max()
         return features
 
     def check_status(self, h):

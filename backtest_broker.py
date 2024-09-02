@@ -277,12 +277,12 @@ class Broker:
                 if profit_cur >= self.best_profit:
                     self.best_profit = profit_cur
                     
-                dp = self.active_position.open_price + self.active_position.dir * self.best_profit
-                new_sl = dp * (1 - self.active_position.dir*self.cfg.trailing_stop_rate)
-                if (new_sl - order.price) * self.active_position.dir >= 0:
-                    order.change(date, new_sl)
+                # dp = self.active_position.open_price + self.active_position.dir * self.best_profit
+                # new_sl = dp * (1 - self.active_position.dir*self.cfg.trailing_stop_rate)
+                # if (new_sl - order.price) * self.active_position.dir >= 0:
+                #     order.change(date, new_sl)
             
-                # order.change(date, order.price + self.cfg.trailing_stop_rate * (h.Open[-1] - order.price))
+                order.change(date, order.price + self.cfg.trailing_stop_rate * (h.Open[-1] - order.price))
             
             
             

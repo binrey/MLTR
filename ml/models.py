@@ -6,12 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
-# from sklearn.metrics import roc_auc_score
-from torch.utils.data import Dataset
 from torchinfo import summary
-
-from utils import FeeRate
 
 # class CustomImageDataset(Dataset):
 #     def __init__(self, X, y):
@@ -161,14 +156,65 @@ def train(X_train, y_train, X_test, y_test, batch_size=1, epochs=4, calc_test=Tr
 
 class E2EModel(nn.Module):
     def __init__(self, n_indicators, n_features, nh, cls_head=False):
+        super(E2EModel, self).__init__()
         self.nh = nh
         self.ni = n_indicators
         self.nf = n_features
         self.train_info = {}
-        super(E2EModel, self).__init__()
 
         nout = 3 if cls_head else 1
-        self.features_merge = nn.Conv1d(in_channels=self.nf, out_channels=self.nf, kernel_size=self.ni, stride=self.ni)
+        # self.features_merge = nn.Conv1d(in_channels=self.nf, out_channels=self.nf, kernel_size=self.ni, stride=self.ni)
+        self.features_merge = nn.Linear(self.ni, 1)
+        self.fc_features_in = nn.Linear(self.nf, nh)
+        self.fc_out_prev_in = nn.Linear(1, nh)
+        self.fc_hid = nn.Linear(nh, nh)
+        self.fc_out = nn.Linear(nh*self.ni, nout)
+
+        self.norm_hid = nn.LayerNorm(nh)
+        self.norm_in = nn.LayerNorm(self.nf)
+
+        self.norm_out = nn.LayerNorm(nout)
+        self.relu = nn.ReLU()
+        self.out_func = self.cls_head if cls_head else nn.Tanh()
+        self.dropout = nn.Dropout(0.5)
+        self.softmax = nn.Softmax(dim=1)
+        self.states = torch.tensor([-1, 0, 1])
+        self.flatten = nn.Flatten()
+
+    def cls_head(self, x):
+        x = self.softmax(x)
+        return (self.states*x).sum(dim=1)
+
+    def forward(self, x):
+        # x = self.norm_in(x)
+        # x = x.permute(0, 2, 1)
+        # x = self.features_merge(x)
+        # x = x.permute(0, 2, 1)
+        # x = x[:, 0, :]
+        x = self.fc_features_in(x)
+        x = self.relu(x)
+        
+        x = self.dropout(x)         
+        x = self.fc_hid(x)
+        x = self.relu(x)
+ 
+        x = self.flatten(x)                
+        x = self.fc_out(x)
+        output = self.out_func(x)
+        
+        return output
+
+
+class E2EModelConv(nn.Module):
+    def __init__(self, n_indicators, n_features, nh, cls_head=False):
+        super(E2EModelConv, self).__init__()
+        self.nh = nh
+        self.ni = n_indicators
+        self.nf = n_features
+        self.train_info = {}
+
+        nout = 3 if cls_head else 1
+        self.features_merge = nn.Conv1d(in_channels=self.nf, out_channels=self.nh, kernel_size=self.ni, stride=self.ni)
         self.fc_features_in = nn.Linear(self.nf, nh)
         self.fc_out_prev_in = nn.Linear(1, nh)
         self.fc_hid = nn.Linear(nh, nh)
@@ -194,8 +240,8 @@ class E2EModel(nn.Module):
         x = x.permute(0, 2, 1)
         x = self.features_merge(x)
         x = x.permute(0, 2, 1)
-        x = self.fc_features_in(x)
-        x = self.relu(self.norm_hid(x))
+        # x = self.fc_features_in(x)
+        x = self.relu(x)
         
         x = self.fc_hid(x)
         x = self.relu(x)
@@ -206,7 +252,7 @@ class E2EModel(nn.Module):
         output = self.out_func(x)
         
         return output
-
+    
 @dataclass
 class SeqOutput:
     model_ans: torch.Tensor
@@ -226,9 +272,9 @@ class SeqOutput:
         return self.profits_with_fees / self.price[:-1]
     
     def sum_profit(self, include_fees=True):
-        profit = self.profit.sum(dim=0)
+        profit = self.profits.sum(dim=0)
         if include_fees:
-            profit -= self.sum_fees
+            profit -= self.sum_fees()
         return profit
       
     def sum_profit_relative(self):
@@ -244,66 +290,27 @@ class SeqOutput:
             profit_curve = self.profits.cumsum(dim=0)
             if include_fees:
                 profit_curve -= self.fees.cumsum(dim=0)
-        return torch.concat([torch.Tensor([0], device=profit_curve.device), profit_curve])
+        return torch.concat([torch.Tensor([0]), profit_curve.cpu()])
 
 
-def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"):
-    if type(p) is np.ndarray:
-        p = torch.from_numpy(p).to(device)
-    if type(features) is np.ndarray:
-        features = torch.from_numpy(features).to(device)
-    dp = p[1:] - p[:-1]
-    output_seq, result_seq, fee_seq = np.zeros(
-        dp.shape[0]+1), np.zeros(dp.shape[0]+1), np.zeros(dp.shape[0]+1)
-    profit = torch.zeros((1, 1), device=device)
-    pred_result = torch.zeros((1, 1), device=device)
-    output = torch.zeros((1, 1, 1), device=device)
-    output_last = torch.zeros((1, 1, 1), device=device)
-    pred_result = torch.zeros((1, 1, 1), device=device)
-    for i in range(dp.shape[0]):
-        # print(f"t={i + 1:04}", end=" ")
-        output = model(features[i:i+1])
-        fees = (output - output_last).abs() * p[i] * 0.001
-        pred_result = dp[i] * output - fees
-        output_last = output
-        if output_sequense:
-            output_seq[i+1] = output.item()
-            result_seq[i+1] = pred_result.item()
-            fee_seq[i+1] = fees.item()
-        else:
-            # print(f"{epoch + 1:03} {i + 1:04}: profit += {output.item():7.2f} * {dp[i]:7.2f} - {fees.item():7.3f} = {pred_result.item():7.2f}", end=" ")
-            profit += pred_result.squeeze()
-
-            # print(f"| profit: {profit.item():9.3f}")
-    if output_sequense:
-        return output_seq, result_seq, fee_seq
-    else:
-        return profit
-
-def batch_sequense(model, p, features, fee_rate:FeeRate, device="cpu") -> SeqOutput:
-    if type(p) is np.ndarray:
-        p = torch.from_numpy(p).to(device)
-    if type(features) is np.ndarray:
-        features = torch.from_numpy(features).float().to(device)
-    output = model(features).squeeze()
-    return SeqOutput(model_ans=output,
-                     price=p,
-                     fees=fee_rate.order_execution_fee(p[:-1], (output[1:] - output[:-1]).abs()))
 
 if __name__ == "__main__":
+    from time import time
+
     import numpy as np
+    ni = 2
+    nf = 64
+    
     torch.manual_seed(0)
     device = torch.device("cpu")
-    model = E2EModel((1, 4), 32)
+    f = torch.randn(10000, ni, nf).to(device)
+
+    model = E2EModel(ni, nf, 8)
     model.to(device)
-    # model.eval()
-    f = torch.randn(10, 1, 4).to(device)
-    p = torch.randn(1, 1, 1).to(device)
     out = model(f)
-    print(out.shape, out)
-    print(summary(model, (1, 4), device="cpu"))
-    # model.to(device)
-    # x = torch.tensor(np.zeros((1, 1, 6, 64))).float().to(device)
-    # with torch.no_grad():
-    #     for _ in range(3):
-    #         print(model(x))
+    summary(model, (1, ni, nf), device="cpu")
+    print(out.shape, out, "\n")
+    t0 = time()
+    for i in range(100):
+        out = model(f)
+    print(time()-t0)

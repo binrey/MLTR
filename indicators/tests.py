@@ -1,17 +1,18 @@
 import sys
-import mplfinance as mpf
 from pathlib import Path
 from shutil import rmtree
-import numpy as np
-from pathlib import Path
 from time import time
+
+import mplfinance as mpf
+import numpy as np
 
 sys.path.append(str(Path(__file__).parent.parent))
 from backtest import DataParser, MovingWindow
-from utils import PyConfig
-from indicators import *
 
-    
+from indicators import *
+from utils import PyConfig
+
+
 class IndcTester():
     def __init__(self, indc, save_path=Path("indicators/test")):
         self.save_path = save_path
@@ -78,7 +79,7 @@ class IndcTester():
     
     
 if __name__ == "__main__":
-    indc = ZigZagNew(8)
+    indc = ZigZag(8)
     tester = IndcTester(indc)
         
     t0 = time()

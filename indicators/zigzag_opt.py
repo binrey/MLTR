@@ -5,8 +5,8 @@ from .zigzag import ZigZag
 
 
 class ZigZagOpt(ZigZag):
-    def __init__(self, min_nodes=1, max_drop=1, simp_while_grow=False):
-        super(ZigZagOpt, self).__init__()
+    def __init__(self, period=1, min_nodes=1, max_drop=1, simp_while_grow=False):
+        super(ZigZagOpt, self).__init__(period, out_size=32)
         self.min_nodes = min_nodes
         self.simp_while_grow = simp_while_grow
         self.max_drop = max_drop
