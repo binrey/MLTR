@@ -24,6 +24,7 @@ class BackTestResults:
             for d in pd.date_range(start=date_start, end=date_end, freq="D")
         ]
         self.daily_hist = pd.DataFrame({"days": self.target_dates})
+        self.monthly_hist = None
         self.buy_and_hold = None
         self.tickers = None
         self.wallet = wallet
@@ -38,7 +39,6 @@ class BackTestResults:
         self.tickers = "+".join(set([pos.ticker for pos in backtest_broker.positions]))
         self.process_profits(dates, profits, backtest_broker.fees)
         self.num_years_on_trade = self.compute_n_years(backtest_broker.positions)
-        # self.mean_pos_duration = np.array([pos.duration for pos in backtest_broker.positions]).mean()
         return perf_counter() - t0
 
     def process_profits(self, dates: Iterable, profits: Iterable, fees: Iterable):
@@ -50,11 +50,12 @@ class BackTestResults:
         )
         # self.open_risks = np.array([pos.open_risk for pos in backtest_broker.positions])
         self.update_daily_profit(self._convert_hist(dates, profit_cumsum))
+        self.update_monthly_profit()
         self.fees = sum(fees)
 
-    def compute_buy_and_hold(self, dates, closes, fuse=False):
+    def compute_buy_and_hold(self, dates: np.ndarray, closes: np.ndarray, fuse=False):
         t0 = perf_counter()
-        dates = [d.date() for d in pd.to_datetime(dates)]
+        dates = pd.to_datetime(dates).date
         yeld_dates = [
             pd.to_datetime(d).date()
             for d in pd.date_range(start=self.date_start, end=self.date_end, freq="M")
@@ -82,10 +83,21 @@ class BackTestResults:
         )
         self.metrics["loss_max_rel"] = self.metrics["loss_max"] / self.deposit * 100
 
+    def update_monthly_profit(self):
+        # Create a temporary DataFrame with a DatetimeIndex for resampling
+        temp_df = self.daily_hist.copy()
+        temp_df.set_index("days", inplace=True)
+        temp_df.index = pd.to_datetime(temp_df.index)
+
+        # Calculate monthly profits
+        self.monthly_hist = temp_df['profit'].resample('M').sum()
+        self.monthly_hist = self.monthly_hist.reset_index()
+        self.monthly_hist.columns = ["days", "profit"]
+        
     def plot_results(self):
-        fig, ax1 = plt.subplots(2, 1, height_ratios=[3, 1], figsize=(10, 8))
-        ax1 = plt.subplot(2, 1, 1)
-        ax2 = ax1.twinx()
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12), gridspec_kw={'height_ratios': [3, 1, 1]})
+        
+        # First subplot
         ax1.plot(
             self.daily_hist.days,
             self.daily_hist.profit,
@@ -117,24 +129,33 @@ class BackTestResults:
         ax1.legend(
             ["sum. profit", "profit from strategy", "profit without fees", "buy and hold"]
         )
-        ax2.plot(
-            self.daily_hist.days,
-            self.daily_hist.buy_and_hold_reinvest,
-            linewidth=2,
-            alpha=0.2,
-        )
-        ax2.legend([self.tickers])
-        # plt.grid("on")
+        if "buy_and_hold_reinvest" in self.daily_hist.columns:
+            ax2.plot(
+                self.daily_hist.days,
+                self.daily_hist.buy_and_hold_reinvest,
+                linewidth=2,
+                alpha=0.2,
+            )
+            ax2.legend([self.tickers])
 
-        ax1 = plt.subplot(2, 1, 2)
-        ax1.plot(
+        # Second subplot
+        ax2.plot(
             self.daily_hist["days"],
             self.daily_hist["deposit"],
             "-",
             linewidth=3,
             alpha=0.3,
         )
-        ax1.legend(["deposit"])
+        ax2.legend(["deposit"])
+
+        # Third subplot
+        ax3.plot(
+            self.monthly_hist["days"],
+            self.monthly_hist["profit"],
+            color="g",
+            alpha=0.6,
+        )
+        ax3.legend(["monthly profit"])
 
         plt.tight_layout()
         plt.savefig("backtest.png")
@@ -214,7 +235,7 @@ class BackTestResults:
                     break
                 date_target -= timedelta(days=1)
             day_profs = vals[mask]
-            # If there are records for currend day, store latest of them, else fill days with no records with latest sored record
+            # If there are records for currend day, store latest of them, else fill days with no records with latest stored record
             if len(day_profs):
                 daily_vals[i] = day_profs[-1]
             elif len(vals):

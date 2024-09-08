@@ -30,7 +30,7 @@ def backtest(cfg, loglevel="INFO"):
 
     exp = BacktestExpert(cfg)
     broker = Broker(cfg)
-    hist_pd, hist = DataParser(cfg).load(os.environ.get("FINDATA", "fin_data"))
+    hist_pd, hist = DataParser(cfg).load()
     mw = MovingWindow(hist, cfg)
 
     if cfg.save_plots:

@@ -1,3 +1,4 @@
+import os
 import pickle
 from pathlib import Path
 from time import perf_counter
@@ -83,7 +84,9 @@ class DataParser():
     def __init__(self, cfg):
         self.cfg = cfg
 
-    def load(self, database="data"):
+    def load(self, database=None):
+        if database is None:
+            database = os.environ.get("FINDATA", "fin_data")
         t0 = perf_counter()
         p = Path(database) / self.cfg.data_type / self.cfg.period
         flist = [f for f in p.glob("*") if self.cfg.ticker in f.stem]

@@ -1,18 +1,19 @@
 from dataclasses import dataclass
 from enum import Enum
 from time import perf_counter
-from typing import List
+from typing import Any, List, Optional
 
 import numpy as np
 from loguru import logger
 
-from utils import FeeRate
+from utils import FeeConst, FeeModel
 
 
 class Side(Enum):
     BUY = 1
     SELL = -1
     UNDEF = 0
+
 
 def date2str(date):
     return str(date).split(".")[0]
@@ -61,7 +62,17 @@ class Order:
 
 
 class Position:
-    def __init__(self, price, date, indx, ticker="NoName", volume=1, period="M5", sl=None, fee_rate=0):
+    def __init__(
+        self,
+        price: float,
+        date: Any,
+        indx: int,
+        ticker: str = "NoName",
+        volume: int = 1,
+        period: str = "M5",
+        sl: Optional[float] = None,
+        fee_rate: Optional[FeeModel] = None,
+    ):
         self.volume = float(volume)
         assert self.volume > 0
         self.ticker = ticker
@@ -78,7 +89,7 @@ class Position:
         self.close_date = None
         self.profit = None
         self.profit_abs = None
-        self.fee_rate = fee_rate
+        self.fee_rate = fee_rate if fee_rate is not None else FeeConst(0, 0)
         self.fees = 0
         self.fees_abs = 0
         self._update_fees(self.open_price, self.volume)
@@ -90,7 +101,12 @@ class Position:
     def _update_fees(self, price, volume):
         self.fees_abs += self.fee_rate.order_execution_fee(price, volume)
         if self.close_date and self.open_date:
-            self.fees_abs += self.fee_rate.position_suply_fee(self.open_date, self.close_date, (self.open_price+self.close_price)/2, volume)
+            self.fees_abs += self.fee_rate.position_suply_fee(
+                self.open_date,
+                self.close_date,
+                (self.open_price + self.close_price) / 2,
+                volume,
+            )
         self.fees = self.fees_abs / self.volume / self.open_price * 100
 
     @property
@@ -273,16 +289,17 @@ class Broker:
                 if self.active_position.dir == 1:
                     profit_cur = h.High[-2] - self.active_position.open_price
                 if self.active_position.dir == -1:
-                    profit_cur = self.active_position.open_price - h.Low[-2]       
+                    profit_cur = self.active_position.open_price - h.Low[-2]
                 if profit_cur >= self.best_profit:
                     self.best_profit = profit_cur
-                    
+
                 # dp = self.active_position.open_price + self.active_position.dir * self.best_profit
                 # new_sl = dp * (1 - self.active_position.dir*self.cfg.trailing_stop_rate)
                 # if (new_sl - order.price) * self.active_position.dir >= 0:
                 #     order.change(date, new_sl)
-            
-                order.change(date, order.price + self.cfg.trailing_stop_rate * (h.Open[-1] - order.price))
-            
-            
-            
+
+                order.change(
+                    date,
+                    order.price
+                    + self.cfg.trailing_stop_rate * (h.Open[-1] - order.price),
+                )
