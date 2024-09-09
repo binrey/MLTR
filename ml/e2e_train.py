@@ -15,8 +15,7 @@ from tqdm import tqdm
 from data_processing.dataloading import DataParser, MovingWindow
 from data_processing.train_dataset import next_price_prediction
 from ml.models import E2EModel, E2EModelConv, SeqOutput
-from utils import PyConfig, FeeRate
-
+from utils import FeeModel, PyConfig
 
 
 def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"):
@@ -52,7 +51,7 @@ def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"
     else:
         return profit
 
-def batch_sequense(model, p, features, fee_rate:FeeRate, device="cpu") -> SeqOutput:
+def batch_sequense(model, p, features, fee_rate:FeeModel, device="cpu") -> SeqOutput:
     if type(p) is np.ndarray:
         p = torch.from_numpy(p).to(device)
     if type(features) is np.ndarray:
@@ -184,7 +183,7 @@ class E2ETrain:
                     self.model, price, features, self.cfg.fee_rate, device=device
                 )
                 # hold_train, _ = self.compute_hold(price, output_last=True, norm=True)
-                loss += self.calculate_loss(seq_result, None, None, 1, ticker_factors.get(ticker, 1))
+                loss += self.calculate_loss(seq_result, None, None, 0, ticker_factors.get(ticker, 1))
                 
             loss /= len(train_tickers)
             loss.backward()
