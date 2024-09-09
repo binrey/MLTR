@@ -1,5 +1,5 @@
 from configs.library import *
-from utils import FeeRate
+from utils importFeeRate
 
 classifier = body_classifiers.tunnel
 classifier.params.ncross = Param(5, [2, 3, 4, 5, 7, 9])
@@ -27,7 +27,7 @@ config = EasyDict(
     period=Param("M60", ["M60"]),
     ticker=Param("BTCUSDT", ["BTCUSDT", "ETHUSDT"]),
     ticksize=Param(1, [None]),
-    data_type=Param("bybit", ["bybit"]),
+    data_type=Param("metatrader", ["bybit"]),
     save_plots=Param(False, [False]),
     run_model_device=Param(None, [None]),
     fee_rate=Param(FeeRate(0.1, 0.00016), [FeeRate(0.1, 0.00016)]),
