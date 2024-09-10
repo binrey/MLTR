@@ -2,7 +2,7 @@ from configs.library import *
 from utils import FeeRate
 
 classifier = body_classifiers.zigzag
-classifier.params.feature_size = Param(16, [3, 5, 8, 12])
+classifier.params.feature_size = Param(1, [3, 5, 8, 12])
 classifier.params.period = Param(4, [3, 5, 8])
 
 # stops_processor = stops_processors.stops_fixed
@@ -30,11 +30,11 @@ config = EasyDict(
     tend=Param(None, [None]),
 
     period=Param("M60", ["M60"]),
-    ticker=Param("SBER", ["BTCUSDT", "ETHUSDT"]),
+    ticker=Param("BTCUSDT", ["BTCUSDT", "ETHUSDT"]),
     ticksize=Param(0.001, [0.001]),
     data_type=Param("metatrader", ["bybit"]),
     
-    add_tickers_to_train=Param(["GAZP", "LKOH"], [None]),
+    add_tickers_to_train=Param([], [None]),
 
     save_plots=Param(False, [False]),
     run_model_device=Param(None, [None]),

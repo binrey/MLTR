@@ -2,9 +2,9 @@ from configs.library import *
 from utils import FeeRate
 
 classifier = body_classifiers.tunzigzag
-classifier.params.ncross = Param(8, [3, 5, 8, 12])
-classifier.params.period = Param(5, [3, 5, 8])
-classifier.params.nzz = Param(32, [4])
+classifier.params.ncross = Param(5, [3, 5, 8, 12])
+classifier.params.period = Param(3, [3, 5, 8])
+classifier.params.nzz = Param(32, [32])
 
 # stops_processor = stops_processors.stops_fixed
 # stops_processor.params.sl = Param(2, [2, 3, 4])
@@ -17,10 +17,10 @@ stops_processor.params.sl_active = Param(True, [True])
 config = EasyDict(
     wallet=Param(100, [100]),
     leverage=Param(1, [1]),
-    date_start=Param("2020-09-01T00:00:00", ["2017-09-01"]),
-    date_end=Param("2024-08-01", ["2025-01-01"]),
+    date_start=Param("2000-09-01T00:00:00", ["2000-01-01"]),
+    date_end=Param("2024-09-01", ["2025-01-01"]),
     no_trading_days=Param(set(), [set()]),
-    trailing_stop_rate=Param(0.05, [0.002, 0.004, 0.006]),
+    trailing_stop_rate=Param(0.006, [0.002, 0.004, 0.006]),
     trailing_stop_type=Param(1, [1]),
     body_classifier=Param(classifier, [classifier]),
     allow_overturn=Param(False, [False]),
@@ -31,9 +31,9 @@ config = EasyDict(
     tend=Param(None, [None]),
     
     period=Param("M60", ["M60"]),
-    ticker=Param("BTCUSDT", ["BTCUSDT", "ETHUSDT"]),
+    ticker=Param("BTCUSDT", ["BTCUSDT"]),
     ticksize=Param(0.001, [0.001]),
-    data_type=Param("bybit", ["bybit"]),
+    data_type=Param("metatrader", ["metatrader"]),
     
     save_plots=Param(False, [False]),
     run_model_device=Param(None, [None]),

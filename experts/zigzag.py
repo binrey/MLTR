@@ -19,12 +19,10 @@ class ClsZigZag(ExtensionBase):
     def getfeatures(self, h):
         id_mask = self.zigzag.ids != 0
         features = np.zeros((3, self.cfg.feature_size))
-        features[0, id_mask] = (self.zigzag.values[id_mask] - h.Close[-1])/h.Close[-1]
+        ma = h.Close.mean()
+        features[0, id_mask] = (self.zigzag.values[id_mask] - ma)/ma
         features[1, id_mask] = (-self.zigzag.ids[id_mask] + self.zigzag.ids[-1])/h.Close.shape[0]
-        # select volumes for ids in zigzag.ids
         volumes_selected = h.Volume[np.in1d(h.Id, self.zigzag.ids)]
-        # if volumes_selected.shape[0] != self.cfg.feature_size:
-        #     print("#")
         features[2, id_mask] = volumes_selected/volumes_selected.max()
         return features
 
