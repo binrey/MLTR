@@ -107,5 +107,5 @@ class FeeConst(FeeModel):
         return volume * self.order_execution_rate
     
     def position_suply_fee(self, open_date, close_date, mean_price, volume):
-        h8_count = np.diff([open_date, close_date]).astype('timedelta64[h]').astype(np.float32).item()/8
+        h8_count = np.diff([open_date, close_date]).astype('timedelta64[h]').astype(np.float32).item()/24
         return self.position_suply_rate * h8_count * volume

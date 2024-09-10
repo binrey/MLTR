@@ -162,7 +162,7 @@ class Broker:
         return np.array([p.profit_abs for p in self.positions])
 
     @property
-    def fees(self):
+    def fees_abs(self):
         return np.array([p.fees_abs for p in self.positions])
 
     def close_orders(self, close_date, i=None):
