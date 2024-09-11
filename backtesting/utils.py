@@ -124,13 +124,13 @@ class BackTestResults:
             color="b",
             alpha=0.6,
         )
-        # ax1.plot(
-        #     self.monthly_hist.index,
-        #     self.monthly_hist["buy_and_hold"],
-        #     linewidth=1,
-        #     color="b",
-        #     alpha=0.6,
-        # )
+        ax1.plot(
+            self.deals_hist["profits"].index,
+            self.deals_hist["profits"].cumsum(),
+            linewidth=1,
+            color="b",
+            alpha=0.6,
+        )
         ax1.plot(
             self.daily_hist.index,
             self.daily_hist.profit_nofees,
