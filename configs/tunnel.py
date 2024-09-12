@@ -21,7 +21,7 @@ config = EasyDict(
     body_classifier=Param(classifier, [classifier]),
     allow_overturn=Param(False, [False]),
     stops_processor=Param(stops_processor, [stops_processor]),
-    hist_buffer_size=Param(128, [128]),
+    hist_buffer_size=Param(64, [64]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
     period=Param("M60", ["M60"]),
@@ -31,6 +31,7 @@ config = EasyDict(
     save_plots=Param(False, [False]),
     run_model_device=Param(None, [None]),
     fee_rate=Param(FeeRate(0.1, 0.00016), [FeeRate(0.1, 0.00016)]),
+    # fee_rate=Param(FeeRate(0., 0.000), [FeeRate(0., 0.000)]),
     eval_buyhold=Param(True, [False]),
     fuse_buyhold=Param(False, [False]),
 )

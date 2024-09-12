@@ -148,10 +148,7 @@ class Broker:
         self.active_position = None
         self.positions: List[Position] = []
         self.orders = []
-
         self.best_profit = 0
-        self.correction = 0
-        self.add_profit = 0
 
     @property
     def profits(self):
