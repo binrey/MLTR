@@ -129,8 +129,9 @@ class Position:
         self.close_indx = indx
         self._update_fees(self.close_price, self.volume)
         self.profit_abs = (self.close_price - self.open_price) * self.dir * self.volume
-        self.profit = self.profit_abs / self.open_price * 100 - self.fees
         self.profit_abs -= self.fees_abs
+        self.profit = self.profit_abs / self.open_price * 100
+        
 
         logger.debug(
             f"{date2str(date)} close position {self.id} at {self.close_price:.2f}, profit: {self.profit_abs:.2f} ({self.profit:.2f}%)"

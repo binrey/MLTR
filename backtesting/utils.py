@@ -41,6 +41,24 @@ class BackTestResults:
         return perf_counter() - t0
 
     def process_profits(self, dates: Iterable, profits: Iterable, fees: Iterable):
+        """
+        Processes the profits, fees, and dates to generate historical data and metrics.
+
+            dates (Iterable): An iterable of dates corresponding to each deal.
+            profits (Iterable): An iterable of absolute profit values (with fees) for each deal.
+            fees (Iterable): An iterable of fee values for each deal.
+
+        This method performs the following steps:
+        1. Calculates the number of deals.
+        2. Creates a DataFrame with the provided dates, profits, and fees.
+        3. Sets the 'dates' column as the index of the DataFrame.
+        4. Resamples the historical data to a daily frequency.
+        5. Adds columns for cumulative sums of profits, fees, and profits without fees.
+        6. Resamples the historical data to a monthly frequency.
+        7. Processes daily metrics.
+        8. Calculates the total fees.
+        """
+
         self.ndeals = len(profits)
         self.deals_hist = pd.DataFrame(
             {"dates": dates, "profits": profits, "fees":fees}
@@ -48,11 +66,11 @@ class BackTestResults:
         self.deals_hist.set_index("dates", inplace=True)
         self.daily_hist = self.resample_hist(self.deals_hist, "D")
         # add column with cumulative sum of profits
-        self.daily_hist["profit_csum"] = (self.daily_hist["profits"] - self.daily_hist["fees"]).cumsum()
+        self.daily_hist["profit_csum"] = self.daily_hist["profits"].cumsum()
         # add column with cumulative sum of fees
         self.daily_hist["fees_csum"] = self.daily_hist["fees"].cumsum()
         # add column with cumulative sum of profits without fees
-        self.daily_hist["profit_nofees"] = self.daily_hist["profits"].cumsum()        
+        self.daily_hist["profit_nofees"] = self.daily_hist["profits"].cumsum() + self.daily_hist["fees"].cumsum()   
         self.monthly_hist = self.resample_hist(self.deals_hist, "M")
         self.process_daily_metrics()
         # self.update_monthly_profit()
@@ -60,6 +78,8 @@ class BackTestResults:
 
     def resample_hist(self, hist, period="D"):
         hist = hist.resample(period).sum()
+        # Set the index to the first day of each month
+        # monthly_sum.index = monthly_sum.index.to_period('M').to_timestamp('M')
         # generate dates based on start and end dates
         target_dates = pd.date_range(start=pd.to_datetime(self.date_start).date(), 
                                      end=pd.to_datetime(self.date_end).date(), 
@@ -70,26 +90,29 @@ class BackTestResults:
         return hist
         
     def compute_buy_and_hold(self, dates: np.ndarray, closes: np.ndarray, fuse=False):
+        """
+        Compute buy and hold strategy for the given dates and closes prices. Use self.resample_hist method to resample data to monthly frequency.
+        
+        Output pandas DataFrame with index "dates" and columns: "profits", "buy_and_hold", "buy_and_hold_reinvest".
+        dates - dates of first day of every month.
+        profits - profits from the strategy on every month.
+        buy_and_hold - Buy at the first day and sell on the last. 
+        """
         t0 = perf_counter()
         # create datafreame from closes and dates as index
-        hist = pd.DataFrame({"price": closes}, index=dates)
+        df = pd.DataFrame({"price": closes}, index=dates)
         # compute profits column as difference between Close prices
-        hist["profits"] = hist["price"].diff().fillna(0)
+        df["dp"] = df["price"].diff().fillna(0)
         # feel fees column with zeros
-        hist["fees"] = 0
-        # resample hist to daily data
-        bh_hist = self.resample_hist(hist, "M")
-        bh_hist["profits"] *= self.wallet / bh_hist["price"].values
-        # bh = np.hstack([0, ((bh[1:] - bh[:-1]) * self.wallet / bh[:-1])]).cumsum()
-        self.monthly_hist["buy_and_hold"] = bh_hist["profits"].cumsum()
-        # self.daily_hist["buy_and_hold"] = self._convert_hist(yeld_dates, bh)
-        # self.daily_hist["buy_and_hold_reinvest"] = self._convert_hist(
-        #     dates, closes * self.wallet
-        # )
-        # if fuse:
-        #     self.update_daily_profit(
-        #         self.daily_hist["profit"] + self.daily_hist["buy_and_hold"]
-        #     )
+        df["fees"] = 0
+        first_prices = df.resample("M").first()["price"]
+        # resample hist to monthly data
+        df = self.resample_hist(df, "M")
+        self.monthly_hist["price"] = first_prices
+        self.monthly_hist["buy_and_hold_volume"] = self.wallet/self.monthly_hist["price"].iloc[0]
+        self.monthly_hist["buy_and_hold"] = (df["dp"]*self.monthly_hist["buy_and_hold_volume"]).cumsum()
+        self.monthly_hist["buy_and_spend_volume"] = self.wallet/self.monthly_hist["price"]
+        self.monthly_hist["buy_and_spend"] = (df["dp"]*self.monthly_hist["buy_and_spend_volume"]).cumsum()
         return perf_counter() - t0
 
     def process_daily_metrics(self):
@@ -114,7 +137,7 @@ class BackTestResults:
         self.monthly_hist.columns = ["days", "profit"]
         
     def plot_results(self):
-        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12), gridspec_kw={'height_ratios': [3, 1, 1]})
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(6, 8), gridspec_kw={'height_ratios': [3, 1, 1]})
         
         # First subplot
         ax1.plot(
@@ -138,29 +161,29 @@ class BackTestResults:
             color="r",
             alpha=0.6,
         )
-        if "buy_and_hold" in self.monthly_hist.columns:
+        legend_ax1 = ["sum. profit", "profit from strategy", "profit without fees"]
+        if "buy_and_spend" in self.monthly_hist.columns:
             ax1.plot(
                 self.monthly_hist.index,
-                self.monthly_hist.buy_and_hold,
+                self.monthly_hist["buy_and_spend"],
                 linewidth=2,
                 alpha=0.6,
             )
-        ax1.legend(
-            ["sum. profit", "profit from strategy", "profit without fees", "buy and hold"]
-        )
+            legend_ax1.append("buy & spend")
+
         
         # Create a secondary y-axis for buy_and_hold_reinvest
-        if "buy_and_hold_reinvest" in self.daily_hist.columns:
-            ax1_reinvest = ax1.twinx()
-            ax1_reinvest.plot(
-                self.daily_hist.index,
-                self.daily_hist.buy_and_hold_reinvest,
+        if "buy_and_hold" in self.monthly_hist.columns:
+            # ax1 = ax1.twinx()
+            ax1.plot(
+                self.monthly_hist.index,
+                self.monthly_hist["buy_and_hold"],
                 linewidth=2,
                 color="g",
                 alpha=0.6,
             )
-            ax1_reinvest.legend(["buy and hold reinvest"], loc='upper left')
-            ax1_reinvest.set_ylabel("Buy and Hold Reinvest")
+            legend_ax1.append("buy & hold")
+            ax1.set_ylabel("Buy & Hold")
 
         # Second subplot
         ax2.plot(
@@ -170,7 +193,7 @@ class BackTestResults:
             linewidth=3,
             alpha=0.3,
         )
-        ax2.legend(["deposit"])
+        
 
         # Third subplot
         ax3.bar(
@@ -180,6 +203,9 @@ class BackTestResults:
             color="g",
             alpha=0.6,
         )
+
+        ax1.legend(legend_ax1)    
+        ax2.legend(["deposit"])    
         ax3.legend(["monthly profit"])
 
         plt.tight_layout()
