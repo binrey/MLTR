@@ -31,6 +31,7 @@ class BackTestResults:
 
     def process_backtest(self, bktest_broker: Broker):
         t0 = perf_counter()
+        self.leverage = bktest_broker.cfg.leverage
         self.wallet = bktest_broker.cfg.wallet if self.wallet is None else self.wallet
 
         self.tickers = "+".join(set([pos.ticker for pos in bktest_broker.positions]))
@@ -47,16 +48,6 @@ class BackTestResults:
             dates (Iterable): An iterable of dates corresponding to each deal.
             profits (Iterable): An iterable of absolute profit values (with fees) for each deal.
             fees (Iterable): An iterable of fee values for each deal.
-
-        This method performs the following steps:
-        1. Calculates the number of deals.
-        2. Creates a DataFrame with the provided dates, profits, and fees.
-        3. Sets the 'dates' column as the index of the DataFrame.
-        4. Resamples the historical data to a daily frequency.
-        5. Adds columns for cumulative sums of profits, fees, and profits without fees.
-        6. Resamples the historical data to a monthly frequency.
-        7. Processes daily metrics.
-        8. Calculates the total fees.
         """
 
         self.ndeals = len(profits)
@@ -111,7 +102,7 @@ class BackTestResults:
         self.monthly_hist["price"] = first_prices
         self.monthly_hist["buy_and_hold_volume"] = self.wallet/self.monthly_hist["price"].iloc[0]
         self.monthly_hist["buy_and_hold"] = (df["dp"]*self.monthly_hist["buy_and_hold_volume"]).cumsum()
-        self.monthly_hist["buy_and_spend_volume"] = self.wallet/self.monthly_hist["price"]
+        self.monthly_hist["buy_and_spend_volume"] = self.wallet/self.monthly_hist["price"]*self.leverage
         self.monthly_hist["buy_and_spend"] = (df["dp"]*self.monthly_hist["buy_and_spend_volume"]).cumsum()
         return perf_counter() - t0
 

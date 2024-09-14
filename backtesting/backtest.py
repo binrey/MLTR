@@ -3,11 +3,13 @@ import sys
 from pathlib import Path
 from shutil import rmtree
 from time import perf_counter
-from .utils import BackTestResults
+
 import pandas as pd
 from loguru import logger
 
 from data_processing.dataloading import DataParser, MovingWindow
+
+from .utils import BackTestResults
 
 pd.options.mode.chained_assignment = None
 
@@ -42,9 +44,6 @@ def backtest(cfg, loglevel="INFO"):
 
     t0, texp, tbrok, tdata = perf_counter(), 0, 0, 0
 
-    # for t in tqdm(range(id2start, id2end),
-    #               desc=f"back test {cfg.body_classifier.func.name}",
-    #               disable=loglevel == "ERROR"):
     for h, dt in mw():
         t = h.Id[-1]
         tdata += dt
@@ -123,7 +122,7 @@ def backtest(cfg, loglevel="INFO"):
 
     sformat = lambda nd: "{:>30}: {:>5.@f}".replace("@", str(nd))
 
-    logger.debug(
+    logger.info(
         f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, "
         f"sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}"
     )

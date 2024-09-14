@@ -1,17 +1,17 @@
 from abc import ABC, abstractmethod
-from time import perf_counter
+from collections import OrderedDict
 from copy import deepcopy
+from time import perf_counter
+
 import numpy as np
 import yaml
 from easydict import EasyDict
 from loguru import logger
-from collections import OrderedDict
 
-from indicators import *
-from backtest_broker import Order
-from data_processing.dataloading import build_features
 # import torch
-from backtest_broker import Broker, Position
+from backtest_broker import Broker, Order, Position
+from data_processing.dataloading import build_features
+from indicators import *
 
 
 class ExpertBase(ABC):
@@ -93,14 +93,14 @@ class ExpertFormation(ExpertBase):
         if self.lprice:
             if (self.sprice is None and h.Open[-1] >= self.lprice) or h.Close[-2] > self.lprice:
                 self.order_dir = 1
-            if self.cprice is not None and h.Open[-1] < self.cprice[1]:
+            if self.cprice is not None and h.Open[-1] < self.cprice:
                 self._reset_state()
                 return
             
         if self.sprice:
             if (self.lprice is None and h.Open[-1] <= self.sprice) or h.Close[-2] < self.sprice:
                 self.order_dir = -1
-            if self.cprice and h.Open[-1] > self.cprice[-1]:
+            if self.cprice and h.Open[-1] > self.cprice:
                 self._reset_state()
                 return            
         

@@ -29,9 +29,9 @@ def plot_daily_balances_with_av(btests: List[BackTestResults], test_ids: List[in
       legend = []
       for test_id in test_ids:
             btest = btests[test_id]
-            plt.plot(btest.daily_hist["days"], btest.daily_hist["profit"])
+            plt.plot(btest.daily_hist.index, btest.daily_hist["profit_csum"])
             legend.append(f"{btest.tickers} profit={btest.final_profit:.0f} ({btest.ndeals}) APR={btest.APR:.2f} mwait={btest.metrics['maxwait']:.0f}")
-      plt.plot(btests[0].daily_hist["days"], profit_av, linewidth=3, color="black")
+      plt.plot(btests[0].daily_hist.index, profit_av, linewidth=3, color="black")
       legend_item = f"AV profit={profit_av[-1]:.0f},"
       for (name, val) in metrics_av:
             legend_item += f" {name}={val:.2f}"
@@ -128,9 +128,9 @@ class Optimizer:
             for ticker in set(opt_summary.ticker):
                   opt_summary_for_ticker = opt_summary[opt_summary.ticker == ticker]
                   top_runs_ids.append(opt_summary_for_ticker.index[0])
-                  sum_daily_profit += btests[top_runs_ids[-1]].daily_hist.profit
+                  sum_daily_profit += btests[top_runs_ids[-1]].daily_hist.profit_csum
                   logger.info(f"\n{opt_summary_for_ticker.head(10)}\n")
-                  pd.DataFrame(btests[top_runs_ids[-1]].daily_hist.profit).to_csv(f"optimization/{ticker}.{optim_cfg.period[0]}.top_{self.sortby}_sorted.csv", index=False)
+                  pd.DataFrame(btests[top_runs_ids[-1]].daily_hist.profit_csum).to_csv(f"optimization/{ticker}.{optim_cfg.period[0]}.top_{self.sortby}_sorted.csv", index=False)
                   
             profit_av = (sum_daily_profit / len(top_runs_ids)).values
             APR_av, maxwait_av = btests[top_runs_ids[-1]].metrics_from_profit(profit_av)
@@ -166,7 +166,7 @@ class Optimizer:
                   sum_daily_profit = 0
                   test_ids = list(map(int, opt_res.test_ids.iloc[i].split(".")[1:]))
                   for test_id in test_ids:
-                        sum_daily_profit += btests[test_id].daily_hist["profit"]
+                        sum_daily_profit += btests[test_id].daily_hist["profit_csum"]
                   profit_av = sum_daily_profit/len(test_ids)
                   bstair_av, metrics = BackTestResults._calc_metrics(profit_av.values)
                   recovery.append(metrics["recovery"])
@@ -186,7 +186,7 @@ class Optimizer:
             # plt.subplot(2, 1, 1)
             legend = []
             for test_id in range(min(opt_res.shape[0], 5)):
-                  plt.plot(btests[0].daily_hist["days"], balances_av[opt_res.index[test_id]], linewidth=2 if test_id==0 else 1)
+                  plt.plot(btests[0].daily_hist.index, balances_av[opt_res.index[test_id]], linewidth=2 if test_id==0 else 1)
                   row = opt_res.iloc[test_id]
                   legend.append(f"{opt_res.index[test_id]}: b={row.final_balance:.0f} ({row.ndeals}) recv={row.recovery:.2f} mwait={row.maxwait:.0f}")
             plt.legend(legend) 
