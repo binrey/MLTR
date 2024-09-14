@@ -12,6 +12,7 @@ from loguru import logger
 from backtest_broker import Broker, Order, Position
 from data_processing.dataloading import build_features
 from indicators import *
+from utils import date2str
 
 
 class ExpertBase(ABC):
@@ -88,8 +89,8 @@ class ExpertFormation(ExpertBase):
         
         if self.cfg.allow_overturn or not self.formation_found:
             self.formation_found = self.body_cls(self, h)   
-            
-        logger.debug(f"{h.Id[-1]} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, open: {h.Open[-1]}")
+        
+        logger.debug(f"{date2str(h.Date[-1])} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, open: {h.Open[-1]}")
         
         if self.lprice:
             if (self.sprice is None and h.Open[-1] >= self.lprice) or h.Close[-2] > self.lprice:

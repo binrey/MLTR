@@ -120,3 +120,7 @@ def side_from_str(side: str):
         return PosSide.sell
     else:
         raise ValueError(f"{side} is not valid value, set ['buy' or 'sell']")
+    
+    
+def date2str(date):
+    return np.datetime_as_string(date.astype('datetime64[s]'))

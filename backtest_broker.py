@@ -9,16 +9,6 @@ from loguru import logger
 from utils import FeeConst, FeeModel
 
 
-class Side(Enum):
-    BUY = 1
-    SELL = -1
-    UNDEF = 0
-
-
-def date2str(date):
-    return str(date).split(".")[0]
-
-
 class Order:
     class TYPE:
         MARKET = "market order"

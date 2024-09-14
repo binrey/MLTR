@@ -128,17 +128,7 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
         fig.savefig(save_path, bbox_inches='tight', pad_inches=0.2)  
     plt.close('all')
     return save_path
-      
-      
-def log_position(t, hist2plot, lines2plot, save_path):
-    d = {"time": t,
-         "hist": hist2plot,
-         "lines": lines2plot
-         }
-    save_path = save_path / f"{str(t).split('.')[0]}.pkl".replace(":", "-")
-    pickle.dump(d, open(save_path, "wb"))
-    logger.info(f"save logs to {save_path}")
-    
+
 
 class BybitTrading:
     def __init__(self, cfg, credentials) -> None:
@@ -153,18 +143,53 @@ class BybitTrading:
             api_secret=credentials["api_secret"],
         )
         self.exp = ByBitExpert(cfg, self.session)
-        if cfg.save_plots:
-            self.save_path = Path("real_trading") / f"{cfg.ticker}-{cfg.period}"
-            if self.save_path.exists():
-                rmtree(self.save_path)
-            self.save_path.mkdir()
             
         self.hist2plot, self.lines2plot, self.open_time, self.side, self.sl = None, None, None, None, None
         
+        self.save_path = Path("real_trading") / f"{cfg.ticker}-{cfg.period}"
+        self.backup_path = self.save_path / "backup.pkl"
+
+    def clear_log_dir(self, cfg):
+        if cfg.save_plots:
+            if self.save_path.exists():
+                rmtree(self.save_path)
+            self.save_path.mkdir(parents=True, exist_ok=True)
+
+    def save_backup(self):
+        backup_data = {
+            "hist2plot": self.hist2plot,
+            "lines2plot": self.lines2plot,
+            "open_time": self.open_time,
+            "side": self.side,
+            "sl": self.sl,
+            "open_position": self.open_position
+        }
+        backup_path = self.save_path / "backup.pkl"
+        with open(backup_path, "wb") as f:
+            pickle.dump(backup_data, f)
+        logger.info(f"Backup saved to {backup_path}")
+
+    def load_backup(self):
+        if self.backup_path.exists():
+            with open(self.backup_path, "rb") as f:
+                backup_data = pickle.load(f)
+            self.hist2plot = backup_data["hist2plot"]
+            self.lines2plot = backup_data["lines2plot"]
+            self.open_time = backup_data["open_time"]
+            self.side = backup_data["side"]
+            self.sl = backup_data["sl"]
+            self.open_position = backup_data["open_position"]
+            logger.info(f"Backup loaded from {self.backup_path}")
+        else:
+            logger.info("No backup found")
+
     def test_connection(self):
-        self.get_open_orders_positions()        
+        self.get_open_orders_positions()
         if self.open_position is not None:
-            raise ConnectionError("Есть открытые позиции! Сначала надо их закрыть :(")
+            self.exp.active_position = self.open_position
+            self.load_backup()
+        else:
+            self.clear_log_dir(cfg)
             
     def handle_trade_message(self, message):
         # try:
@@ -178,29 +203,29 @@ class BybitTrading:
         if time_rounded > self.t0:
             if self.t0:
                 self.update()
-                actpos = f"{self.open_position.ticker} {self.open_position.dir} {self.open_position.volume}" if self.open_position is not None else "пока нету"
+                actpos = f"{self.open_position.ticker} {self.open_position.dir} {self.open_position.volume}" if self.open_position is not None else "пусто"
                 msg = f"{datetime.fromtimestamp(int(self.time/1000))}: new candle processed. Current pos: {actpos}"
                 logger.info(msg)
                 print()
                 self.my_telebot.send_text(msg)
             self.t0 = time_rounded
 
-        
     def trailing_sl(self, pos:Position):
+        if self.h is None:
+            return
         sl = float(pos.sl)
-        # try:
-        sl_new = float(sl + self.cfg.trailing_stop_rate*(self.h.Open[-1] - sl))
-        sl = sl_new if abs(sl_new - self.h.Open[-1]) - self.cfg.ticksize > 0 else sl
-        resp = self.session.set_trading_stop(
-            category="linear",
-            symbol=self.cfg.ticker,
-            stopLoss=sl,
-            slTriggerB="IndexPrice",
-            positionIdx=0,
-        )
-        # logger.debug(resp)
-        # except Exception as ex:
-        #     print(ex)
+        try:
+            sl_new = float(sl + self.cfg.trailing_stop_rate*(self.h.Open[-1] - sl))
+            sl = sl_new if abs(sl_new - self.h.Open[-1]) - self.cfg.ticksize > 0 else sl
+            resp = self.session.set_trading_stop(
+                category="linear",
+                symbol=self.cfg.ticker,
+                stopLoss=sl,
+                slTriggerB="IndexPrice",
+                positionIdx=0,
+            )
+        except Exception as ex:
+            logger.error(ex)
         return float(sl)       
 
     def get_open_orders_positions(self):
@@ -210,26 +235,25 @@ class BybitTrading:
             positions = self.session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
             for pos in positions :
                 if float(pos["size"]):
-                    self.open_position = Position(price=pos["avgPrice"]*side_from_str(pos["side"]),
+                    self.open_position = Position(price=float(pos["avgPrice"])*side_from_str(pos["side"]),
                                                   date=pos["createdTime"],
                                                   indx=0,
                                                   ticker=pos["symbol"],
-                                                  volume=pos["size"], 
+                                                  volume=float(pos["size"]), 
                                                   period=self.cfg.period,
-                                                  sl=pos["stopLoss"])
+                                                  sl=float(pos["stopLoss"]))
 
     def update(self):
         # try:
         self.get_open_orders_positions()    
         if cfg.save_plots:
-            if self.hist2plot is not None:
+            if self.hist2plot is not None and self.h is not None:
                 h = pd.DataFrame(self.h).iloc[-2:-1]
                 h.index = pd.to_datetime(h.Date)
                 self.hist2plot = pd.concat([self.hist2plot, h])
                 self.lines2plot[-1].append((pd.to_datetime(self.hist2plot.iloc[-1].Date), self.sl))
-                log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
                             
-            if self.open_position is not None and self.hist2plot is None:
+            if self.open_position is not None and self.h is not None and self.hist2plot is None:
                 self.hist2plot = pd.DataFrame(self.h)
                 self.hist2plot.index = pd.to_datetime(self.hist2plot.Date)
                 self.lines2plot = deepcopy(self.exp.lines)
@@ -248,13 +272,11 @@ class BybitTrading:
                 self.side = self.open_position.str_dir
                 self.lines2plot.append([(self.open_time, self.open_position.open_price), (self.open_time, self.open_position.open_price)])
                 self.lines2plot.append([(self.open_time, self.open_position.sl), (self.open_time, self.open_position.sl)])
-                log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
                 p = Process(target=plot_fig, args=(self.hist2plot, self.lines2plot, self.save_path, None, self.open_time, self.side, cfg.ticker))
                 p.start()
                 p.join()
                 self.my_telebot.send_image(self.save_path / date2save_format(self.open_time))
                 self.hist2plot = self.hist2plot.iloc[:-1]
-                
                 
         if self.open_position is not None:
             self.sl = self.trailing_sl(self.open_position)
@@ -276,7 +298,6 @@ class BybitTrading:
                 self.hist2plot = pd.concat([self.hist2plot, last_row])                    
                 self.lines2plot[-2][-1] = (pd.to_datetime(self.hist2plot.iloc[-1].Date), self.lines2plot[-2][-1][-1])
                 self.lines2plot[-1].append((pd.to_datetime(self.hist2plot.iloc[-1].Date), self.sl))
-                log_position(self.open_time, self.hist2plot, self.lines2plot, self.save_path)
                 p = Process(target=plot_fig, args=(self.hist2plot, self.lines2plot, self.save_path, None, self.open_time, self.side, cfg.ticker))
                 p.start()
                 p.join()
@@ -284,6 +305,7 @@ class BybitTrading:
                 self.hist2plot = None    
         
         texp = self.exp.update(self.h, self.open_position)
+        self.save_backup()
         # except Exception as ex:
         #     logger.error(ex)
         
@@ -313,10 +335,6 @@ if __name__ == "__main__":
         creds["api_key"] = creds["api_key_demo"]
     
     public = WebSocket(channel_type='linear', testnet=False)
-    # private = WebSocket(channel_type='private',
-    #                     api_key=api_key,
-    #                     api_secret=api_secret, 
-    #                     testnet=False) 
     bybit_trading = BybitTrading(cfg, creds)
     bybit_trading.test_connection()
     public.trade_stream(symbol=cfg.ticker, callback=bybit_trading.handle_trade_message)
@@ -325,7 +343,7 @@ if __name__ == "__main__":
     while True:
         sleep(60)
         if not public.is_connected():
-            logger.warning("Connection lost! Reconnect...")
+            logger.warning("Connection is lost! Reconnect...")
             public.exit()
             public = WebSocket(channel_type='linear', testnet=False)
             public.trade_stream(symbol=cfg.ticker, callback=bybit_trading.handle_trade_message)
