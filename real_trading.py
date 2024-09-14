@@ -26,7 +26,7 @@ from pybit.unified_trading import HTTP, WebSocket
 
 from backtest_broker import Position
 from experts import ByBitExpert
-from utils import PyConfig
+from utils import PyConfig, side_from_str
 
 stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
@@ -164,7 +164,7 @@ class BybitTrading:
     def test_connection(self):
         self.get_open_orders_positions()        
         if self.open_position is not None:
-            raise ConnectionError("Есть открытые позиции! Сначала надо всех их закрыть :(")
+            raise ConnectionError("Есть открытые позиции! Сначала надо их закрыть :(")
             
     def handle_trade_message(self, message):
         # try:
@@ -179,7 +179,7 @@ class BybitTrading:
             if self.t0:
                 self.update()
                 actpos = f"{self.open_position.ticker} {self.open_position.dir} {self.open_position.volume}" if self.open_position is not None else "пока нету"
-                msg = f"{datetime.fromtimestamp(int(self.time/1000))}: processed new candle. Current pos: {actpos}"
+                msg = f"{datetime.fromtimestamp(int(self.time/1000))}: new candle processed. Current pos: {actpos}"
                 logger.info(msg)
                 print()
                 self.my_telebot.send_text(msg)
@@ -210,7 +210,7 @@ class BybitTrading:
             positions = self.session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
             for pos in positions :
                 if float(pos["size"]):
-                    self.open_position = Position(price=pos["avgPrice"],
+                    self.open_position = Position(price=pos["avgPrice"]*side_from_str(pos["side"]),
                                                   date=pos["createdTime"],
                                                   indx=0,
                                                   ticker=pos["symbol"],
@@ -306,7 +306,7 @@ if __name__ == "__main__":
     cfg.save_plots = True
     print(cfg)
     
-    with open("./configs/api.yaml", "r") as f:
+    with open("./api.yaml", "r") as f:
         creds = yaml.safe_load(f)
     if args.demo:
         creds["api_secret"] = creds["api_secret_demo"]

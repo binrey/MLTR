@@ -72,6 +72,7 @@ class ExpertFormation(ExpertBase):
     def estimate_volume(self, h):
         volume = self.cfg.wallet/h.Open[-1]*self.cfg.leverage
         volume = self.normalize_volume(volume)
+        logger.debug(f"estimated lot: {volume}")
         return volume
     
     def normalize_volume(self, volume):

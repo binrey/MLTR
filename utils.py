@@ -7,6 +7,8 @@ import numpy as np
 from diskcache import Cache
 from easydict import EasyDict
 
+from type import PosSide
+
 cache = Cache(".tmp")
 
 def cache_result(func):
@@ -109,3 +111,12 @@ class FeeConst(FeeModel):
     def position_suply_fee(self, open_date, close_date, mean_price, volume):
         h8_count = np.diff([open_date, close_date]).astype('timedelta64[h]').astype(np.float32).item()/24
         return self.position_suply_rate * h8_count * volume
+
+    
+def side_from_str(side: str):
+    if side.lower() == "buy":
+        return PosSide.buy
+    elif side.lower() == "sell":
+        return PosSide.sell
+    else:
+        raise ValueError(f"{side} is not valid value, set ['buy' or 'sell']")
