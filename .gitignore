@@ -1,6 +1,7 @@
 data/
 runs/
 optimization/data/
+env/
 
 *.csv
 *.png

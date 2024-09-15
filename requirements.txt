@@ -10,3 +10,6 @@ stackprinter==0.2.12
 stackprinter
 telebot
 pybit
+diskcache
+tqdm
+torch
