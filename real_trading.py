@@ -13,7 +13,7 @@ from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime
 from multiprocessing import Process
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -44,7 +44,7 @@ def get_bybit_hist(mresult, size):
 
     input = np.array(mresult["list"], dtype=np.float64)[::-1]
     data.Id = input[:, 0].astype(np.int64)
-    data.Date = data.Id*1000000
+    data.Date = data.Id.astype("datetime64[ms]")
     data.Open = input[:, 1]
     data.High = input[:, 2]
     data.Low  = input[:, 3]
@@ -167,7 +167,7 @@ class BybitTrading:
         backup_path = self.save_path / "backup.pkl"
         with open(backup_path, "wb") as f:
             pickle.dump(backup_data, f)
-        logger.info(f"Backup saved to {backup_path}")
+        logger.debug(f"backup saved to {backup_path}")
 
     def load_backup(self):
         if self.backup_path.exists():
@@ -216,17 +216,22 @@ class BybitTrading:
         sl = float(pos.sl)
         try:
             sl_new = float(sl + self.cfg.trailing_stop_rate*(self.h.Open[-1] - sl))
-            sl = sl_new if abs(sl_new - self.h.Open[-1]) - self.cfg.ticksize > 0 else sl
+            sl_new = sl_new if abs(sl_new - self.h.Open[-1]) - self.cfg.ticksize > 0 else sl
             resp = self.session.set_trading_stop(
                 category="linear",
                 symbol=self.cfg.ticker,
-                stopLoss=sl,
+                stopLoss=sl_new,
                 slTriggerB="IndexPrice",
                 positionIdx=0,
             )
+            logger.debug(f"trailing sl: {sl:.2f} -> {sl_new:.2f}")
         except Exception as ex:
             logger.error(ex)
         return float(sl)       
+
+    def get_position_time(self, pos: Dict[str, Any]) -> np.datetime64:
+        return np.datetime64(int(pos["updatedTime"]), "ms")
+        
 
     def get_open_orders_positions(self):
             self.open_orders = []
@@ -236,7 +241,7 @@ class BybitTrading:
             for pos in positions :
                 if float(pos["size"]):
                     self.open_position = Position(price=float(pos["avgPrice"])*side_from_str(pos["side"]),
-                                                  date=pos["createdTime"],
+                                                  date=self.get_position_time(pos),
                                                   indx=0,
                                                   ticker=pos["symbol"],
                                                   volume=float(pos["size"]), 
