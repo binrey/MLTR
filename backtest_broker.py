@@ -1,135 +1,12 @@
-from dataclasses import dataclass
-from enum import Enum
 from time import perf_counter
-from typing import Any, List, Optional
+from typing import List
 
 import numpy as np
 from loguru import logger
 
-from utils import FeeConst, FeeModel, date2str
-
-
-class Order:
-    class TYPE:
-        MARKET = "market order"
-        LIMIT = "limit order"
-
-    def __init__(self, directed_price, type, volume, indx, date):
-        self.dir = np.sign(directed_price)
-        self.type = type
-        self.volume = volume
-        self.open_indx = indx
-        self.open_date = date
-        self.close_date = None
-        self._change_hist = []
-        self.change(date, abs(directed_price) if type == Order.TYPE.LIMIT else 0)
-
-    def __str__(self):
-        return f"{self.type} {self.id} {self.volume}"
-
-    @property
-    def str_dir(self):
-        return "BUY" if self.dir > 0 else "SELL"
-
-    @property
-    def id(self):
-        return f"{self.open_indx}-{self.str_dir}-{self.price:.2f}"
-
-    @property
-    def lines(self):
-        return self._change_hist
-
-    def change(self, date, price):
-        assert round(date) == date
-        self.price = price
-        if price != 0:
-            self._change_hist.append((date, price))
-
-    def close(self, date):
-        assert round(date) == date
-        self.close_date = date
-        self._change_hist.append((date, self.price))
-
-
-class Position:
-    def __init__(
-        self,
-        price: float,
-        date: Any,
-        indx: int,
-        ticker: str = "NoName",
-        volume: int = 1,
-        period: str = "M5",
-        sl: Optional[float] = None,
-        fee_rate: Optional[FeeModel] = None,
-    ):
-        self.volume = float(volume)
-        assert self.volume > 0
-        self.ticker = ticker
-        self.period = period
-        self.open_price = abs(float(price))
-        self.open_date = np.datetime64(date)
-        self.open_indx = int(indx)
-        self.sl = float(sl) if sl is not None else sl
-        self.open_risk = np.nan
-        if self.sl is not None:
-            self.open_risk = abs(self.open_price - self.sl) / self.open_price * 100
-        self.dir = np.sign(float(price))
-        self.close_price = None
-        self.close_date = None
-        self.profit = None
-        self.profit_abs = None
-        self.fee_rate = fee_rate if fee_rate is not None else FeeConst(0, 0)
-        self.fees = 0
-        self.fees_abs = 0
-        self._update_fees(self.open_price, self.volume)
-        logger.debug(f"{date2str(date)} open position {self.id}")
-
-    def __str__(self):
-        return f"pos {self.ticker} {self.dir} {self.volume} {self.id}"
-
-    def _update_fees(self, price, volume):
-        self.fees_abs += self.fee_rate.order_execution_fee(price, volume)
-        if self.close_date and self.open_date:
-            self.fees_abs += self.fee_rate.position_suply_fee(
-                self.open_date,
-                self.close_date,
-                (self.open_price + self.close_price) / 2,
-                volume,
-            )
-        self.fees = self.fees_abs / self.volume / self.open_price * 100
-
-    @property
-    def str_dir(self):
-        return "BUY" if self.dir > 0 else "SELL"
-
-    @property
-    def duration(self):
-        return self.close_indx - self.open_indx
-
-    @property
-    def id(self):
-        return (
-            f"{self.open_indx}-{self.str_dir}-{self.open_price:.2f}-{self.volume:.2f}"
-        )
-
-    def close(self, price, date, indx):
-        self.close_price = abs(price)
-        self.close_date = np.datetime64(date)
-        self.close_indx = indx
-        self._update_fees(self.close_price, self.volume)
-        self.profit_abs = (self.close_price - self.open_price) * self.dir * self.volume
-        self.profit_abs -= self.fees_abs
-        self.profit = self.profit_abs / self.open_price * 100
-        
-
-        logger.debug(
-            f"{date2str(date)} close position {self.id} at {self.close_price:.2f}, profit: {self.profit_abs:.2f} ({self.profit:.2f}%)"
-        )
-
-    @property
-    def lines(self):
-        return [(self.open_indx, self.open_price), (self.close_indx, self.close_price)]
+from trade.utils import Order, Position
+from type import Side
+from utils import date2str
 
 
 class Broker:
@@ -190,7 +67,7 @@ class Broker:
                 logger.debug(
                     f"{date2str(date)} process order {order.id} (O:{h.Open[-1]})"
                 )
-                triggered_price = h.Open[-1] * order.dir
+                triggered_price = h.Open[-1] * order.side.value
                 triggered_date, triggered_id, triggered_vol = (
                     date,
                     h.Id[-1],
@@ -204,7 +81,7 @@ class Broker:
                     logger.debug(
                         f"{date2str(date)} process order {order.id}, and change price to O:{h.Open[-1]}"
                     )
-                    triggered_price = h.Open[-1] * order.dir
+                    triggered_price = h.Open[-1] * order.side.value
                     triggered_date, triggered_id, triggered_vol = (
                         date,
                         h.Id[-1],
@@ -214,7 +91,7 @@ class Broker:
                     logger.debug(
                         f"{date2str(date)} process order {order.id} (L:{h.Low[-2]} <= {order.price:.2f} <= H:{h.High[-2]})"
                     )
-                    triggered_price = order.price * order.dir
+                    triggered_price = order.price * order.side.value
                     triggered_date, triggered_id, triggered_vol = (
                         h.Date[-2],
                         h.Id[-2],
@@ -225,7 +102,7 @@ class Broker:
                 self.close_orders(triggered_id, i)
 
                 if self.active_position is not None:
-                    if self.active_position.dir * triggered_price < 0:
+                    if self.active_position.side.value * triggered_price < 0:
                         self.active_position.close(
                             triggered_price, triggered_date, triggered_id
                         )
@@ -242,7 +119,7 @@ class Broker:
                 if triggered_vol:
                     sl = None
                     for order in self.active_orders:
-                        if order.dir * triggered_price < 0:
+                        if order.side.value * triggered_price < 0:
                             if (
                                 triggered_price > 0 and order.price < triggered_price
                             ) or (
@@ -274,9 +151,9 @@ class Broker:
                 self.best_profit = 0
             else:
                 profit_cur = 0
-                if self.active_position.dir == 1:
+                if self.active_position.side == Side.BUY:
                     profit_cur = h.High[-2] - self.active_position.open_price
-                if self.active_position.dir == -1:
+                if self.active_position.side == Side.SELL:
                     profit_cur = self.active_position.open_price - h.Low[-2]
                 if profit_cur >= self.best_profit:
                     self.best_profit = profit_cur

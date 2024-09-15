@@ -7,13 +7,16 @@ import mplfinance as mpf
 import pandas as pd
 from loguru import logger
 
+from trade.utils import Position
+from type import Side
+
 pd.options.mode.chained_assignment = None
 import pickle
 from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime
 from multiprocessing import Process
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -24,9 +27,8 @@ from easydict import EasyDict
 from PIL import Image
 from pybit.unified_trading import HTTP, WebSocket
 
-from backtest_broker import Position
 from experts import ByBitExpert
-from utils import PyConfig, side_from_str
+from utils import PyConfig, date2str
 
 stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
@@ -179,9 +181,9 @@ class BybitTrading:
             self.side = backup_data["side"]
             self.sl = backup_data["sl"]
             self.open_position = backup_data["open_position"]
-            logger.info(f"Backup loaded from {self.backup_path}")
+            logger.info(f"backup loaded from {self.backup_path}")
         else:
-            logger.info("No backup found")
+            logger.info("no backup found")
 
     def test_connection(self):
         self.get_open_orders_positions()
@@ -194,17 +196,17 @@ class BybitTrading:
     def handle_trade_message(self, message):
         # try:
         data = message.get('data')
-        self.time = int(data[0].get("T"))#/60/int(cfg.period[1:]))
+        self.time = self.to_datetime(data[0].get("T"))#/60/int(cfg.period[1:]))
         time_rounded = int(int(data[0].get("T"))/1000/60/int(cfg.period[1:]))
         print ("\033[A\033[A")
-        logger.info(f"server time: {datetime.fromtimestamp(int(self.time/1000))}")
+        logger.info(f"server time: {date2str(self.time)}")
         # except (ValueError, AttributeError):
             # pass            
         if time_rounded > self.t0:
             if self.t0:
                 self.update()
-                actpos = f"{self.open_position.ticker} {self.open_position.dir} {self.open_position.volume}" if self.open_position is not None else "пусто"
-                msg = f"{datetime.fromtimestamp(int(self.time/1000))}: new candle processed. Current pos: {actpos}"
+                actpos = f"{self.open_position.ticker} {self.open_position.side} {self.open_position.volume}" if self.open_position is not None else "пусто"
+                msg = f"{date2str(self.time)}: cur. pos: {actpos}"
                 logger.info(msg)
                 print()
                 self.my_telebot.send_text(msg)
@@ -229,10 +231,9 @@ class BybitTrading:
             logger.error(ex)
         return float(sl)       
 
-    def get_position_time(self, pos: Dict[str, Any]) -> np.datetime64:
-        return np.datetime64(int(pos["updatedTime"]), "ms")
+    def to_datetime(self, timestamp: Union[int, float]) -> np.datetime64:
+        return np.datetime64(int(timestamp), "ms")
         
-
     def get_open_orders_positions(self):
             self.open_orders = []
             self.open_position = None
@@ -240,8 +241,8 @@ class BybitTrading:
             positions = self.session.get_positions(category="linear", symbol=cfg.ticker)["result"]["list"]
             for pos in positions :
                 if float(pos["size"]):
-                    self.open_position = Position(price=float(pos["avgPrice"])*side_from_str(pos["side"]),
-                                                  date=self.get_position_time(pos),
+                    self.open_position = Position(price=float(pos["avgPrice"])*Side.from_str(pos["side"]).value,
+                                                  date=self.to_datetime(pos["updatedTime"]),
                                                   indx=0,
                                                   ticker=pos["symbol"],
                                                   volume=float(pos["size"]), 
