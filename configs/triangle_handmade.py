@@ -1,5 +1,5 @@
 from configs.library import *
-from utils import FeeRate
+from common.utils import FeeRate
 
 classifier = body_classifiers.custom
 classifier.params.source_file = Param("data/test.csv", ["data/test.csv"])

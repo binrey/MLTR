@@ -4,7 +4,7 @@ import numpy as np
 from loguru import logger
 
 from data_processing.dataloading import MovingWindow
-from utils import cache_result
+from common.utils import cache_result
 
 
 # @cache_result

@@ -9,8 +9,8 @@ import numpy as np
 sys.path.append(str(Path(__file__).parent.parent))
 from backtest import DataParser, MovingWindow
 
+from common.utils import PyConfig
 from indicators import *
-from utils import PyConfig
 
 
 class IndcTester():

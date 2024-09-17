@@ -1,5 +1,5 @@
 from configs.library import *
-from utils import FeeRate
+from common.utils import FeeRate
 
 classifier = body_classifiers.tunzigzag
 classifier.params.ncross = Param(5, [3, 5, 8, 12])

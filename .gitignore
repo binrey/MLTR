@@ -12,6 +12,8 @@ env/
 *.jpg
 *.txt
 *.pkl
+*.yaml
 
 .DS_Store
 .*
+_*

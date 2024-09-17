@@ -12,10 +12,10 @@ from torch.utils.tensorboard import SummaryWriter
 from torchinfo import summary
 from tqdm import tqdm
 
+from common.utils import FeeModel, PyConfig
 from data_processing.dataloading import DataParser, MovingWindow
 from data_processing.train_dataset import next_price_prediction
 from ml.models import E2EModel, E2EModelConv, SeqOutput
-from utils import FeeModel, PyConfig
 
 
 def autoregress_sequense(model, p, features, output_sequense=False, device="cpu"):

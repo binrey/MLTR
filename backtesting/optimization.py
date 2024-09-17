@@ -19,7 +19,7 @@ from matplotlib import pyplot as plt
 
 from backtesting.backtest import backtest
 from backtesting.utils import BackTestResults
-from utils import PyConfig
+from common.utils import PyConfig
 
 logger.remove()
 logger.add(sys.stderr, level="DEBUG") 

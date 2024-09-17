@@ -13,9 +13,9 @@ from .utils import BackTestResults
 
 pd.options.mode.chained_assignment = None
 
-from backtest_broker import Broker
+from backtesting.backtest_broker import Broker
+from common.utils import plot_fig
 from experts import BacktestExpert
-from real_trading import plot_fig
 
 
 def find_available_date(hist: pd.DataFrame, date_start: pd.Timestamp):

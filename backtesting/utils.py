@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from backtest_broker import Broker
+from backtesting.backtest_broker import Broker
 
 
 class BackTestResults:
