@@ -104,8 +104,8 @@ def backtest(cfg, loglevel="INFO"):
                     lines2plot=lines2plot,
                     save_path=save_path,
                     prefix=cfg.ticker,
-                    t=pd.to_datetime(closed_pos.open_date, utc=True),
-                    side="Buy" if closed_pos.dir > 0 else "Sell",
+                    time=pd.to_datetime(closed_pos.open_date, utc=True),
+                    side=closed_pos.side,
                     ticker=cfg.ticker,
                 )
             closed_pos = None

@@ -2,6 +2,7 @@ import importlib.util
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import mplfinance as mpf
@@ -11,6 +12,8 @@ import telebot
 from diskcache import Cache
 from easydict import EasyDict
 from PIL import Image
+
+from common.type import Side
 
 cache = Cache(".tmp")
 
@@ -116,8 +119,8 @@ class FeeConst(FeeModel):
         return self.position_suply_rate * h8_count * volume
 
     
-def date2str(date: np.datetime64) -> str:
-    return np.datetime_as_string(date.astype("datetime64[s]"))
+def date2str(date: np.datetime64, step="s") -> str:
+    return np.datetime_as_string(date.astype(f"datetime64[{step}]")) if date is not None else "-/-"
 
 
 class Telebot:
@@ -144,7 +147,7 @@ def date2name(date, prefix=None):
         s += f"-{prefix}"
     return s + ".png"
 
-def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=None, ticker="X"):
+def plot_fig(hist2plot, lines2plot, save_path, prefix, time, side: Optional[Side], ticker="X"):  
     lines_in_range = [[] for _ in range(len(lines2plot))]
     for i, line in enumerate(lines2plot):
         assert len(line) >= 2, "line must have more than 1 point"
@@ -168,30 +171,28 @@ def plot_fig(hist2plot, lines2plot, save_path=None, prefix=None, t=None, side=No
         figscale=1.5,
         style=mystyle,
         datetime_format='%m-%d %H:%M:%Y',
-        title=f"{np.array(t).astype('datetime64[s]')}-{ticker}-{side}",
+        title=f"{np.array(time).astype('datetime64[m]')}-{ticker}-{side.name}",
         returnfig=True
     )
 
     fig, axlist = mpf.plot(data=hist2plot, **kwargs)
 
-    if side.lower() in ["buy", "sell"]:
-        side_int = 1 if side.lower() == "buy" else -1
-        x = hist2plot.index.get_loc(t)
-        if type(x) is slice:
-            x = x.start
-        y = hist2plot.loc[t].Open
-        if y.ndim > 0:
-            y = y.iloc[0]
-        arrow_size = (hist2plot.iloc[-10:].High - hist2plot.iloc[-10:].Low).mean()
-        axlist[0].annotate("", (x, y + arrow_size*side_int), fontsize=20, xytext=(x, y),
-                    color="black",
-                    arrowprops=dict(
-                        arrowstyle='->',
-                        facecolor='b',
-                        edgecolor='b'))
+    x = hist2plot.index.get_loc(time)
+    if type(x) is slice:
+        x = x.start
+    y = hist2plot.loc[time].Open
+    if y.ndim > 0:
+        y = y.iloc[0]
+    arrow_size = (hist2plot.iloc[-10:].High - hist2plot.iloc[-10:].Low).mean()
+    axlist[0].annotate("", (x, y + arrow_size*side.value), fontsize=20, xytext=(x, y),
+                color="black",
+                arrowprops=dict(
+                    arrowstyle='->',
+                    facecolor='b',
+                    edgecolor='b'))
 
     if save_path is not None:
-        save_path = save_path / date2name(t, prefix)
+        save_path = save_path / date2name(time, prefix)
         fig.savefig(save_path, bbox_inches='tight', pad_inches=0.2)
     plt.close('all')
     return save_path
