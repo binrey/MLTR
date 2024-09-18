@@ -27,7 +27,7 @@ from pybit.unified_trading import HTTP, WebSocket
 
 from common.utils import PyConfig, date2str
 from experts import ByBitExpert
-from trade.base import BaseTradeClass
+from trade.base import BaseTradeClass, StepData
 
 stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
