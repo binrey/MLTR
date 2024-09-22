@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from copy import deepcopy
 from time import perf_counter
+from typing import Optional
 
 import numpy as np
 import yaml
@@ -10,9 +11,11 @@ from loguru import logger
 
 # import torch
 from backtesting.backtest_broker import Broker, Order, Position
+from common.type import Side
 from common.utils import date2str
 from data_processing.dataloading import build_features
 from indicators import *
+from trade.utils import ORDER_TYPE, fix_rate_trailing_sl
 
 
 class ExpertBase(ABC):
@@ -71,7 +74,7 @@ class ExpertFormation(ExpertBase):
         self.order_dir = 0
             
     def estimate_volume(self, h):
-        volume = self.cfg.wallet/h.Open[-1]*self.cfg.leverage
+        volume = self.cfg.wallet/h["Open"][-1]*self.cfg.leverage
         volume = self.normalize_volume(volume)
         logger.debug(f"estimated lot: {volume}")
         return volume
@@ -79,7 +82,21 @@ class ExpertFormation(ExpertBase):
     def normalize_volume(self, volume):
         return round(volume/self.cfg.ticksize, 0)*self.cfg.ticksize
             
+    def update_trailing_sl(self, h):
+        if self.active_position is not None:
+            if self.active_position.sl is None:
+                tp, sl = self.stops_processor(self, h)
+                self.modify_sl(sl)
+            else:
+                sl_new = fix_rate_trailing_sl(sl=self.active_position.sl, 
+                                            open_price=h["Open"][-1],
+                                            side=self.active_position.side,
+                                            trailing_stop_rate=self.cfg.trailing_stop_rate, 
+                                            ticksize=self.cfg.ticksize)
+                self.modify_sl(sl_new)                
+            
     def get_body(self, h):
+        self.update_trailing_sl(h)
         self.body_cls.update_inner_state(h)
         if not self.cfg.allow_overturn and self.active_position is not None:
             return
@@ -90,23 +107,23 @@ class ExpertFormation(ExpertBase):
         if self.cfg.allow_overturn or not self.formation_found:
             self.formation_found = self.body_cls(self, h)   
         
-        logger.debug(f"{date2str(h.Date[-1])} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, open: {h.Open[-1]}")
+        logger.debug(f"{date2str(h['Date'][-1])} long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}, open: {h['Open'][-1]}")
         
         if self.lprice:
-            if (self.sprice is None and h.Open[-1] >= self.lprice) or h.Close[-2] > self.lprice:
+            if (self.sprice is None and h["Open"][-1] >= self.lprice) or h["Close"][-2] > self.lprice:
                 self.order_dir = 1
-            if self.cprice is not None and h.Open[-1] < self.cprice:
+            if self.cprice is not None and h["Open"][-1] < self.cprice:
                 self._reset_state()
                 return
             
         if self.sprice:
-            if (self.lprice is None and h.Open[-1] <= self.sprice) or h.Close[-2] < self.sprice:
+            if (self.lprice is None and h["Open"][-1] <= self.sprice) or h["Close"][-2] < self.sprice:
                 self.order_dir = -1
-            if self.cprice and h.Open[-1] > self.cprice:
+            if self.cprice and h["Open"][-1] > self.cprice:
                 self._reset_state()
                 return            
         
-        if h.Date[-1] in self.cfg.no_trading_days:
+        if h["Date"][-1] in self.cfg.no_trading_days:
             self._reset_state()
             
         # y = None
@@ -122,29 +139,29 @@ class ExpertFormation(ExpertBase):
         
         if self.order_dir != 0:
             if self.active_position is None or self.active_position.dir*self.order_dir < 0:
-                tp, sl = self.stops_processor(self, h)
-                self.create_orders(h.Id[-1], self.order_dir, self.estimate_volume(h), tp, sl)
+                
+                self.create_orders(h["Id"][-1], self.order_dir, self.estimate_volume(h))
                 self.order_sent = True
                 if not self.cfg.allow_overturn:
                     self._reset_state()
+            
 
             
 class BacktestExpert(ExpertFormation):
-    def __init__(self, cfg):
+    def __init__(self, cfg, session: Broker):
         self.cfg = cfg
+        self.session = session
         super(BacktestExpert, self).__init__(cfg)
         
-    def create_orders(self, time_id, dir, volume, tp, sl):
-        self.orders = [Order(dir, Order.TYPE.MARKET, volume, time_id, time_id)]
+    def create_orders(self, time_id, dir, volume):
+        self.orders = [Order(0, Side.from_int(dir), ORDER_TYPE.MARKET, volume, time_id, time_id)]
         log_message = f"{time_id} send order {self.orders[0]}"
-        if sl:
-            self.orders.append(Order(sl, Order.TYPE.LIMIT, volume, time_id, time_id))
-            log_message += f", sl: {self.orders[-1]}"     
-        if tp:
-            self.orders.append(Order(tp, Order.TYPE.LIMIT, volume, time_id, time_id))
-            log_message += f", tp: {self.orders[-1]}"
 
+        self.session.set_active_orders(self.orders)
         logger.debug(log_message)
+        
+    def modify_sl(self, sl: Optional[float]):
+        self.session.update_sl(sl)
         
             
 class ByBitExpert(ExpertFormation):

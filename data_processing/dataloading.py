@@ -9,7 +9,15 @@ from easydict import EasyDict
 from loguru import logger
 from tqdm import tqdm
 
-
+# Define the dtype for the structured array
+DTYPE = [('Date', np.dtype('<M8[m]')), 
+         ('Open', np.dtype('float64')), 
+         ('High', np.dtype('float64')), 
+         ('Low', np.dtype('float64')), 
+         ('Close', np.dtype('float64')), 
+         ('Volume', np.dtype('float64')),
+         ('Id', np.dtype('int64'))]
+        
 def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=None):
     fo = f.Open/f.Open[-1]
     fc = f.Close/f.Open[-1]
@@ -88,7 +96,7 @@ class DataParser():
         if database is None:
             database = os.environ.get("FINDATA", "fin_data")
         t0 = perf_counter()
-        p = Path(database) / self.cfg.data_type / self.cfg.period
+        p = Path(database) / self.cfg.data_type / self.cfg.period.value
         flist = [f for f in p.glob("*") if self.cfg.ticker in f.stem]
         if len(flist):
             fpath = flist[np.argmin([len(f.name) for f in flist])]
@@ -102,20 +110,14 @@ class DataParser():
             return data
         else:
             raise FileNotFoundError(f"No data for {self.cfg.ticker} in {p}")
-
+    
     def bybit(self, data_file):
         pd.options.mode.chained_assignment = None
         hist = pd.read_csv(data_file, sep=",")
-        # hist.columns = map(lambda x:x[1:-1], hist.columns)
-        # hist.columns = map(str.capitalize, hist.columns)
-        hist["Date"] = pd.to_datetime(hist.Date.values, utc=True)
-        columns = list(hist.columns)
-        hist.columns = columns
+        hist["Date"] = np.array(hist.Date.values).astype("datetime64[m]")
         hist["Id"] = list(range(hist.shape[0]))
-        hist_dict = EasyDict({c: hist[c].values for c in hist.columns})
-        # hist_dict["Date"] = hist["Date"].values
-        hist.set_index("Date", inplace=True, drop=True)
-        return hist, hist_dict
+        hist_structured = np.array([tuple(row) for row in hist.to_records(index=False)], dtype=DTYPE)
+        return hist_structured
 
     def metatrader(self, data_file):
         pd.options.mode.chained_assignment = None
@@ -177,7 +179,7 @@ def collect_train_data(dir, fsize=64, glob="*.pickle"):
                                btest.cfg.stops_processor.func.cfg.sl,
                                btest.cfg.trailing_stop_rate,
                                pos.open_date,
-                               tfdict[btest.cfg.period])
+                               tfdict[btest.cfg.period.value])
             X.append([x])
             y.append(pos.profit)
 
@@ -222,7 +224,7 @@ def collect_train_data2(dir, fsize=64, nparams=4):
                                0,
                                btest.cfg.trailing_stop_rate,
                                open_date,
-                               tfdict[btest.cfg.period])
+                               tfdict[btest.cfg.period.value])
             X.append([x])
             y.append(pos["prof"])
 
@@ -233,39 +235,30 @@ def collect_train_data2(dir, fsize=64, nparams=4):
 
 
 class MovingWindow():
-    def __init__(self, hist, cfg):
-        self.hist = hist
-        self.date_start = pd.to_datetime(cfg["date_start"])
-        self.date_end = pd.to_datetime(cfg["date_end"])
+    def __init__(self, cfg):
+        self.hist = DataParser(cfg).load()
+        self.date_start = np.datetime64(cfg["date_start"])
+        self.date_end = np.datetime64(cfg["date_end"])
         self.size = cfg["hist_buffer_size"]
         self.ticker = cfg["ticker"]
 
-        self.data = EasyDict(Date=np.empty(self.size, dtype=np.datetime64),
-                             Id=np.zeros(self.size, dtype=np.int64),
-                             Open=np.zeros(self.size, dtype=np.float32),
-                             Close=np.zeros(self.size, dtype=np.float32),
-                             High=np.zeros(self.size, dtype=np.float32),
-                             Low=np.zeros(self.size, dtype=np.float32),
-                             Volume=np.zeros(self.size, dtype=np.int64)
-                             )
-
         self.id2start = self.find_nearest_date_indx(
-            hist.Date, np.datetime64(self.date_start))
-        if self.id2start == hist.Id[-1]:
-            logger.error(f"Date start {self.date_start} is equal or higher than latest range date {pd.to_datetime(hist.Date[-1])}")
+            self.hist["Date"], self.date_start)
+        if self.id2start == self.hist["Id"][-1]:
+            logger.error(f"Date start {self.date_start} is equal or higher than latest range date {self.hist['Date'][-1]}")
             raise ValueError()
 
         if self.id2start < self.size:
             logger.warning(f"Not enough history, shift start id from {self.id2start} to {self.size}")
             self.id2start = self.size
             logger.warning(
-                f"Switch to {pd.to_datetime(hist.Date[self.id2start])}")
+            f"Switch to {self.hist['Date'][self.id2start]}")
 
         self.id2end = self.find_nearest_date_indx(
-            hist.Date, np.datetime64(self.date_end))
+            self.hist["Date"], self.date_end)
         
-        self.date_start = pd.to_datetime(hist.Date[self.id2start])
-        self.date_end = pd.to_datetime(hist.Date[self.id2end])
+        self.date_start = self.hist["Date"][self.id2start]
+        self.date_end = self.hist["Date"][self.id2end]
 
     @staticmethod
     def find_nearest_date_indx(array, target):
@@ -274,22 +267,17 @@ class MovingWindow():
 
     def __getitem__(self, t):
         t0 = perf_counter()
-        self.data.Date = self.hist.Date[t-self.size+1:t+1]
-        self.data.Id[:] = self.hist.Id[t-self.size+1:t+1]
-        self.data.Open[:] = self.hist.Open[t-self.size+1:t+1]
-        self.data.Close[:-1] = self.hist.Close[t-self.size+1:t]
-        self.data.Close[-1] = self.data.Open[-1]
-        self.data.High[:-1] = self.hist.High[t-self.size+1:t]
-        self.data.High[-1] = self.data.Open[-1]
-        self.data.Low[:-1] = self.hist.Low[t-self.size+1:t]
-        self.data.Low[-1] = self.data.Open[-1]
-        self.data.Volume[:-1] = self.hist.Volume[t-self.size+1:t]
-        self.data.Volume[-1] = 0
-        return self.data, perf_counter() - t0
+        data = self.hist[t-self.size+1:t+1].copy()
+        data['Close'][-1] = data['Open'][-1]
+        data['High'][-1] = data['Open'][-1]
+        data['Low'][-1] = data['Open'][-1]
+        data["Volume"][-1] = 0
+        return data, perf_counter() - t0
 
     def __call__(self, output_time=True):
         logger.info(f"Start generate {self.ticker} data from {self.date_start} (id:{self.id2start}) to {self.date_end} (id:{self.id2end})")
-        for t in tqdm(range(self.id2start, self.id2end), desc=f"Processing {self.ticker}"):
+        # for t in tqdm(range(self.id2start, self.id2end), desc=f"Processing {self.ticker}"):
+        for t in range(self.id2start, self.id2end):    
             yield self[t] if output_time else self[t][0]
 
 

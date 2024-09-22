@@ -1,3 +1,4 @@
+from common.type import TimePeriod
 from configs.tunnel import Param, config
 
 config.ticker.test = "ETHUSDT"
@@ -9,4 +10,6 @@ config.leverage.test = 1
 config.body_classifier.test.params.ncross.test = 5
 config.trailing_stop_rate.test = 0.003
 config.hist_buffer_size.test = 32
-config.period.test = "M60"
+config.period.test = TimePeriod.M60
+
+config.save_backups.test = True
