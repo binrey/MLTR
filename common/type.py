@@ -34,9 +34,8 @@ class Side(Enum):
 
 
 class Vis(Enum):
-    OFF = 0
-    ON_STEP = 1
-    ON_DEAL = 2
+    ON_STEP = 0
+    ON_DEAL = 1
     
 
 class TimePeriod(Enum):

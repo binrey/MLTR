@@ -1,15 +1,23 @@
-from typing import List
+from pathlib import Path
+from typing import List, Optional
 
 import finplot as fplt
 import pandas as pd
 
-from common.type import Side
+from common.type import Side, TimePeriod
+from common.utils import date2str
 from trade.utils import Position
 
 
 class Visualizer:
-    def __init__(self, cfg):
-        self.cfg = cfg
+    def __init__(self, period: TimePeriod, show: bool, save_to: Optional[str], vis_hist_length: int) -> None:
+        self.period = period
+        self.show = show
+        self.save_plots = True if save_to is not None else False
+        self.vis_hist_length = vis_hist_length
+        
+        if self.save_plots:
+            self.path2save = Path(save_to)
         self.hist2plot = None
     
     def update_hist(self, h):
@@ -24,19 +32,25 @@ class Visualizer:
             h["Date"] = pd.to_datetime(h["Date"])
             h.set_index("Date", drop=True, inplace=True)
             self.hist2plot.iloc[-1, :] = h.iloc[0]
-            self.hist2plot = pd.concat([self.hist2plot, h.iloc[1:2, :]])   
+            self.hist2plot = pd.concat([self.hist2plot, h.iloc[1:2, :]])  
+            # if self.hist2plot.shape[0] > self.vis_hist_length:
+            self.hist2plot = self.hist2plot.iloc[-self.vis_hist_length:] 
              
     def __call__(self, pos_list: List[Position]):
         fplt.candlestick_ochl(self.hist2plot[['Open', 'Close', 'High', 'Low']])
         for pos in pos_list:
             if pos is None:
                 continue
-            profit = pos.profit
             end_time, end_price = pos.close_date, pos.close_price
+            profit = pos.profit
+            
             if profit is None:
                 profit = pos.cur_profit(self.hist2plot["Open"][-1])
                 end_time, end_price = self.hist2plot.index[-1], self.hist2plot["Open"][-1]
                 
+            if pd.to_datetime(end_time) < self.hist2plot.index[0]:
+                continue
+            
             rect = fplt.add_rect((end_time, end_price), 
                                  (pos.open_date, pos.open_price), 
                                  color='#8c8' if pos.side == Side.BUY else '#c88')
@@ -48,8 +62,19 @@ class Visualizer:
                                  style="--")
             
             for t, p in pos.sl_hist:
-                fplt.add_line((t - self.cfg.period.to_timedelta(), p), 
+                fplt.add_line((t - self.period.to_timedelta(), p), 
                               (t, p), 
                               width=2)
         fplt.winh = 600
-        fplt.show()
+        fplt.timer_callback(update_func=self.save_func,
+                            seconds=0.25,
+                            single_shot=True)
+        if self.show or self.save_plots:
+            fplt.show()
+                
+    def save_func(self):
+        if self.save_plots:
+            save_name = date2str(self.hist2plot.index[-1].to_datetime64()) + ".png"
+            fplt.screenshot(open(self.path2save / save_name, 'wb'))
+            if not self.show:
+                fplt.close()

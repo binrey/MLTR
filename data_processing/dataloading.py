@@ -94,7 +94,7 @@ class DataParser():
 
     def load(self, database=None):
         if database is None:
-            database = os.environ.get("FINDATA", "fin_data")
+            database = os.environ.get("FINDATA", "../fin_data")
         t0 = perf_counter()
         p = Path(database) / self.cfg.data_type / self.cfg.period.value
         flist = [f for f in p.glob("*") if self.cfg.ticker in f.stem]

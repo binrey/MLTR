@@ -52,10 +52,13 @@ class BaseTradeClass(ABC):
         self.exp = expert
         self.h, self.time = None, StepData()
         self.pos: StepData[Position] = StepData()
-        self.visualizer = Visualizer(cfg)        
+     
         self.save_path = Path("real_trading") / f"{self.cfg.ticker}-{self.cfg.period}"
         self.backup_path = self.save_path / "backup.pkl"
-        
+        self.visualizer = Visualizer(period=cfg.period, 
+                                     show=self.cfg.visualize, 
+                                     save_to=self.save_path if self.cfg.save_plots else None,
+                                     vis_hist_length=self.cfg.vis_hist_length)           
         self.nmin = self.cfg.period.minutes
         self.time = StepData()
 
@@ -103,7 +106,7 @@ class BaseTradeClass(ABC):
 
     def save_backup(self):
         backup_data = {
-            "open_position": self.pos
+            "active_position": self.pos
         }
         backup_path = self.save_path / "backup.pkl"
         with open(backup_path, "wb") as f:
@@ -114,10 +117,7 @@ class BaseTradeClass(ABC):
         if self.backup_path.exists():
             with open(self.backup_path, "rb") as f:
                 backup_data = pickle.load(f)
-            self.hist2plot = backup_data["hist2plot"]
-            self.lines2plot = backup_data["lines2plot"]
-            self.sl = backup_data["sl"]
-            self.pos = backup_data["open_position"]
+            self.pos = backup_data["active_position"]
             logger.info(f"backup loaded from {self.backup_path}")
         else:
             logger.info("no backup found")
@@ -138,19 +138,19 @@ class BaseTradeClass(ABC):
 
     def update(self):
         self.h = self.get_hist()
-        if self.cfg.visualize != Vis.OFF:
+        if self.cfg.visualize or self.cfg.save_plots:
             self.visualizer.update_hist(self.h)
         self.update_market_state()
 
         logger.debug(f"open: {self.h['Open'][-1]}")
 
         if self.pos.change(): 
-            if self.cfg.visualize == Vis.ON_DEAL:
+            if self.cfg.vis_events == Vis.ON_DEAL:
                 self.vis()
             if self.my_telebot is not None:
                 self.my_telebot.send_image(self.save_path / date2name(self.time))
         
-        if self.cfg.visualize == Vis.ON_STEP:
+        if self.cfg.vis_events == Vis.ON_STEP:
             self.vis()        
         
         texp = self.exp.update(self.h, self.pos.curr)
