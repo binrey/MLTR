@@ -51,21 +51,22 @@ class BackTestResults:
         """
 
         self.ndeals = len(profits)
-        self.deals_hist = pd.DataFrame(
-            {"dates": dates, "profits": profits, "fees":fees}
-            )       
-        self.deals_hist.set_index("dates", inplace=True)
-        self.daily_hist = self.resample_hist(self.deals_hist, "D")
-        # add column with cumulative sum of profits
-        self.daily_hist["profit_csum"] = self.daily_hist["profits"].cumsum()
-        # add column with cumulative sum of fees
-        self.daily_hist["fees_csum"] = self.daily_hist["fees"].cumsum()
-        # add column with cumulative sum of profits without fees
-        self.daily_hist["profit_nofees"] = self.daily_hist["profits"].cumsum() + self.daily_hist["fees"].cumsum()   
-        self.monthly_hist = self.resample_hist(self.deals_hist, "M")
-        self.process_daily_metrics()
-        # self.update_monthly_profit()
-        self.fees = sum(fees)
+        if self.ndeals:
+            self.deals_hist = pd.DataFrame(
+                {"dates": dates, "profits": profits, "fees":fees}
+                )       
+            self.deals_hist.set_index("dates", inplace=True)
+            self.daily_hist = self.resample_hist(self.deals_hist, "D")
+            # add column with cumulative sum of profits
+            self.daily_hist["profit_csum"] = self.daily_hist["profits"].cumsum()
+            # add column with cumulative sum of fees
+            self.daily_hist["fees_csum"] = self.daily_hist["fees"].cumsum()
+            # add column with cumulative sum of profits without fees
+            self.daily_hist["profit_nofees"] = self.daily_hist["profits"].cumsum() + self.daily_hist["fees"].cumsum()   
+            self.monthly_hist = self.resample_hist(self.deals_hist, "M")
+            self.process_daily_metrics()
+            # self.update_monthly_profit()
+            self.fees = sum(fees)
 
     def resample_hist(self, hist, period="D"):
         hist = hist.resample(period).sum()
@@ -205,11 +206,12 @@ class BackTestResults:
 
     @property
     def final_profit(self):
-        return (
-            self.daily_hist["profit_csum"].values[-1]
-            if len(self.daily_hist["profit_csum"].values) > 0
-            else 0
-        )
+        if self.daily_hist is not None:
+            return (
+                self.daily_hist["profit_csum"].values[-1]
+                if len(self.daily_hist["profit_csum"].values) > 0
+                else 0
+            )
 
     @property
     def final_profit_rel(self):

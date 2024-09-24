@@ -1,16 +1,22 @@
 import argparse
+import sys
+
+from loguru import logger
 
 from backtesting.backtest import backtest
 from common.utils import PyConfig
+from trade.backtest import launch as backtest_launch
 from trade.bybit import launch as bybit_launch
 
 
-def run_backtest(config_path, debug):
+def run_backtest(config_path):
     cfg = PyConfig(config_path).test()
-    btest_results = backtest(cfg, loglevel="DEBUG" if debug else "INFO")
+    cfg.save_backups = False
+    btest_results = backtest_launch(cfg)
     btest_results.plot_results()
+    
 
-def run_bybit(config_path, debug):
+def run_bybit(config_path):
     cfg = PyConfig(config_path).test()
     cfg.save_plots = True
     bybit_launch(cfg)
@@ -25,9 +31,12 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
+    logger.remove()
+    logger.add(sys.stderr, level="INFO" if not args.debug else "DEBUG")
+
     if args.run_type == "bybit":
-        run_bybit(args.config_path, args.debug)
+        run_bybit(args.config_path)
     elif args.run_type == "backtest":
-        run_backtest(args.config_path, args.debug)
+        run_backtest(args.config_path)
     else:
         raise ValueError(f"Unknown run type: {args.run_type}")

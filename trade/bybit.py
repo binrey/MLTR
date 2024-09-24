@@ -27,6 +27,7 @@ from pybit.unified_trading import HTTP, WebSocket
 
 from common.utils import PyConfig, date2str
 from experts import ByBitExpert
+from experts.base import ExpertBase
 from trade.base import BaseTradeClass, StepData
 
 stackprinter.set_excepthook(style='color')
@@ -55,26 +56,12 @@ def get_bybit_hist(mresult, size):
 
 
 class BybitTrading(BaseTradeClass):
-    def __init__(self, cfg, expert, telebot, bybit_session) -> None:
+    def __init__(self, cfg, expert: ExpertBase, telebot: Telebot, bybit_session: HTTP) -> None:
         super().__init__(cfg=cfg, expert=expert, telebot=telebot)
         self.session = bybit_session
-        self.nmin = int(self.cfg.period[1:])
-        self.time = StepData()
             
-    def handle_trade_message(self, message):
-        time = self.to_datetime(message.get('data')[0].get("T"))
-        time_rounded = time.astype("datetime64[m]").astype(int)//self.nmin
-        self.time.update(np.datetime64(int(time_rounded*self.nmin), "m"))
-        print ("\033[A\033[A")
-        logger.info(f"server time: {date2str(time, 'ms')}: {date2str(self.time.prev)} -> {date2str(self.time.curr)}")
-        
-        if self.time.change(no_none=True):
-            self.update()
-            actpos = f"{self.pos.curr.ticker} {self.pos.curr.side} {self.pos.curr.volume}" if self.pos.curr is not None else "пусто"
-            msg = f"{date2str(self.time.curr)}: cur. pos: {actpos}"
-            logger.info(msg)
-            print()
-            self.my_telebot.send_text(msg)
+    def get_server_time(self, message) -> np.datetime64:
+        return self.to_datetime(message.get('data')[0].get("T"))
 
     def update_trailing_stop(self, sl_new: float):
         try:

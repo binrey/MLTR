@@ -1,3 +1,4 @@
+from common.type import TimePeriod
 from configs.tunnel import config
 
 config.ticker.test = "BTCUSDT"
@@ -9,4 +10,6 @@ config.leverage.test = 1
 config.body_classifier.test.params.ncross.test = 4
 config.trailing_stop_rate.test = 0.005
 config.hist_buffer_size.test = 64
-config.period.test = "M60"
+config.period.test = TimePeriod.M60
+
+config.save_backups.test = False

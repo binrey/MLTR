@@ -14,12 +14,12 @@ class ClsTunnel(ExtensionBase):
             "line_above": None,
             "line_below": None,
         }
-        for i in range(4, h.Id.shape[0], 1):
-            line_above = h.High[-i:].mean()
-            line_below = h.Low[-i:].mean()
+        for i in range(4, h.shape[0], 1):
+            line_above = h["High"][-i:].mean()
+            line_below = h["Low"][-i:].mean()
             middle_line = (line_above + line_below) / 2
 
-            if h.Close[-1] < line_above and h.Close[-1] > line_below:
+            if h["Close"][-1] < line_above and h["Close"][-1] > line_below:
                 metric = i / ((line_above - line_below) / middle_line) / 100
 
                 if metric > best_params["metric"]:
@@ -38,17 +38,17 @@ class ClsTunnel(ExtensionBase):
 
         if is_fig:
             i = best_params["i"]
-            common.sl = {1: h.Low[-i:].min(), -1: h.High[-i:].max()}
+            common.sl = {1: h["Low"][-i:].min(), -1: h["High"][-i:].max()}
             # v1
             common.lprice = best_params["line_above"]
             common.sprice = best_params["line_below"]
             # v2
-            # if middle_line > h.Close.mean():
+            # if middle_line > h["Close"].mean():
             #     common.lprice = line_below
             # else:
             #     common.sprice = line_above
-            common.lines = [[(h.Id[-i], best_params["line_above"]), (h.Id[-1], best_params["line_above"])],
-                            [(h.Id[-i], best_params["line_below"]), (h.Id[-1], best_params["line_below"])],
-                            [(h.Id[-i], best_params["middle_line"]), (h.Id[-1], best_params["middle_line"])]]
+            common.lines = [[(h["Id"][-i], best_params["line_above"]), (h["Id"][-1], best_params["line_above"])],
+                            [(h["Id"][-i], best_params["line_below"]), (h["Id"][-1], best_params["line_below"])],
+                            [(h["Id"][-i], best_params["middle_line"]), (h["Id"][-1], best_params["middle_line"])]]
 
         return is_fig

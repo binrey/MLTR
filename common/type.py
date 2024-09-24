@@ -1,5 +1,7 @@
 from enum import Enum
 
+import numpy as np
+
 
 class Side(Enum):
     BUY = 1
@@ -26,8 +28,28 @@ class Side(Enum):
     def __str__(self):
         return "BUY" if self == Side.BUY else "SELL"
     
+    @staticmethod
+    def reverse(side):
+        return Side.BUY if side == Side.SELL else Side.SELL
+
+
+class Vis(Enum):
+    OFF = 0
+    ON_STEP = 1
+    ON_DEAL = 2
+    
+
+class TimePeriod(Enum):
+    M60 = "M60"
+
+    def to_timedelta(self):
+        return np.timedelta64(self.value[1:], self.value[0].lower())
+    
+    @property
+    def minutes(self):
+        return int(self.value[1:])
+        
+
 if __name__ == "__main__":
-    print(Side.from_str("buy"))
-    print(Side.from_int(1))
-    print(Side.BUY)
-    print(Side.SELL)
+    tp = TimePeriod.M60
+    print(tp.to_timedelta())

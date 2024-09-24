@@ -17,6 +17,10 @@ from common.type import Side
 
 cache = Cache(".tmp")
 
+
+def name_from_cfg(cfg, name):
+    return name + ":" + "-".join([f"{v}" for k, v in cfg.items()])
+
 def cache_result(func):
     def wrapper(*args, **kwargs):
         key = (func.__name__, args, frozenset(kwargs.items()))
