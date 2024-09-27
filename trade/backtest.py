@@ -68,7 +68,7 @@ def launch(cfg):
         save_path = Path("backtests") / f"{cfg.ticker}"
         if save_path.exists():
             rmtree(save_path)
-        save_path.mkdir()
+        save_path.mkdir(parents=True)
     mw = MovingWindow(cfg)
     backtest_session = Broker(cfg)
     backtest_trading = BackTest(

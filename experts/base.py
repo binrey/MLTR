@@ -1,25 +1,31 @@
 from abc import ABC, abstractmethod
-from collections import OrderedDict
-from copy import deepcopy
 from time import perf_counter
-from typing import Optional
+from typing import Any, Callable, Optional
 
-import numpy as np
-import yaml
-from easydict import EasyDict
 from loguru import logger
 
 # import torch
 from backtesting.backtest_broker import Broker, Order, Position
 from common.type import Side
 from common.utils import date2str
-from data_processing.dataloading import build_features
 from indicators import *
 from trade.utils import ORDER_TYPE, fix_rate_trailing_sl
 
 
+def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(self, sl: Optional[float]):
+        logger.debug(f"Modifying sl: {self.active_position.sl} -> {sl}")
+        result = func(self, sl)
+        return result
+    return wrapper
+
 class ExpertBase(ABC):
-    def __init__(self):
+    def __init__(self, cfg):
+        self.cfg = cfg 
+        self.body_cls = cfg.body_classifier.func
+        self.sl_processor = cfg.sl_processor.func
+        self.sl_processor.set_expert(self)
+        
         self.lines = []
         self.orders = []
             
@@ -51,12 +57,11 @@ class ExtensionBase:
 
 class ExpertFormation(ExpertBase):
     def __init__(self, cfg):
-        self.cfg = cfg 
-        super(ExpertFormation, self).__init__()  
-        self.body_cls = cfg.body_classifier.func
-        self.stops_processor = cfg.stops_processor.func
+        super(ExpertFormation, self).__init__(cfg)  
         self._reset_state()
         self.order_sent = False
+        self.sl = None
+        self.tp = None
         
         if self.cfg.run_model_device is not None:
             from ml import Net, Net2
@@ -85,14 +90,14 @@ class ExpertFormation(ExpertBase):
     def update_trailing_sl(self, h):
         if self.active_position is not None:
             if self.active_position.sl is None:
-                tp, sl = self.stops_processor(self, h)
+                sl = self.sl_processor(h)
                 self.modify_sl(sl)
             else:
                 sl_new = fix_rate_trailing_sl(sl=self.active_position.sl, 
-                                            open_price=h["Open"][-1],
-                                            side=self.active_position.side,
-                                            trailing_stop_rate=self.cfg.trailing_stop_rate, 
-                                            ticksize=self.cfg.ticksize)
+                                              open_price=h["Open"][-1],
+                                              side=self.active_position.side,
+                                              trailing_stop_rate=self.cfg.trailing_stop_rate, 
+                                              ticksize=self.cfg.ticksize)
                 self.modify_sl(sl_new)                
             
     def get_body(self, h):
@@ -138,9 +143,11 @@ class ExpertFormation(ExpertBase):
             
         
         if self.order_dir != 0:
-            if self.active_position is None or self.active_position.dir*self.order_dir < 0:
+            if self.active_position is None or self.active_position.side.value*self.order_dir < 0:
                 
-                self.create_orders(h["Id"][-1], self.order_dir, self.estimate_volume(h))
+                self.create_orders(side=Side.from_int(self.order_dir), 
+                                   volume=self.estimate_volume(h),
+                                   time_id=h["Id"][-1])
                 self.order_sent = True
                 if not self.cfg.allow_overturn:
                     self._reset_state()
@@ -153,13 +160,14 @@ class BacktestExpert(ExpertFormation):
         self.session = session
         super(BacktestExpert, self).__init__(cfg)
         
-    def create_orders(self, time_id, dir, volume):
-        self.orders = [Order(0, Side.from_int(dir), ORDER_TYPE.MARKET, volume, time_id, time_id)]
+    def create_orders(self, *, side, volume, time_id):
+        self.orders = [Order(0, side, ORDER_TYPE.MARKET, volume, time_id, time_id)]
         log_message = f"{time_id} send order {self.orders[0]}"
 
         self.session.set_active_orders(self.orders)
         logger.debug(log_message)
-        
+    
+    @log_modify_sl    
     def modify_sl(self, sl: Optional[float]):
         self.session.update_sl(sl)
         
@@ -170,22 +178,36 @@ class ByBitExpert(ExpertFormation):
         self.session = session
         super(ByBitExpert, self).__init__(cfg)
         
-    def create_orders(self, time_id, order_dir, volume, tp, sl):
+    def create_orders(self, *, side, volume, time_id=None):
         try:
             resp = self.session.place_order(
                 category="linear",
                 symbol=self.cfg.ticker,
-                side="Buy" if order_dir > 0 else "Sell",
+                side=side.name.capitalize(),
                 orderType="Market",
-                qty=str(volume),
+                qty=volume,
                 timeInForce="GTC",
-                # orderLinkId="spot-test-postonly",
-                stopLoss="" if sl is None else str(abs(sl)),
-                takeProfit="" if tp is None else str(tp)
+                # orderLinkId="spot-test-po1stonly",
+                # stopLoss="" if sl is None else str(abs(sl)),
+                # takeProfit="" if tp is None else str(tp)
                 )
             logger.debug(resp)
         except Exception as ex:
             logger.error(ex)
 
+    @log_modify_sl 
+    def modify_sl(self, sl: Optional[float]):
+        if sl is None:
+            return
+        try:
+            resp = self.session.set_trading_stop(
+                category="linear",
+                symbol=self.cfg.ticker,
+                stopLoss=sl,
+                slTriggerB="IndexPrice",
+                positionIdx=0,
+            )
+        except Exception as ex:
+            logger.error(ex)
 
 

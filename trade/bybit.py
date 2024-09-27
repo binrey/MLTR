@@ -1,3 +1,4 @@
+import numbers
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import rmtree
@@ -8,6 +9,7 @@ from loguru import logger
 
 from common.type import Side
 from common.utils import Telebot, date2name, plot_fig
+from data_processing.dataloading import DTYPE
 from trade.utils import Position
 
 pd.options.mode.chained_assignment = None
@@ -28,30 +30,24 @@ from pybit.unified_trading import HTTP, WebSocket
 from common.utils import PyConfig, date2str
 from experts import ByBitExpert
 from experts.base import ExpertBase
-from trade.base import BaseTradeClass, StepData
+from trade.base import BaseTradeClass, StepData, log_get_hist
 
 stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen
  
 def get_bybit_hist(mresult, size):
-    data = EasyDict(Date=np.empty(size, dtype=np.datetime64),
-        Id=np.zeros(size, dtype=np.int64),
-        Open=np.zeros(size, dtype=np.float32),
-        Close=np.zeros(size, dtype=np.float32),
-        High=np.zeros(size, dtype=np.float32),
-        Low=np.zeros(size, dtype=np.float32),
-        Volume=np.zeros(size, dtype=np.int64)
-        )    
-
+    data = np.zeros(size, dtype=DTYPE)
+    
     input = np.array(mresult["list"], dtype=np.float64)[::-1]
-    data.Id = input[:, 0].astype(np.int64)
-    data.Date = data.Id.astype("datetime64[ms]")
-    data.Open = input[:, 1]
-    data.High = input[:, 2]
-    data.Low  = input[:, 3]
-    data.Close= input[:, 4]
-    data.Volume = input[:, 5]
+    data['Id'] = input[:, 0].astype(np.int64)
+    data['Date'] = data['Id'].astype("datetime64[ms]")
+    data['Open'] = input[:, 1]
+    data['High'] = input[:, 2]
+    data['Low'] = input[:, 3]
+    data['Close'] = input[:, 4]
+    data['Volume'] = input[:, 5].astype(np.int64)
+    
     return data
 
 
@@ -63,25 +59,12 @@ class BybitTrading(BaseTradeClass):
     def get_server_time(self, message) -> np.datetime64:
         return self.to_datetime(message.get('data')[0].get("T"))
 
-    def update_trailing_stop(self, sl_new: float):
-        try:
-            resp = self.session.set_trading_stop(
-                category="linear",
-                symbol=self.cfg.ticker,
-                stopLoss=sl_new,
-                slTriggerB="IndexPrice",
-                positionIdx=0,
-            )
-            logger.debug(f"trailing sl: {self.pos.curr.sl:.2f} -> {sl_new:.2f}")
-        except Exception as ex:
-            logger.error(ex)
-
     def to_datetime(self, timestamp: Union[int, float]) -> np.datetime64:
         return np.datetime64(int(timestamp), "ms")
     
-    def get_pos_hist(self, limit=1):
+    def get_pos_history(self, limit=5):
         positions = self.session.get_closed_pnl(category="linear", limit=limit)["result"]["list"]
-        positions = [self.build_position(pos) for pos in positions if pos["symbol"] == self.cfg.ticker]
+        positions = [self._build_position(pos) for pos in positions if pos["symbol"] == self.cfg.ticker]
         return positions
 
     def get_current_position(self):
@@ -91,21 +74,34 @@ class BybitTrading(BaseTradeClass):
             return self._build_position(positions[0]) if len(positions) else None
                 
     def _build_position(self, pos: Dict[str, Any]):
-        return Position(
-            price=float(pos["avgPrice"])*Side.from_str(pos["side"]).value,
+        if "avgEntryPrice" in pos.keys():
+            price = pos["avgEntryPrice"]
+        else:
+            price = pos.get("avgPrice", 0)
+
+        pos_object = Position(
+            price=float(price),
             date=self.to_datetime(pos["updatedTime"]),
             indx=0,
+            side=Side.from_str(pos["side"]),
             ticker=pos["symbol"],
-            volume=float(pos["size"]),
+            volume=float(pos["closedSize"] if "closedSize" in pos else pos["size"]),
             period=self.cfg.period,
-            sl=float(pos["stopLoss"])
-            )            
+            sl=float(pos["stopLoss"]) if "stopLoss" in pos and len(pos["stopLoss"]) else None,
+            )    
+        if "avgExitPrice" in pos.keys():
+            pos_object.close(price=float(pos["avgExitPrice"]),
+                      date=self.to_datetime(pos["updatedTime"]),
+                      indx=int(pos["updatedTime"])
+                      )
+        return pos_object
 
+    @log_get_hist
     def get_hist(self):
         message = self.session.get_kline(
             category="linear",
             symbol=self.cfg.ticker,
-            interval=self.cfg.period[1:],
+            interval=str(self.cfg.period.minutes),
             start=0,
             end=self.time.curr,
             limit=self.cfg.hist_buffer_size

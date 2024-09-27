@@ -75,14 +75,12 @@ class Position:
         self.fees = 0
         self.fees_abs = 0
         self._update_fees(self.open_price, self.volume)
-        logger.debug(f"{date2str(date)} open position {self.id}")
 
     def __str__(self):
         return f"pos {self.ticker} {self.side} {self.volume}: {self.open_price}"
 
     def update_sl(self, sl: float, time: np.datetime64):
         assert not (self.sl is not None and sl is None), "Set sl to None is not allowed"
-        logger.debug(f"{date2str(time)} update sl {self.sl} -> {sl}")
         self.sl = sl
         if sl is not None:
             self.sl_hist.append((time, sl))
@@ -109,7 +107,7 @@ class Position:
     @property
     def id(self):
         return (
-            f"{self.open_indx}-{self.str_dir}-{self.open_price:.2f}-{self.volume:.2f}"
+            f"{self.open_indx}-{self.str_dir}-{self.open_price:.2f}-{self.volume:.2f} sl:{self.sl}"
         )
 
     def close(self, price, date, indx):
@@ -120,9 +118,6 @@ class Position:
         self.profit_abs = (self.close_price - self.open_price) * self.side.value * self.volume
         self.profit_abs -= self.fees_abs
         self.profit = self.profit_abs / self.open_price * 100
-        logger.debug(
-            f"{date2str(date)} close position {self.id} at {self.close_price:.2f}, profit: {self.profit_abs:.2f} ({self.profit:.2f}%)"
-        )
 
     def cur_profit(self, price):
         return (price - self.open_price) * self.side.value * self.volume

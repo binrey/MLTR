@@ -37,6 +37,8 @@ class Visualizer:
             self.hist2plot = self.hist2plot.iloc[-self.vis_hist_length:] 
              
     def __call__(self, pos_list: List[Position]):
+        if not self.show and not self.save_plots:
+            return
         fplt.candlestick_ochl(self.hist2plot[['Open', 'Close', 'High', 'Low']])
         for pos in pos_list:
             if pos is None:
@@ -52,10 +54,10 @@ class Visualizer:
                 continue
             
             rect = fplt.add_rect((end_time, end_price), 
-                                 (pos.open_date, pos.open_price), 
+                                 (pos.open_date.astype("datetime64[m]"), pos.open_price), 
                                  color='#8c8' if pos.side == Side.BUY else '#c88')
             
-            line = fplt.add_line((pos.open_date, pos.open_price), 
+            line = fplt.add_line((pos.open_date.astype("datetime64[m]"), pos.open_price), 
                                  (end_time, end_price), 
                                  color='#000',
                                  width=2, 
@@ -67,10 +69,9 @@ class Visualizer:
                               width=2)
         fplt.winh = 600
         fplt.timer_callback(update_func=self.save_func,
-                            seconds=0.25,
+                            seconds=0.5,
                             single_shot=True)
-        if self.show or self.save_plots:
-            fplt.show()
+        fplt.show()
                 
     def save_func(self):
         if self.save_plots:

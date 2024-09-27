@@ -15,7 +15,7 @@ pd.options.mode.chained_assignment = None
 import pickle
 from copy import deepcopy
 from multiprocessing import Process
-from typing import Any
+from typing import Any, Callable, Optional
 
 import finplot as fplt
 import numpy as np
@@ -28,6 +28,14 @@ stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen
  
+
+def log_get_hist(func: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(self, *args, **kwargs):
+        result = func(self)
+        if result is not None:
+            logger.debug(f"new:{result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}")
+        return result
+    return wrapper
 
 
 @dataclass
@@ -53,7 +61,7 @@ class BaseTradeClass(ABC):
         self.h, self.time = None, StepData()
         self.pos: StepData[Position] = StepData()
      
-        self.save_path = Path("real_trading") / f"{self.cfg.ticker}-{self.cfg.period}"
+        self.save_path = Path("real_trading") / f"{self.cfg.ticker}-{self.cfg.period.value}"
         self.backup_path = self.save_path / "backup.pkl"
         self.visualizer = Visualizer(period=cfg.period, 
                                      show=self.cfg.visualize, 
@@ -67,14 +75,10 @@ class BaseTradeClass(ABC):
         pass
 
     @abstractmethod
-    def update_trailing_stop(self, sl_new: float) -> None:
-        pass
-
-    @abstractmethod
     def get_current_position(self) -> Position:
         pass
     
-    @abstractmethod  
+    @abstractmethod
     def get_hist(self):
         pass    
     
@@ -142,19 +146,19 @@ class BaseTradeClass(ABC):
             self.visualizer.update_hist(self.h)
         self.update_market_state()
 
-        logger.debug(f"open: {self.h['Open'][-1]}")
-
         if self.pos.change(): 
+            if self.pos.prev is not None: 
+                logger.debug(f"{date2str(self.time.curr)} close position {self.pos.prev.id} at {self.pos.prev.close_price:.2f}, profit: {self.pos.prev.profit_abs:.2f} ({self.pos.prev.profit:.2f}%)")
             if self.cfg.vis_events == Vis.ON_DEAL:
                 self.vis()
             if self.my_telebot is not None:
-                self.my_telebot.send_image(self.save_path / date2name(self.time))
+                self.my_telebot.send_image(self.save_path / date2name(self.time.curr))
         
         if self.cfg.vis_events == Vis.ON_STEP:
             self.vis()        
         
         texp = self.exp.update(self.h, self.pos.curr)
-        if self.cfg.save_backups:
+        if self.cfg.save_backup:
             self.save_backup()
 
 

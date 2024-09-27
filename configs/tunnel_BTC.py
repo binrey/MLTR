@@ -12,4 +12,4 @@ config.trailing_stop_rate.test = 0.005
 config.hist_buffer_size.test = 64
 config.period.test = TimePeriod.M60
 
-config.save_backups.test = False
+config.save_backup.test = False

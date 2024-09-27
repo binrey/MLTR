@@ -1,6 +1,7 @@
 from easydict import EasyDict
 
 from experts import *
+from experts.position_control import *
 
 
 class Param:
@@ -75,10 +76,9 @@ stops_processors = EasyDict(
             sl=Param(None, [None])
             )
         ),
-    stops_dynamic = EasyDict(
-        func=StopsDynamic,
+    sl_dynamic = EasyDict(
+        func=SLDynamic,
         params=EasyDict(
-            tp_active=Param(False, [False]),
             sl_active=Param(False, [False])
             )
         )    

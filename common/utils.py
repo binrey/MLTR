@@ -11,6 +11,7 @@ import pandas as pd
 import telebot
 from diskcache import Cache
 from easydict import EasyDict
+from loguru import logger
 from PIL import Image
 
 from common.type import Side
@@ -141,7 +142,10 @@ class Telebot:
             self.bot.send_message(self.chat_id, ex)
 
     def send_text(self, text):
+        try:
             self.bot.send_message(self.chat_id, text)
+        except Exception as ex:
+            logger.error(f"error in sending bot message: {ex}")
 
 
 

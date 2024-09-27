@@ -1,3 +1,4 @@
+from common.type import Side
 from experts.base import ExtensionBase
 
 
@@ -5,6 +6,7 @@ class ClsTunnel(ExtensionBase):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsTunnel, self).__init__(cfg, name="tunnel")
+        self.sl_definer = {Side.BUY: None, Side.SELL: None}
 
     def __call__(self, common, h) -> bool:
         is_fig = False
@@ -36,9 +38,12 @@ class ClsTunnel(ExtensionBase):
             is_fig = True
             # break
 
+
+
         if is_fig:
             i = best_params["i"]
-            common.sl = {1: h["Low"][-i:].min(), -1: h["High"][-i:].max()}
+            self.sl_definer[Side.BUY] = h["Low"][-i:].min()
+            self.sl_definer[Side.SELL] = h["High"][-i:].max()         
             # v1
             common.lprice = best_params["line_above"]
             common.sprice = best_params["line_below"]
@@ -52,3 +57,9 @@ class ClsTunnel(ExtensionBase):
                             [(h["Id"][-i], best_params["middle_line"]), (h["Id"][-1], best_params["middle_line"])]]
 
         return is_fig
+    
+    def setup_sl(self, side: Side):
+        return self.sl_definer[side]
+    
+    def setup_tp(self, side: Side):
+        return None

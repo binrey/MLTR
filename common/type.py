@@ -40,6 +40,7 @@ class Vis(Enum):
 
 class TimePeriod(Enum):
     M60 = "M60"
+    M1 = "M1"
 
     def to_timedelta(self):
         return np.timedelta64(self.value[1:], self.value[0].lower())
