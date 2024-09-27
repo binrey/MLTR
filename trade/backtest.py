@@ -96,7 +96,7 @@ def launch(cfg):
 
     logger.info(
         f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, "
-        f"sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}"
+        f"sl={cfg.sl_processor.func.name}, sl-rate={cfg.trailing_stop_rate}"
     )
 
     logger.debug(sformat(1).format("total backtest", ttotal) + " sec")

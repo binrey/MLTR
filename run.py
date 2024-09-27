@@ -18,6 +18,8 @@ def run_backtest(config_path):
 
 def run_bybit(config_path):
     cfg = PyConfig(config_path).test()
+    cfg.save_backup = True
+    cfg.visualize = False
     bybit_launch(cfg)
     
 

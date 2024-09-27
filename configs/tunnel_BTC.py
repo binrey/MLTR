@@ -11,5 +11,3 @@ config.body_classifier.test.params.ncross.test = 4
 config.trailing_stop_rate.test = 0.005
 config.hist_buffer_size.test = 64
 config.period.test = TimePeriod.M60
-
-config.save_backup.test = False
