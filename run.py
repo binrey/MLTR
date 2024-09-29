@@ -3,7 +3,6 @@ import sys
 
 from loguru import logger
 
-from backtesting.backtest import backtest
 from common.utils import PyConfig
 from trade.backtest import launch as backtest_launch
 from trade.bybit import launch as bybit_launch

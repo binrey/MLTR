@@ -1,36 +1,25 @@
-import numbers
-from dataclasses import dataclass
-from pathlib import Path
-from shutil import rmtree
 from time import sleep
 
 import pandas as pd
 from loguru import logger
 
 from common.type import Side
-from common.utils import Telebot, date2name, plot_fig
+from common.utils import Telebot
 from data_processing.dataloading import DTYPE
 from trade.utils import Position
 
 pd.options.mode.chained_assignment = None
-import pickle
-from collections import defaultdict
-from copy import deepcopy
-from datetime import datetime
-from multiprocessing import Process
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Union
 
 import numpy as np
 import pandas as pd
 import stackprinter
 import yaml
-from easydict import EasyDict
 from pybit.unified_trading import HTTP, WebSocket
 
-from common.utils import PyConfig, date2str
 from experts import ByBitExpert
 from experts.base import ExpertBase
-from trade.base import BaseTradeClass, StepData, log_get_hist
+from trade.base import BaseTradeClass, log_get_hist
 
 stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков

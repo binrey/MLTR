@@ -76,9 +76,9 @@ class BybitDownloader:
 
 
 if __name__ == "__main__":
-    symbol = "ETHUSDT"
+    symbol = "BTCUSDT"
     period = 60
-    init_data = f"/Users/andrybin/Yandex.Disk.localized/fin_data/bybit/M{period}/{symbol}_M{period}.csv"
+    init_data = f"/Users/andrybin/Yandex.Disk.localized/fin_data/bybit/M{period}/{symbol}.csv"
     bb_loader = BybitDownloader(symbol=symbol, 
                                 period=period, 
                                 start_date="2000-01-01",
