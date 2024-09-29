@@ -1,37 +1,24 @@
-import sys
-from dataclasses import dataclass
 from pathlib import Path
 from shutil import rmtree
-from time import sleep, time
+from time import time
 
 import pandas as pd
 from loguru import logger
 
 from backtesting.utils import BackTestResults
-from common.type import Side
-from common.utils import Telebot, date2name, plot_fig
-from data_processing.dataloading import DataParser, MovingWindow
+from data_processing.dataloading import MovingWindow
 from trade.utils import Position
 
 pd.options.mode.chained_assignment = None
-import pickle
-from collections import defaultdict
-from copy import deepcopy
-from datetime import datetime
-from multiprocessing import Process
-from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
 import stackprinter
 import yaml
-from easydict import EasyDict
-from pybit.unified_trading import HTTP, WebSocket
 
 from backtesting.backtest_broker import Broker
-from common.utils import PyConfig, date2str
 from experts import BacktestExpert
-from trade.base import BaseTradeClass, StepData
+from trade.base import BaseTradeClass
 
 stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
