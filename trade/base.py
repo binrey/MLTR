@@ -7,17 +7,15 @@ import pandas as pd
 from loguru import logger
 
 from common.type import Vis
-from common.utils import date2name, plot_fig
+from common.utils import date2name
 from common.visualization import Visualizer
 from trade.utils import Position
 
 pd.options.mode.chained_assignment = None
 import pickle
-from copy import deepcopy
-from multiprocessing import Process
-from typing import Any, Callable, Optional
+from copy import copy
+from typing import Any, Callable
 
-import finplot as fplt
 import numpy as np
 import pandas as pd
 import stackprinter
@@ -44,7 +42,7 @@ class StepData:
     prev: Any = None
     
     def update(self, curr_value: Any):
-        self.prev = deepcopy(self.curr)
+        self.prev = copy(self.curr)
         self.curr = curr_value
         
     def change(self, no_none=False):
@@ -69,6 +67,8 @@ class BaseTradeClass(ABC):
                                      vis_hist_length=self.cfg.vis_hist_length)           
         self.nmin = self.cfg.period.minutes
         self.time = StepData()
+        self.update = self._update
+        self.exp_update = self.exp.update
 
     @abstractmethod
     def get_server_time(self, message: Any) -> np.datetime64:
@@ -135,12 +135,13 @@ class BaseTradeClass(ABC):
             self.clear_log_dir() 
 
     def update_market_state(self) -> None:
-        self.pos.update(self.get_current_position())
+        cur_pos = self.get_current_position()
+        self.pos.update(cur_pos)
 
     def vis(self):
         self.visualizer(self.get_pos_history() + [self.pos.curr])
 
-    def update(self):
+    def _update(self):
         self.h = self.get_hist()
         if self.cfg.visualize or self.cfg.save_plots:
             self.visualizer.update_hist(self.h)
@@ -148,7 +149,7 @@ class BaseTradeClass(ABC):
 
         if self.pos.change(): 
             if self.pos.prev is not None: 
-                logger.debug(f"{date2str(self.time.curr)} close position {self.pos.prev.id} at {self.pos.prev.close_price:.2f}, profit: {self.pos.prev.profit_abs:.2f} ({self.pos.prev.profit:.2f}%)")
+                logger.debug(f"{date2str(self.time.curr)} close position {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
             if self.cfg.vis_events == Vis.ON_DEAL:
                 self.vis()
             if self.my_telebot is not None:
@@ -157,7 +158,7 @@ class BaseTradeClass(ABC):
         if self.cfg.vis_events == Vis.ON_STEP:
             self.vis()        
         
-        texp = self.exp.update(self.h, self.pos.curr)
+        self.exp_update(self.h, self.pos.curr)
         if self.cfg.save_backup:
             self.save_backup()
 

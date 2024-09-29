@@ -1,14 +1,22 @@
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import finplot as fplt
+import mplfinance as mpf
 import pandas as pd
+from matplotlib import pyplot as plt
 
 from common.type import Side, TimePeriod
 from common.utils import date2str
 from trade.utils import Position
 
 
+@dataclass
+class DrawItem:
+    line: List[Tuple]
+    color: str
+    
 class Visualizer:
     def __init__(self, period: TimePeriod, show: bool, save_to: Optional[str], vis_hist_length: int) -> None:
         self.period = period
@@ -39,7 +47,8 @@ class Visualizer:
     def __call__(self, pos_list: List[Position]):
         if not self.show and not self.save_plots:
             return
-        fplt.candlestick_ochl(self.hist2plot[['Open', 'Close', 'High', 'Low']])
+        drawitems4pos: List[DrawItem] = []
+        drawitems4sl: List[DrawItem] = []
         for pos in pos_list:
             if pos is None:
                 continue
@@ -47,35 +56,82 @@ class Visualizer:
             profit = pos.profit
             
             if profit is None:
-                profit = pos.cur_profit(self.hist2plot["Open"][-1])
-                end_time, end_price = self.hist2plot.index[-1], self.hist2plot["Open"][-1]
+                profit = pos.cur_profit(self.hist2plot["Open"].iloc[-1])
+                end_time, end_price = self.hist2plot.index[-1], self.hist2plot["Open"].iloc[-1]
                 
             if pd.to_datetime(end_time) < self.hist2plot.index[0]:
                 continue
+            drawitem = DrawItem(line=[(pd.to_datetime(pos.open_date.astype("datetime64[m]")), pos.open_price), 
+                                      (pd.to_datetime(end_time), end_price)],
+                                color='#8c8' if pos.side == Side.BUY else '#c88')
+            drawitems4pos.append(drawitem)
             
-            rect = fplt.add_rect((end_time, end_price), 
-                                 (pos.open_date.astype("datetime64[m]"), pos.open_price), 
-                                 color='#8c8' if pos.side == Side.BUY else '#c88')
+            for t, p in pos.sl_hist:
+                drawitems4sl.append(DrawItem(line=[(pd.to_datetime(t - self.period.to_timedelta()), p), 
+                                                   (pd.to_datetime(t), p)], 
+                                             color="#000"))
+        if self.show:
+            self.visualize(drawitems4pos, drawitems4sl)
+        if self.save_plots:
+            pos_curr_side = pos_list[-1].side if pos_list[-1] else None
+            self.save(drawitems4pos, drawitems4sl, pos_curr_side)
+        
+
+    def visualize(self, drawitems4possitions: List[DrawItem], drawitems4sl: List[DrawItem]):
+        fplt.candlestick_ochl(self.hist2plot[['Open', 'Close', 'High', 'Low']])
+        for drawitem in drawitems4possitions:
+            rect = fplt.add_rect(drawitem.line[1], drawitem.line[0], color=drawitem.color)
             
-            line = fplt.add_line((pos.open_date.astype("datetime64[m]"), pos.open_price), 
-                                 (end_time, end_price), 
-                                 color='#000',
+            line = fplt.add_line(drawitem.line[0], 
+                                 drawitem.line[1], 
+                                 color="#000",
                                  width=2, 
                                  style="--")
             
-            for t, p in pos.sl_hist:
-                fplt.add_line((t - self.period.to_timedelta(), p), 
-                              (t, p), 
-                              width=2)
+        for drawitem in drawitems4sl:
+            fplt.add_line(drawitem.line[0], 
+                          drawitem.line[1], 
+                          color=drawitem.color,
+                          width=2, 
+                          style="-")
         fplt.winh = 600
-        fplt.timer_callback(update_func=self.save_func,
-                            seconds=0.5,
-                            single_shot=True)
         fplt.show()
-                
-    def save_func(self):
-        if self.save_plots:
-            save_name = date2str(self.hist2plot.index[-1].to_datetime64()) + ".png"
-            fplt.screenshot(open(self.path2save / save_name, 'wb'))
-            if not self.show:
-                fplt.close()
+
+
+    def save(self, drawitems4possitions: List[DrawItem], drawitems4sl: List[DrawItem], side_current: Optional[Side]):
+        mystyle = mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
+        lines = [drawitem.line for drawitem in drawitems4possitions + drawitems4sl]
+        for line in lines:
+            for i, point in enumerate(line):
+                if point[0] < self.hist2plot.index[0]:
+                    line[i] = (self.hist2plot.index[0], point[1])
+        
+        colors = [drawitem.color for drawitem in drawitems4possitions + drawitems4sl]
+        kwargs = dict(
+            type='candle',
+            block=False,
+            alines=dict(alines=lines, colors=colors, linewidths=[1]*len(lines)),
+            volume=True,
+            figscale=1.5,
+            style=mystyle,
+            datetime_format='%m-%d %H:%M:%Y',
+            # title=f"{np.array(time).astype('datetime64[m]')}-{ticker}-{side.name}",
+            returnfig=True
+        )
+
+        fig, axlist = mpf.plot(data=self.hist2plot, **kwargs)
+
+        if side_current is not None:
+            x, y = self.hist2plot.shape[0]-2, drawitems4possitions[-1].line[0][1]
+            id4scale = min(self.hist2plot.shape[0], 10)
+            arrow_size = (self.hist2plot.iloc[-id4scale:].High - self.hist2plot.iloc[-id4scale:].Low).mean()
+            axlist[0].annotate("", (x, y + arrow_size*side_current.value), fontsize=20, xytext=(x, y),
+                        color="black",
+                        arrowprops=dict(
+                            arrowstyle='->',
+                            facecolor='b',
+                            edgecolor='b'))
+
+        save_name = date2str(self.hist2plot.index[-1].to_datetime64()) + ".png"
+        fig.savefig(self.path2save / save_name, bbox_inches='tight', pad_inches=0.2)
+        plt.close('all')

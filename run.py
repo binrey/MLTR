@@ -12,13 +12,13 @@ from trade.bybit import launch as bybit_launch
 def run_backtest(config_path):
     cfg = PyConfig(config_path).test()
     cfg.save_backup = False
-    btest_results = backtest_launch(cfg)
-    btest_results.plot_results()
+    backtest_launch(cfg)
     
 
 def run_bybit(config_path):
     cfg = PyConfig(config_path).test()
     cfg.save_backup = True
+    cfg.save_plots = True
     cfg.visualize = False
     bybit_launch(cfg)
     

@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from time import perf_counter
 from typing import Any, Callable, Optional
 
 from loguru import logger
@@ -38,10 +37,8 @@ class ExpertBase(ABC):
         pass
     
     def update(self, h, active_position: Position):
-        t0 = perf_counter()
         self.active_position = active_position
         self.get_body(h)
-        return perf_counter() - t0
 
 
 class ExtensionBase:
@@ -99,7 +96,7 @@ class ExpertFormation(ExpertBase):
                                               trailing_stop_rate=self.cfg.trailing_stop_rate, 
                                               ticksize=self.cfg.ticksize)
                 self.modify_sl(sl_new)                
-            
+
     def get_body(self, h):
         self.update_trailing_sl(h)
         self.body_cls.update_inner_state(h)
