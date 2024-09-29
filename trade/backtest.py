@@ -18,7 +18,7 @@ import yaml
 
 from backtesting.backtest_broker import Broker
 from experts import BacktestExpert
-from trade.base import BaseTradeClass
+from trade.base import BaseTradeClass, log_get_hist
 
 stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
@@ -39,6 +39,7 @@ class BackTest(BaseTradeClass):
     def get_current_position(self) -> Position:
         return self.session.active_position
     
+    @log_get_hist
     def get_hist(self):
         return self.session.hist_window
     

@@ -77,7 +77,12 @@ class Position:
         self._update_fees(self.open_price, self.volume)
 
     def __str__(self):
-        return f"pos {self.ticker} {self.side} {self.volume}: {self.open_price}"
+        name = f"pos {self.ticker} {self.side} {self.volume}: {self.open_price}"
+        if self.close_price:
+            name += f" -> {self.close_price}"
+        if self.sl:
+            name += f" | sl:{self.sl}"
+        return name
 
     def update_sl(self, sl: float, time: np.datetime64):
         assert not (self.sl is not None and sl is None), "Set sl to None is not allowed"

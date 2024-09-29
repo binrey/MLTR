@@ -31,7 +31,7 @@ def log_get_hist(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, *args, **kwargs):
         result = func(self)
         if result is not None:
-            logger.debug(f"new:{result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}")
+            logger.debug(f"load: new:{result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}")
         return result
     return wrapper
 
@@ -93,7 +93,7 @@ class BaseTradeClass(ABC):
         logger.info(f"server time: {date2str(time, 'ms')}")
         
         if self.time.change(no_none=True):
-            msg = f"{date2str(self.time.curr)}: {str(self.pos.curr) if self.pos.curr is not None else 'no pos'}"
+            msg = f"{str(self.pos.curr) if self.pos.curr is not None else 'no pos'}"
             self.update()
             
             logger.debug(msg)
@@ -149,7 +149,7 @@ class BaseTradeClass(ABC):
 
         if self.pos.change(): 
             if self.pos.prev is not None: 
-                logger.debug(f"{date2str(self.time.curr)} close position {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
+                logger.debug(f"close position {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
             if self.cfg.vis_events == Vis.ON_DEAL:
                 self.vis()
             if self.my_telebot is not None:
