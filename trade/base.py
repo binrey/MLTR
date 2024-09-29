@@ -139,7 +139,7 @@ class BaseTradeClass(ABC):
         self.pos.update(cur_pos)
 
     def vis(self):
-        self.visualizer(self.get_pos_history() + [self.pos.curr])
+        return self.visualizer(self.get_pos_history() + [self.pos.curr])
 
     def _update(self):
         self.h = self.get_hist()
@@ -151,9 +151,9 @@ class BaseTradeClass(ABC):
             if self.pos.prev is not None: 
                 logger.debug(f"close position {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
             if self.cfg.vis_events == Vis.ON_DEAL:
-                self.vis()
+                saved_img_path = self.vis()
             if self.my_telebot is not None:
-                self.my_telebot.send_image(self.save_path / date2name(self.time.curr))
+                self.my_telebot.send_image(saved_img_path)
         
         if self.cfg.vis_events == Vis.ON_STEP:
             self.vis()        

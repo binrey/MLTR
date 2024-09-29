@@ -133,6 +133,8 @@ class Telebot:
         self.bot = telebot.TeleBot(token)
         self.chat_id = 480902846
     def send_image(self, img_path, caption=None):
+        if img_path is None:
+            return
         try:
             img = Image.open(img_path)
             if caption is not None:

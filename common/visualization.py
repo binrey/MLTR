@@ -74,7 +74,7 @@ class Visualizer:
             self.visualize(drawitems4pos, drawitems4sl)
         if self.save_plots:
             pos_curr_side = pos_list[-1].side if pos_list[-1] else None
-            self.save(drawitems4pos, drawitems4sl, pos_curr_side)
+            return self.save(drawitems4pos, drawitems4sl, pos_curr_side)
         
 
     def visualize(self, drawitems4possitions: List[DrawItem], drawitems4sl: List[DrawItem]):
@@ -132,6 +132,7 @@ class Visualizer:
                             facecolor='b',
                             edgecolor='b'))
 
-        save_name = date2str(self.hist2plot.index[-1].to_datetime64()) + ".png"
-        fig.savefig(self.path2save / save_name, bbox_inches='tight', pad_inches=0.2)
+        save_name = (self.path2save / date2str(self.hist2plot.index[-1].to_datetime64(), "m")).with_suffix(".png")
+        fig.savefig(save_name, bbox_inches='tight', pad_inches=0.2)
         plt.close('all')
+        return save_name

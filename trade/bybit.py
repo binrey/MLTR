@@ -123,7 +123,7 @@ def launch(cfg, demo=False):
             public = WebSocket(channel_type='linear', testnet=False)
             public.trade_stream(symbol=cfg.ticker, callback=bybit_trading.handle_trade_message)
             sleep(1)
-            msg = f"Request connection status: is_connected={public.is_connected()}\n"
+            msg = f"Reconnection... connection status: is_connected={public.is_connected()}\n"
             logger.warning(msg)
             bybit_trading.my_telebot.send_text(msg)
     
