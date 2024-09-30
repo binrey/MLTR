@@ -7,7 +7,7 @@ config.ticksize.test = 0.01
 config.wallet.test = 100
 config.leverage.test = 1
 
-config.body_classifier.test.params.ncross.test = 40
+config.body_classifier.test.params.ncross.test = 4
 config.trailing_stop_rate.test = 0.003
 config.hist_buffer_size.test = 32
-config.period.test = TimePeriod.M5
+config.period.test = TimePeriod.M1

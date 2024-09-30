@@ -3,9 +3,13 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import finplot as fplt
+import matplotlib
 import mplfinance as mpf
 import pandas as pd
+from loguru import logger
 from matplotlib import pyplot as plt
+
+matplotlib.use('agg')
 
 from common.type import Side, TimePeriod
 from common.utils import date2str
@@ -99,40 +103,46 @@ class Visualizer:
 
 
     def save(self, drawitems4possitions: List[DrawItem], drawitems4sl: List[DrawItem], side_current: Optional[Side]):
-        mystyle = mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
-        lines = [drawitem.line for drawitem in drawitems4possitions + drawitems4sl]
-        for line in lines:
-            for i, point in enumerate(line):
-                if point[0] < self.hist2plot.index[0]:
-                    line[i] = (self.hist2plot.index[0], point[1])
-        
-        colors = [drawitem.color for drawitem in drawitems4possitions + drawitems4sl]
-        kwargs = dict(
-            type='candle',
-            block=False,
-            alines=dict(alines=lines, colors=colors, linewidths=[1]*len(lines)),
-            volume=True,
-            figscale=1.5,
-            style=mystyle,
-            datetime_format='%m-%d %H:%M:%Y',
-            # title=f"{np.array(time).astype('datetime64[m]')}-{ticker}-{side.name}",
-            returnfig=True
-        )
+        try:
+            mystyle = mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
+            lines = [drawitem.line for drawitem in drawitems4possitions + drawitems4sl]
+            for line in lines:
+                for i, point in enumerate(line):
+                    if point[0] < self.hist2plot.index[0]:
+                        line[i] = (self.hist2plot.index[0], point[1])
+                    if point[0] > self.hist2plot.index[-1]:
+                        line[i] = (self.hist2plot.index[-1], point[1])                    
+            
+            colors = [drawitem.color for drawitem in drawitems4possitions + drawitems4sl]
+            kwargs = dict(
+                type='candle',
+                block=False,
+                alines=dict(alines=lines, colors=colors, linewidths=[1]*len(lines)),
+                volume=True,
+                figscale=1.5,
+                style=mystyle,
+                datetime_format='%m-%d %H:%M:%Y',
+                # title=f"{np.array(time).astype('datetime64[m]')}-{ticker}-{side.name}",
+                returnfig=True
+            )
 
-        fig, axlist = mpf.plot(data=self.hist2plot, **kwargs)
+            fig, axlist = mpf.plot(data=self.hist2plot, **kwargs)
 
-        if side_current is not None:
-            x, y = self.hist2plot.shape[0]-2, drawitems4possitions[-1].line[0][1]
-            id4scale = min(self.hist2plot.shape[0], 10)
-            arrow_size = (self.hist2plot.iloc[-id4scale:].High - self.hist2plot.iloc[-id4scale:].Low).mean()
-            axlist[0].annotate("", (x, y + arrow_size*side_current.value), fontsize=20, xytext=(x, y),
-                        color="black",
-                        arrowprops=dict(
-                            arrowstyle='->',
-                            facecolor='b',
-                            edgecolor='b'))
+            if side_current is not None:
+                x, y = self.hist2plot.shape[0]-2, drawitems4possitions[-1].line[0][1]
+                id4scale = min(self.hist2plot.shape[0], 10)
+                arrow_size = (self.hist2plot.iloc[-id4scale:].High - self.hist2plot.iloc[-id4scale:].Low).mean()
+                axlist[0].annotate("", (x, y + arrow_size*side_current.value), fontsize=20, xytext=(x, y),
+                            color="black",
+                            arrowprops=dict(
+                                arrowstyle='->',
+                                facecolor='b',
+                                edgecolor='b'))
 
-        save_name = (self.path2save / date2str(self.hist2plot.index[-1].to_datetime64(), "m")).with_suffix(".png")
-        fig.savefig(save_name, bbox_inches='tight', pad_inches=0.2)
-        plt.close('all')
+            save_name = (self.path2save / date2str(self.hist2plot.index[-1].to_datetime64(), "m")).with_suffix(".png")
+            fig.savefig(save_name, bbox_inches='tight', pad_inches=0.2)
+            plt.close('all')
+        except Exception as e:
+            logger.error(f"error in save plot: {e}")
+
         return save_name

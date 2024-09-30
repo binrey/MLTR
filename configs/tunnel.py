@@ -32,7 +32,7 @@ config = EasyDict(
     data_type=Param("bybit", ["metatrader"]),
     
     save_backup=Param(False, [False]),    
-    save_plots=Param(False, [False]),
+    save_plots=Param(True, [False]),
     vis_events=Param(Vis.ON_DEAL, [False]),
     vis_hist_length=Param(256, [64]),
     visualize=Param(False, [False]),

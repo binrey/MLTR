@@ -45,11 +45,18 @@ class StepData:
         self.prev = copy(self.curr)
         self.curr = curr_value
         
-    def change(self, no_none=False):
+    def changed(self, no_none=False) -> bool:
         ch = str(self.curr) != str(self.prev)
         if no_none:
             ch = ch and self.prev is not None
         return ch
+    
+    def created(self) -> bool:
+        return self.curr is not None and self.prev is None
+
+    def deleted(self) -> bool:
+        return self.curr is None and self.prev is not None
+
 
 class BaseTradeClass(ABC):
     def __init__(self, cfg, expert, telebot) -> None:
@@ -92,13 +99,13 @@ class BaseTradeClass(ABC):
         self.time.update(np.datetime64(int(time_rounded*self.nmin), "m"))
         logger.info(f"server time: {date2str(time, 'ms')}")
         
-        if self.time.change(no_none=True):
+        if self.time.changed(no_none=True):
             msg = f"{str(self.pos.curr) if self.pos.curr is not None else 'no pos'}"
             self.update()
             
             logger.debug(msg)
             if self.my_telebot is not None:
-                self.my_telebot.send_text(msg)
+                self.my_telebot.send_text(f"{date2str(self.time, 'm')}: " + msg)
         else:
             print ("\033[A\033[A")  
 
@@ -147,13 +154,13 @@ class BaseTradeClass(ABC):
             self.visualizer.update_hist(self.h)
         self.update_market_state()
 
-        if self.pos.change(): 
-            if self.pos.prev is not None: 
-                logger.debug(f"close position {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
+        if self.pos.created() or self.pos.deleted(): 
+            if self.pos.deleted(): 
+                logger.debug(f"position closed {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
             if self.cfg.vis_events == Vis.ON_DEAL:
                 saved_img_path = self.vis()
-            if self.my_telebot is not None:
-                self.my_telebot.send_image(saved_img_path)
+                if self.my_telebot is not None:
+                    self.my_telebot.send_image(saved_img_path)
         
         if self.cfg.vis_events == Vis.ON_STEP:
             self.vis()        
