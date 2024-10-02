@@ -125,7 +125,8 @@ def launch(cfg, demo=False):
             sleep(1)
             msg = f"connection was lost... websocket.is_connected = {public.is_connected()}\n"
             logger.warning(msg)
-            bybit_trading.my_telebot.send_text(msg)
+            if bybit_trading.my_telebot is not None:
+                bybit_trading.my_telebot.send_text(msg)
     
 
     

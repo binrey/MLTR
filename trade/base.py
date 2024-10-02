@@ -1,3 +1,4 @@
+import multiprocessing
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,7 +8,6 @@ import pandas as pd
 from loguru import logger
 
 from common.type import Vis
-from common.utils import date2name
 from common.visualization import Visualizer
 from trade.utils import Position
 
@@ -105,7 +105,10 @@ class BaseTradeClass(ABC):
             
             logger.debug(msg)
             if self.my_telebot is not None:
-                self.my_telebot.send_text(f"{date2str(self.time, 'm')}: " + msg)
+                process = multiprocessing.Process(target=self.my_telebot.send_text, 
+                                                  args=[f"{date2str(self.time, 'm')}: " + msg])
+                process.start()
+                # self.my_telebot.send_text(f"{date2str(self.time, 'm')}: " + msg)
         else:
             print ("\033[A\033[A")  
 
