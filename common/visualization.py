@@ -43,8 +43,8 @@ class Visualizer:
             h = pd.DataFrame(h).iloc[-2:]
             h["Date"] = pd.to_datetime(h["Date"])
             h.set_index("Date", drop=True, inplace=True)
-            self.hist2plot.iloc[-1, :] = h.iloc[0]
-            self.hist2plot = pd.concat([self.hist2plot, h.iloc[1:2, :]])  
+            # self.hist2plot.iloc[-1, :] = h.iloc[0]
+            self.hist2plot = pd.concat([self.hist2plot.iloc[:-1, :], h])  
             # if self.hist2plot.shape[0] > self.vis_hist_length:
             self.hist2plot = self.hist2plot.iloc[-self.vis_hist_length:] 
              
@@ -59,9 +59,11 @@ class Visualizer:
             end_time, end_price = pos.close_date, pos.close_price
             profit = pos.profit
             
-            if profit is None:
+            if profit is None or end_time is None:
                 profit = pos.cur_profit(self.hist2plot["Open"].iloc[-1])
                 end_time, end_price = self.hist2plot.index[-1], self.hist2plot["Open"].iloc[-1]
+            else:
+                end_time = end_time.astype("datetime64[m]")
                 
             if pd.to_datetime(end_time) < self.hist2plot.index[0]:
                 continue
@@ -76,6 +78,7 @@ class Visualizer:
                                              color="#000"))
         if self.show:
             self.visualize(drawitems4pos, drawitems4sl)
+            return None
         if self.save_plots:
             pos_curr_side = pos_list[-1].side if pos_list[-1] else None
             return self.save(drawitems4pos, drawitems4sl, pos_curr_side)

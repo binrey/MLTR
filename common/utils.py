@@ -132,6 +132,7 @@ class Telebot:
     def __init__(self, token) -> None:
         self.bot = telebot.TeleBot(token)
         self.chat_id = 480902846
+        
     def send_image(self, img_path, caption=None):
         if img_path is None:
             return

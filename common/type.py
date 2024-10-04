@@ -50,7 +50,17 @@ class TimePeriod(Enum):
     def minutes(self):
         return int(self.value[1:])
         
+class RunType(Enum):
+    BACKTEST = "backtest"
+    BYBIT = "bybit"
 
+    @staticmethod
+    def from_str(label):
+        if label in ('backtest', 'bybit'):
+            return RunType[label.upper()]
+        else:
+            raise ValueError(f"Unknown run type: {label}")
+            
 if __name__ == "__main__":
     tp = TimePeriod.M60
     print(tp.to_timedelta())

@@ -54,7 +54,7 @@ def backtest(cfg, loglevel="INFO"):
         tbrok += dt
         if closed_pos is not None:
             # if broker.active_position is None and exp.order_sent:
-            logger.debug(f"t = {t} -> postprocess closed position")
+            logger.info(f"t = {t} -> postprocess closed position")
             if broker.active_position is None:
                 broker.close_orders(h.Id[-2])
             if cfg.save_plots:
@@ -127,14 +127,14 @@ def backtest(cfg, loglevel="INFO"):
         f"sl={cfg.stops_processor.func.name}, sl-rate={cfg.trailing_stop_rate}"
     )
 
-    logger.debug(sformat(1).format("total backtest", ttotal) + " sec")
-    logger.debug(sformat(1).format("data loadings", tdata / ttotal * 100) + " %")
-    logger.debug(sformat(1).format("expert updates", texp / ttotal * 100) + " %")
-    logger.debug(sformat(1).format("broker updates", tbrok / ttotal * 100) + " %")
-    logger.debug(sformat(1).format("postproc. broker", tpost / ttotal * 100) + " %")
+    logger.info(sformat(1).format("total backtest", ttotal) + " sec")
+    logger.info(sformat(1).format("data loadings", tdata / ttotal * 100) + " %")
+    logger.info(sformat(1).format("expert updates", texp / ttotal * 100) + " %")
+    logger.info(sformat(1).format("broker updates", tbrok / ttotal * 100) + " %")
+    logger.info(sformat(1).format("postproc. broker", tpost / ttotal * 100) + " %")
 
     if cfg.eval_buyhold:
-        logger.debug(sformat(1).format("Buy & Hold", tbandh / ttotal * 100) + " %")
+        logger.info(sformat(1).format("Buy & Hold", tbandh / ttotal * 100) + " %")
 
     logger.info("-" * 40)
     logger.info(sformat(0).format("APR", bt_res.APR) + f" %")

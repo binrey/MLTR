@@ -13,7 +13,7 @@ from trade.utils import ORDER_TYPE, fix_rate_trailing_sl
 
 def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, sl: Optional[float]):
-        logger.debug(f"Modifying sl: {self.active_position.sl} -> {sl}")
+        logger.info(f"Modifying sl: {self.active_position.sl} -> {sl}")
         result = func(self, sl)
         return result
     return wrapper
@@ -78,7 +78,7 @@ class ExpertFormation(ExpertBase):
     def estimate_volume(self, h):
         volume = self.cfg.wallet/h["Open"][-1]*self.cfg.leverage
         volume = self.normalize_volume(volume)
-        logger.debug(f"estimated lot: {volume}")
+        logger.info(f"estimated lot: {volume}")
         return volume
     
     def normalize_volume(self, volume):
@@ -109,7 +109,7 @@ class ExpertFormation(ExpertBase):
         if self.cfg.allow_overturn or not self.formation_found:
             self.formation_found = self.body_cls(self, h)   
         
-        logger.debug(f"found enter points: long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}")
+        logger.info(f"found enter points: long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}")
         
         if self.lprice:
             if (self.sprice is None and h["Open"][-1] >= self.lprice) or h["Close"][-2] > self.lprice:
@@ -162,7 +162,7 @@ class BacktestExpert(ExpertFormation):
         log_message = f"{time_id} send order {self.orders[0]}"
 
         self.session.set_active_orders(self.orders)
-        logger.debug(log_message)
+        logger.info(log_message)
     
     @log_modify_sl    
     def modify_sl(self, sl: Optional[float]):
@@ -188,7 +188,7 @@ class ByBitExpert(ExpertFormation):
                 # stopLoss="" if sl is None else str(abs(sl)),
                 # takeProfit="" if tp is None else str(tp)
                 )
-            logger.debug(resp)
+            logger.info("place order result: ", resp.get("result", "--"))
         except Exception as ex:
             logger.error(ex)
 

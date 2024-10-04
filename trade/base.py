@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 import stackprinter
 
-from common.utils import date2str
+from common.utils import Telebot, date2str
 
 stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
@@ -31,7 +31,7 @@ def log_get_hist(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, *args, **kwargs):
         result = func(self)
         if result is not None:
-            logger.debug(f"load: new:{result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}")
+            logger.info(f"load: {result['Date'][-1]} | new: {result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}")
         return result
     return wrapper
 
@@ -59,7 +59,7 @@ class StepData:
 
 
 class BaseTradeClass(ABC):
-    def __init__(self, cfg, expert, telebot) -> None:
+    def __init__(self, cfg, expert, telebot: Telebot) -> None:
         self.cfg = cfg
         self.my_telebot = telebot
         self.exp = expert
@@ -97,18 +97,18 @@ class BaseTradeClass(ABC):
         time = self.get_server_time(message)
         time_rounded = time.astype("datetime64[m]").astype(int)//self.nmin
         self.time.update(np.datetime64(int(time_rounded*self.nmin), "m"))
-        logger.info(f"server time: {date2str(time, 'ms')}")
+        logger.debug(f"server time: {date2str(time, 'ms')}")
         
         if self.time.changed(no_none=True):
             msg = f"{str(self.pos.curr) if self.pos.curr is not None else 'no pos'}"
             self.update()
-            
-            logger.debug(msg)
+            logger.info(msg)
             if self.my_telebot is not None:
-                process = multiprocessing.Process(target=self.my_telebot.send_text, 
-                                                  args=[f"{date2str(self.time, 'm')}: " + msg])
-                process.start()
-                # self.my_telebot.send_text(f"{date2str(self.time, 'm')}: " + msg)
+                # process = multiprocessing.Process(target=self.my_telebot.send_text, 
+                #                                   args=[msg])
+                # process.start()
+                self.my_telebot.send_text(msg)
+            
         else:
             print ("\033[A\033[A")  
 
@@ -125,7 +125,7 @@ class BaseTradeClass(ABC):
         backup_path = self.save_path / "backup.pkl"
         with open(backup_path, "wb") as f:
             pickle.dump(backup_data, f)
-        logger.debug(f"backup saved to {backup_path}")
+        logger.info(f"backup saved to {backup_path}")
 
     def load_backup(self):
         if self.backup_path.exists():
@@ -149,7 +149,8 @@ class BaseTradeClass(ABC):
         self.pos.update(cur_pos)
 
     def vis(self):
-        return self.visualizer(self.get_pos_history() + [self.pos.curr])
+        return self.visualizer([self.pos.prev, self.pos.curr])
+        # return self.visualizer(self.get_pos_history() + [self.pos.curr])
 
     def _update(self):
         self.h = self.get_hist()
@@ -159,11 +160,13 @@ class BaseTradeClass(ABC):
 
         if self.pos.created() or self.pos.deleted(): 
             if self.pos.deleted(): 
-                logger.debug(f"position closed {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
+                logger.info(f"position closed {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
             if self.cfg.vis_events == Vis.ON_DEAL:
+                # process = multiprocessing.Process(target=self.vis())
+                # process.start()
                 saved_img_path = self.vis()
-                if self.my_telebot is not None:
-                    self.my_telebot.send_image(saved_img_path)
+                # if self.my_telebot is not None:
+                #     self.my_telebot.send_image(saved_img_path)
         
         if self.cfg.vis_events == Vis.ON_STEP:
             self.vis()        

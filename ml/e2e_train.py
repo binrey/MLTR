@@ -100,7 +100,7 @@ class E2ETrain:
         self.model = E2EModel(n_indicators=n_indics, 
                               n_features=n_feats, 
                               nh=8, cls_head=False)
-        logger.debug("\n" + str(summary(self.model, [1, n_indics, n_feats], device="cpu")))
+        logger.info("\n" + str(summary(self.model, [1, n_indics, n_feats], device="cpu")))
 
     def load_data(self, dataset_root="data", max_size=np.Inf, val_size=0):
         self.val_size = val_size

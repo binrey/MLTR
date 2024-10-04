@@ -88,13 +88,13 @@ def launch(cfg):
     )
 
     logger.info(sformat(1).format("total backtest", ttotal) + " sec")
-    # logger.debug(sformat(1).format("data loadings", tdata / ttotal * 100) + " %")
-    # logger.debug(sformat(1).format("expert updates", texp / ttotal * 100) + " %")
-    # logger.debug(sformat(1).format("broker updates", tbrok / ttotal * 100) + " %")
+    # logger.info(sformat(1).format("data loadings", tdata / ttotal * 100) + " %")
+    # logger.info(sformat(1).format("expert updates", texp / ttotal * 100) + " %")
+    # logger.info(sformat(1).format("broker updates", tbrok / ttotal * 100) + " %")
     logger.info(sformat(1).format("postproc. broker", tpost / ttotal * 100) + " %")
 
     if cfg.eval_buyhold:
-        logger.debug(sformat(1).format("Buy & Hold", tbandh / ttotal * 100) + " %")
+        logger.info(sformat(1).format("Buy & Hold", tbandh / ttotal * 100) + " %")
 
     logger.info("-" * 40)
     logger.info(sformat(0).format("APR", bt_res.APR) + f" %")

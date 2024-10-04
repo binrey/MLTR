@@ -87,15 +87,20 @@ class BybitTrading(BaseTradeClass):
 
     @log_get_hist
     def get_hist(self):
-        message = self.session.get_kline(
-            category="linear",
-            symbol=self.cfg.ticker,
-            interval=str(self.cfg.period.minutes),
-            start=0,
-            end=self.time.curr,
-            limit=self.cfg.hist_buffer_size
-        )
-        return get_bybit_hist(message["result"], self.cfg.hist_buffer_size)
+        t = self.time.curr
+        data = None
+        while data is None or t != data["Date"][-1]:
+            logger.info(f"request history data for {t}...")
+            message = self.session.get_kline(
+                category="linear",
+                symbol=self.cfg.ticker,
+                interval=str(self.cfg.period.minutes),
+                start=0,
+                end=t.astype("datetime64[ms]").astype(int),
+                limit=self.cfg.hist_buffer_size
+            )
+            data = get_bybit_hist(message["result"], self.cfg.hist_buffer_size)
+        return data
         
 
 def launch(cfg, demo=False):
@@ -116,7 +121,7 @@ def launch(cfg, demo=False):
     
     print()
     while True:
-        sleep(6)
+        sleep(5)
         if not public.is_connected():
             logger.warning("connection lost! try to reconnect...")
             public.exit()

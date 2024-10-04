@@ -119,8 +119,8 @@ class Broker:
             triggered_side: Optional[Side] = None
             triggered_date: np.datetime64 = None
             if order.type == ORDER_TYPE.MARKET and order.open_indx == self.hist_id:
-                logger.debug(
-                    f"{date2str(self.time)} process order {order.id}"
+                logger.info(
+                    f"process order {order.id}"
                 )
                 triggered_price = self.open_price
                 triggered_side = order.side
@@ -134,8 +134,8 @@ class Broker:
                 if (last_low > order.price and self.open_price < order.price) or (
                     last_high < order.price and self.open_price > order.price
                 ):
-                    logger.debug(
-                        f"{date2str(self.time)} process order {order.id}, and change price to O:{self.open_price}"
+                    logger.info(
+                        f"process order {order.id}, and change price to O:{self.open_price}"
                     )
                     triggered_price = self.open_price
                     triggered_side = order.side
@@ -145,8 +145,8 @@ class Broker:
                         order.volume,
                     )
                 elif last_high >= order.price and last_low <= order.price:
-                    logger.debug(
-                        f"{date2str(self.time)} process order {order.id} (L:{last_low} <= {order.price:.2f} <= H:{last_high})"
+                    logger.info(
+                        f"process order {order.id} (L:{last_low} <= {order.price:.2f} <= H:{last_high})"
                     )
                     triggered_price = order.price
                     triggered_side = order.side

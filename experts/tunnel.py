@@ -17,11 +17,11 @@ class ClsTunnel(ExtensionBase):
             "line_below": None,
         }
         for i in range(4, h.shape[0], 1):
-            line_above = h["High"][-i:].mean()
-            line_below = h["Low"][-i:].mean()
+            line_above = h["High"][-i:-1].mean()
+            line_below = h["Low"][-i:-1].mean()
             middle_line = (line_above + line_below) / 2
 
-            if h["Close"][-1] < line_above and h["Close"][-1] > line_below:
+            if h["Close"][-2] < line_above and h["Close"][-2] > line_below:
                 metric = i / ((line_above - line_below) / middle_line) / 100
 
                 if metric > best_params["metric"]:
@@ -42,8 +42,8 @@ class ClsTunnel(ExtensionBase):
 
         if is_fig:
             i = best_params["i"]
-            self.sl_definer[Side.BUY] = h["Low"][-i:].min()
-            self.sl_definer[Side.SELL] = h["High"][-i:].max()         
+            self.sl_definer[Side.BUY] = h["Low"][-i:-1].min()
+            self.sl_definer[Side.SELL] = h["High"][-i:-1].max()         
             # v1
             common.lprice = best_params["line_above"]
             common.sprice = best_params["line_below"]

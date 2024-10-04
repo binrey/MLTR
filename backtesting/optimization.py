@@ -48,7 +48,7 @@ class Optimizer:
 
       def backtest_process(self, args):
             num, cfg = args
-            logger.debug(f"start backtest {num}: {cfg}")
+            logger.info(f"start backtest {num}: {cfg}")
             locnum = 0
             while True:
                   btest = backtest(cfg, loglevel="INFO")
