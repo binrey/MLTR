@@ -31,21 +31,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run backtest with specified configuration."
     )
-    parser.add_argument("run_type", type=str, help="Type of run: backtest or bybit")
-    parser.add_argument("config_path", type=str, help="Path to the configuration file")
     parser.add_argument(
-        "--loglevel",
-        choices=["DEBUG", "INFO", "ERROR"],
-        default="DEBUG",
-        help="Set the logging level: 'DEBUG' for detailed logging, 'INFO' for minimal logging, and 'ERROR' for only arrors"
+        "run_type", 
+        type=str, 
+        choices=["backtest", "bybit"], 
+        help="Type of run: backtest or bybit"
     )
+    parser.add_argument("config_path", type=str, help="Path to the configuration file")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
     run_type = RunType.from_str(args.run_type)
 
-    log_level = args.loglevel.upper()
+    log_level = "DEBUG" if not args.debug else "INFO"
     logger.remove()
-    logger.add(sys.stderr, level=log_level)
+    logger.add(sys.stderr, level="DEBUG")
     log_dir = f"logs/{run_type.value}"
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
