@@ -33,12 +33,17 @@ if __name__ == "__main__":
     )
     parser.add_argument("run_type", type=str, help="Type of run: backtest or bybit")
     parser.add_argument("config_path", type=str, help="Path to the configuration file")
-    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument(
+        "--loglevel",
+        choices=["DEBUG", "INFO", "ERROR"],
+        default="DEBUG",
+        help="Set the logging level: 'DEBUG' for detailed logging, 'INFO' for minimal logging, and 'ERROR' for only arrors"
+    )
     args = parser.parse_args()
 
     run_type = RunType.from_str(args.run_type)
 
-    log_level = "INFO" if not args.debug else "DEBUG"
+    log_level = args.loglevel.upper()
     logger.remove()
     logger.add(sys.stderr, level=log_level)
     log_dir = f"logs/{run_type.value}"

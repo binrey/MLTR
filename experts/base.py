@@ -188,7 +188,7 @@ class ByBitExpert(ExpertFormation):
                 # stopLoss="" if sl is None else str(abs(sl)),
                 # takeProfit="" if tp is None else str(tp)
                 )
-            logger.info("place order result: ", resp.get("result", "--"))
+            logger.info(f"place order result: {resp.get('result', '--')}")
         except Exception as ex:
             logger.error(ex)
 
