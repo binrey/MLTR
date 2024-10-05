@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
     run_type = RunType.from_str(args.run_type)
 
-    log_level = "DEBUG" if not args.debug else "INFO"
+    log_level = "DEBUG" if args.debug else "INFO"
     logger.remove()
     logger.add(sys.stderr, level="DEBUG")
     log_dir = f"logs/{run_type.value}"
