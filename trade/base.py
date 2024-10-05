@@ -103,6 +103,7 @@ class BaseTradeClass(ABC):
             msg = f"{str(self.pos.curr) if self.pos.curr is not None else 'no pos'}"
             self.update()
             logger.info(msg)
+            print()
             if self.my_telebot is not None:
                 # process = multiprocessing.Process(target=self.my_telebot.send_text, 
                 #                                   args=[msg])

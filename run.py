@@ -38,14 +38,15 @@ if __name__ == "__main__":
 
     run_type = RunType.from_str(args.run_type)
 
+    log_level = "INFO" if not args.debug else "DEBUG"
     logger.remove()
-    logger.add(sys.stderr, level="INFO" if not args.debug else "DEBUG")
+    logger.add(sys.stderr, log_level)
     log_dir = f"logs/{run_type.value}"
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     
     log_file_path = os.path.join(log_dir, f"{datetime.now()}.log")
-    logger.add(log_file_path, level="INFO")
+    logger.add(log_file_path, level=log_level)
 
     if run_type == RunType.BYBIT:
         run_bybit(args.config_path)
