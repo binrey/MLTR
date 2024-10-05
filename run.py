@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     log_level = "INFO" if not args.debug else "DEBUG"
     logger.remove()
-    logger.add(sys.stderr, log_level)
+    logger.add(sys.stderr, level=log_level)
     log_dir = f"logs/{run_type.value}"
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
