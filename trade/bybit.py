@@ -2,6 +2,7 @@ from time import sleep
 
 import pandas as pd
 from loguru import logger
+from tqdm import tqdm
 
 from common.type import Side
 from common.utils import Telebot
@@ -41,13 +42,15 @@ def get_bybit_hist(mresult, size):
 
 
 class BybitTrading(BaseTradeClass):
-    def __init__(self, cfg, expert: ExpertBase, telebot: Telebot, bybit_session: HTTP) -> None:
-        super().__init__(cfg=cfg, expert=expert, telebot=telebot)
+    def __init__(self, cfg, telebot: Telebot, bybit_session: HTTP) -> None:
         self.session = bybit_session
-            
-    def get_server_time(self, message) -> np.datetime64:
-        return self.to_datetime(message.get('data')[0].get("T"))
+        super().__init__(cfg=cfg, expert=ByBitExpert(cfg, bybit_session), telebot=telebot)
 
+    def get_server_time(self) -> np.datetime64:
+        serv_time = int(self.session.get_server_time()["result"]["timeSecond"])
+        serv_time = np.array(serv_time).astype("datetime64[s]")
+        return serv_time     
+       
     def to_datetime(self, timestamp: Union[int, float]) -> np.datetime64:
         return np.datetime64(int(timestamp), "ms")
     
@@ -103,7 +106,7 @@ class BybitTrading(BaseTradeClass):
         return data
         
 
-def launch(cfg, demo=False):
+def launch_old(cfg, demo=False):
     with open("./api.yaml", "r") as f:
         creds = yaml.safe_load(f)
     if demo:
@@ -134,5 +137,28 @@ def launch(cfg, demo=False):
                 bybit_trading.my_telebot.send_text(msg)
     
 
+def launch(cfg, demo=False):
+    with open("./api.yaml", "r") as f:
+        creds = yaml.safe_load(f)
+    if demo:
+        creds["api_secret"] = creds["api_secret_demo"]
+        creds["api_key"] = creds["api_key_demo"]
     
+    bybit_session = HTTP(testnet=False, api_key=creds["api_key"], api_secret=creds["api_secret"])
+    bybit_trading = BybitTrading(cfg=cfg,
+                                 telebot=Telebot(creds["bot_token"]), 
+                                 bybit_session=bybit_session)
+    bybit_trading.test_connection()
+    
+    print()
+    while True:
+        bybit_trading.handle_trade_message(None)
+        time_step_curr = bybit_trading.time.curr
+        time_step_next = time_step_curr + np.timedelta64(cfg.period.minutes, "m")
+        dtime = time_step_next - bybit_trading.get_server_time()
+        # for _ in tqdm(range(dtime.astype(int)), "wait"):
+        #     sleep(1)
+        print(f"wait {dtime} seconds ...")
+        sleep(dtime.astype(int))
+        # print ("\033[A\033[A")
     

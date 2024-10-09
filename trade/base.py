@@ -74,11 +74,12 @@ class BaseTradeClass(ABC):
                                      vis_hist_length=self.cfg.vis_hist_length)           
         self.nmin = self.cfg.period.minutes
         self.time = StepData()
+        self.serv_time = None
         self.update = self._update
         self.exp_update = self.exp.update
 
     @abstractmethod
-    def get_server_time(self, message: Any) -> np.datetime64:
+    def get_server_time(self) -> np.datetime64:
         pass
 
     @abstractmethod
@@ -93,11 +94,15 @@ class BaseTradeClass(ABC):
     def get_pos_history(self) -> list[Position]:
         pass
 
+    def get_rounded_time(self, time: np.datetime64) -> np.datetime64:
+        trounded = np.array(time).astype("datetime64[m]").astype(int)//self.nmin
+        return np.datetime64(int(trounded*self.nmin), "m")
+
     def handle_trade_message(self, message):
-        time = self.get_server_time(message)
-        time_rounded = time.astype("datetime64[m]").astype(int)//self.nmin
-        self.time.update(np.datetime64(int(time_rounded*self.nmin), "m"))
-        logger.debug(f"server time: {date2str(time, 'ms')}")
+        self.server_time = self.get_server_time()
+        time_rounded = self.get_rounded_time(self.server_time)
+        self.time.update(time_rounded)
+        logger.debug(f"server time: {date2str(self.server_time, 'ms')}")
         
         if self.time.changed(no_none=True):
             msg = f"{str(self.pos.curr) if self.pos.curr is not None else 'no pos'}"
@@ -109,9 +114,8 @@ class BaseTradeClass(ABC):
                 #                                   args=[msg])
                 # process.start()
                 self.my_telebot.send_text(msg)
-            
-        else:
-            print ("\033[A\033[A")  
+        # else:
+        #     print ("\033[A\033[A")  
 
     def clear_log_dir(self):
         if self.cfg.save_plots:
