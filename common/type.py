@@ -18,12 +18,12 @@ class Side(Enum):
 
     @staticmethod
     def from_int(side: int):
-        if side == 1:
+        if side > 0:
             return Side.BUY
-        elif side == -1:
+        elif side < 0:
             return Side.SELL
         else:
-            raise ValueError(f"{side} is not valid value, set [1 or -1]")
+            raise ValueError(f"{side} undefined")
 
     def __str__(self):
         return "BUY" if self == Side.BUY else "SELL"
@@ -40,6 +40,7 @@ class Vis(Enum):
 
 class TimePeriod(Enum):
     M60 = "M60"
+    M15 = "M15"
     M5 = "M5"
     M1 = "M1"
 

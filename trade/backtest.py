@@ -30,8 +30,8 @@ class BackTest(BaseTradeClass):
         super().__init__(cfg=cfg, expert=expert, telebot=telebot)
         self.session = session
             
-    def get_server_time(self, message) -> np.datetime64:
-        return message["timestamp"]
+    def get_server_time(self) -> np.datetime64:
+        return self.session.time
         
     def update_trailing_stop(self, sl_new: float) -> None:
         pass

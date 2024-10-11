@@ -14,7 +14,6 @@ from .utils import BackTestResults
 pd.options.mode.chained_assignment = None
 
 from backtesting.backtest_broker import Broker
-from common.utils import plot_fig
 from experts import BacktestExpert
 
 

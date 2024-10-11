@@ -158,7 +158,7 @@ def launch(cfg, demo=False):
         dtime = time_step_next - bybit_trading.get_server_time()
         # for _ in tqdm(range(dtime.astype(int)), "wait"):
         #     sleep(1)
-        print(f"wait {dtime} seconds ...")
+        print(f"wait {dtime} ...")
         sleep(dtime.astype(int))
         # print ("\033[A\033[A")
     

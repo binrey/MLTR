@@ -11,7 +11,7 @@ from trade.utils import ORDER_TYPE, Order, Position
 
 
 class Broker:
-    def __init__(self, cfg):
+    def __init__(self, cfg: Optional[dict] = None):
         self.cfg = cfg
         self.active_orders: List[Order] = []
         self.active_position: Position = None
@@ -23,7 +23,8 @@ class Broker:
         self.hist_id = None
         self.open_price = None
         
-        self.mw = MovingWindow(cfg)
+        if cfg is not None:
+            self.mw = MovingWindow(cfg)
 
     @property
     def profits(self):
@@ -44,7 +45,7 @@ class Broker:
             self.open_price = self.hist_window["Open"][-1]
             
             closed_position = self.update()
-            callback({"timestamp": self.time})
+            callback({"timestamp": self.time}) #TODO remove time
             closed_position_new = self.update()
             if closed_position is None:
                 if closed_position_new is not None:
