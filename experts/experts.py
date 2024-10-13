@@ -9,6 +9,7 @@ from experts.base import ExpertBase
 from indicators import *
 from trade.utils import ORDER_TYPE, fix_rate_trailing_sl
 
+
 def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, sl: Optional[float]):
         logger.debug(f"Modifying sl: {self.active_position.sl} -> {sl}")
@@ -63,7 +64,7 @@ class ExpertFormation(ExpertBase):
 
     def get_body(self, h):
         self.update_trailing_sl(h)
-        self.body_cls.update_inner_state(h)
+        self.decision_maker.update_inner_state(h)
         if not self.cfg["allow_overturn"] and self.active_position is not None:
             return
         
@@ -71,7 +72,11 @@ class ExpertFormation(ExpertBase):
         self.order_dir = 0
         
         if self.cfg["allow_overturn"] or not self.formation_found:
-            self.formation_found = self.body_cls(self, h)   
+            lprice, sprice = self.decision_maker(h)   
+            self.formation_found = lprice or sprice
+            if self.formation_found:
+                self.lprice = lprice
+                self.sprice = sprice
         
         logger.debug(f"found enter points: long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}")
         

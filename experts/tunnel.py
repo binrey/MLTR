@@ -8,7 +8,7 @@ class ClsTunnel(DecisionMaker):
     def __init__(self, cfg):
         super(ClsTunnel, self).__init__(cfg)
 
-    def __call__(self, common, h) -> bool:
+    def __call__(self, h) -> bool:
         is_fig = False
         best_params = {
             "metric": 0,
@@ -38,25 +38,15 @@ class ClsTunnel(DecisionMaker):
             is_fig = True
             # break
 
-
-
+        lprice, sprice = None, None
         if is_fig:
             i = best_params["i"]
             self.sl_definer[Side.BUY] = h["Low"][-i:-1].min()
             self.sl_definer[Side.SELL] = h["High"][-i:-1].max()         
-            # v1
-            common.lprice = best_params["line_above"]
-            common.sprice = best_params["line_below"]
-            # v2
-            # if middle_line > h["Close"].mean():
-            #     common.lprice = line_below
-            # else:
-            #     common.sprice = line_above
-            common.lines = [[(h["Id"][-i], best_params["line_above"]), (h["Id"][-1], best_params["line_above"])],
-                            [(h["Id"][-i], best_params["line_below"]), (h["Id"][-1], best_params["line_below"])],
-                            [(h["Id"][-i], best_params["middle_line"]), (h["Id"][-1], best_params["middle_line"])]]
+            lprice = best_params["line_above"]
+            sprice = best_params["line_below"]
 
-        return is_fig
+        return lprice, sprice
     
     def setup_sl(self, side: Side):
         return self.sl_definer[side]

@@ -15,14 +15,14 @@ def init_target_from_cfg(cfg):
 class ExpertBase(ABC):
     def __init__(self, cfg):
         self.cfg = cfg
-        self.body_cls = init_target_from_cfg(cfg["body_classifier"])
+        self.decision_maker = init_target_from_cfg(cfg["decision_maker"])
         self.sl_processor = init_target_from_cfg(cfg["sl_processor"])
         self.sl_processor.set_expert(self)
         
         self.orders = []
             
     def __str__(self):
-        return f"{str(self.body_cls)} sl: {str(self.sl_processor)}"
+        return f"{str(self.decision_maker)} sl: {str(self.sl_processor)}"
     
     @abstractmethod
     def get_body(self) -> None:
@@ -46,7 +46,7 @@ class DecisionMaker:
     def __str__(self):
         return self.type + ": " + "|".join([f"{k}:{v}" for k, v in self.cfg.items()])
 
-    def __call__(self, common, h):
+    def __call__(self, h):
         pass
             
     def update_inner_state(self, h):

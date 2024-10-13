@@ -11,7 +11,7 @@ config = dict(
     no_trading_days=set(),
     trailing_stop_rate=0.004,
     trailing_stop_type=1,
-    body_classifier=dict(
+    decision_maker=dict(
         type=ClsTunnel,
         ncross=3
     ),
