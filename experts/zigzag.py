@@ -5,7 +5,7 @@ import torch
 from .base import *
 
 
-class ClsZigZag(ExtensionBase):
+class ClsZigZag(DecisionMaker):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsZigZag, self).__init__(cfg, name="zigzag")

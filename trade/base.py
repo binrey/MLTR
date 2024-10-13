@@ -31,7 +31,7 @@ def log_get_hist(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, *args, **kwargs):
         result = func(self)
         if result is not None:
-            logger.info(f"load: {result['Date'][-1]} | new: {result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}")
+            logger.debug(f"load: {result['Date'][-1]} | new: {result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}")
         return result
     return wrapper
 
@@ -66,13 +66,13 @@ class BaseTradeClass(ABC):
         self.h, self.time = None, StepData()
         self.pos: StepData[Position] = StepData()
      
-        self.save_path = Path("real_trading") / f"{self.cfg.ticker}-{self.cfg.period.value}"
+        self.save_path = Path("real_trading") / f"{self.cfg['ticker']}-{self.cfg['period'].value}"
         self.backup_path = self.save_path / "backup.pkl"
-        self.visualizer = Visualizer(period=cfg.period, 
-                                     show=self.cfg.visualize, 
-                                     save_to=self.save_path if self.cfg.save_plots else None,
-                                     vis_hist_length=self.cfg.vis_hist_length)           
-        self.nmin = self.cfg.period.minutes
+        self.visualizer = Visualizer(period=self.cfg['period'], 
+                                     show=self.cfg['visualize'], 
+                                     save_to=self.save_path if self.cfg['save_plots'] else None,
+                                     vis_hist_length=self.cfg['vis_hist_length'])           
+        self.nmin = self.cfg['period'].minutes
         self.time = StepData()
         self.serv_time = None
         self.update = self._update
@@ -107,8 +107,9 @@ class BaseTradeClass(ABC):
         if self.time.changed(no_none=True):
             msg = f"{str(self.pos.curr) if self.pos.curr is not None else 'no pos'}"
             self.update()
-            logger.info(msg)
-            print()
+            logger.debug(msg)
+            if logger._core.min_level == 10:
+                print()
             if self.my_telebot is not None:
                 # process = multiprocessing.Process(target=self.my_telebot.send_text, 
                 #                                   args=[msg])
@@ -118,7 +119,7 @@ class BaseTradeClass(ABC):
         #     print ("\033[A\033[A")  
 
     def clear_log_dir(self):
-        if self.cfg.save_plots:
+        if self.cfg["save_plots"]:
             if self.save_path.exists():
                 rmtree(self.save_path)
             self.save_path.mkdir(parents=True, exist_ok=True)
@@ -130,16 +131,16 @@ class BaseTradeClass(ABC):
         backup_path = self.save_path / "backup.pkl"
         with open(backup_path, "wb") as f:
             pickle.dump(backup_data, f)
-        logger.info(f"backup saved to {backup_path}")
+        logger.debug(f"backup saved to {backup_path}")
 
     def load_backup(self):
         if self.backup_path.exists():
             with open(self.backup_path, "rb") as f:
                 backup_data = pickle.load(f)
             self.pos = backup_data["active_position"]
-            logger.info(f"backup loaded from {self.backup_path}")
+            logger.debug(f"backup loaded from {self.backup_path}")
         else:
-            logger.info("no backup found")
+            logger.debug("no backup found")
 
     def test_connection(self):
         self.update_market_state()
@@ -159,25 +160,25 @@ class BaseTradeClass(ABC):
 
     def _update(self):
         self.h = self.get_hist()
-        if self.cfg.visualize or self.cfg.save_plots:
+        if self.cfg['visualize'] or self.cfg['save_plots']:
             self.visualizer.update_hist(self.h)
         self.update_market_state()
-
+        
         if self.pos.created() or self.pos.deleted(): 
             if self.pos.deleted(): 
-                logger.info(f"position closed {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
-            if self.cfg.vis_events == Vis.ON_DEAL:
+                logger.debug(f"position closed {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
+            if self.cfg['vis_events'] == Vis.ON_DEAL:
                 # process = multiprocessing.Process(target=self.vis())
                 # process.start()
                 saved_img_path = self.vis()
                 # if self.my_telebot is not None:
                 #     self.my_telebot.send_image(saved_img_path)
         
-        if self.cfg.vis_events == Vis.ON_STEP:
+        if self.cfg['vis_events'] == Vis.ON_STEP:
             self.vis()        
         
         self.exp_update(self.h, self.pos.curr)
-        if self.cfg.save_backup:
+        if self.cfg['save_backup']:
             self.save_backup()
 
 

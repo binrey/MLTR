@@ -1,12 +1,12 @@
 from common.type import Side
-from experts.base import ExtensionBase
+from experts.base import DecisionMaker
 
 
-class ClsTunnel(ExtensionBase):
+class ClsTunnel(DecisionMaker):
+    type = "tunnel"
+    
     def __init__(self, cfg):
-        self.cfg = cfg
-        super(ClsTunnel, self).__init__(cfg, name="tunnel")
-        self.sl_definer = {Side.BUY: None, Side.SELL: None}
+        super(ClsTunnel, self).__init__(cfg)
 
     def __call__(self, common, h) -> bool:
         is_fig = False
@@ -34,7 +34,7 @@ class ClsTunnel(ExtensionBase):
                         }
                     )
 
-        if best_params["metric"] > self.cfg.ncross:
+        if best_params["metric"] > self.cfg["ncross"]:
             is_fig = True
             # break
 

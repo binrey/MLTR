@@ -29,10 +29,10 @@ class BackTestResults:
         self.tickers = None
         self.wallet = wallet
 
-    def process_backtest(self, bktest_broker: Broker, leverage):
+    def process_backtest(self, bktest_broker: Broker, leverage=None):
         t0 = perf_counter()
-        self.leverage = leverage #bktest_broker.cfg.leverage
-        self.wallet = bktest_broker.cfg.wallet if self.wallet is None else self.wallet
+        self.leverage = bktest_broker.cfg["leverage"] if leverage is None else leverage
+        self.wallet = bktest_broker.cfg["wallet"] if self.wallet is None else self.wallet
 
         self.tickers = "+".join(set([pos.ticker for pos in bktest_broker.positions]))
         self.process_profits(dates=[pd.to_datetime(pos.close_date) for pos in bktest_broker.positions],

@@ -1,6 +1,7 @@
 import numpy as np
 from easydict import EasyDict
 from loguru import logger
+
 from .zigzag import ZigZag
 
 

@@ -13,18 +13,16 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
-from easydict import EasyDict
 from loguru import logger
 from matplotlib import pyplot as plt
 
-from backtesting.backtest import backtest
 from backtesting.utils import BackTestResults
 from common.utils import PyConfig
+from trade.backtest import launch as backtest_launch
 
 logger.remove()
-logger.add(sys.stderr, level="DEBUG") 
-
-
+logger.add(sys.stderr, level="INFO")
+    
 def plot_daily_balances_with_av(btests: List[BackTestResults], test_ids: List[int], profit_av: np.ndarray, metrics_av: List[Tuple[str, float]]):
       legend = []
       for test_id in test_ids:
@@ -44,44 +42,43 @@ def plot_daily_balances_with_av(btests: List[BackTestResults], test_ids: List[in
 class Optimizer:
       def __init__(self):
             self.data_path = None
-            self.sortby = "recovery" #"recovery" #"final_balance" #
+            self.sortby = "recovery"
 
       def backtest_process(self, args):
             num, cfg = args
             logger.info(f"start backtest {num}: {cfg}")
             locnum = 0
             while True:
-                  btest = backtest(cfg, loglevel="INFO")
+                  btest = backtest_launch(cfg)
                   if btest.ndeals == 0:
                         break
                   # cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
                   locnum += 1
-                  pickle.dump((cfg, btest), open(str(self.data_path / f"btest.{num + locnum/100:05.2f}.{cfg.ticker}.pickle"), "wb"))
+                  pickle.dump((cfg, btest), open(str(self.data_path / f"btest.{num + locnum/100:05.2f}.{cfg['ticker']}.pickle"), "wb"))
                   break
 
 
       def pool_handler(self, optim_cfg):
             if self.data_path.exists():
                   rmtree(self.data_path)
-            self.data_path.mkdir(exist_ok=True)
+            self.data_path.mkdir(exist_ok=True, parents=True)
             ncpu = multiprocessing.cpu_count()
             logger.info(f"Number of cpu : {ncpu}")
 
             keys, values = zip(*optim_cfg.items())
-            cfgs = [EasyDict(zip(keys, copy(v))) for v in itertools.product(*values)]
-            # for cfg in cfgs:
-            #       print(cfg["stops_processor"]["func"].cfg.sl, id(cfg["body_classifier"]["func"]))
+            cfgs = [dict(zip(keys, copy(v))) for v in itertools.product(*values)]
             logger.info(f"optimization steps number: {len(cfgs)}")
 
-            # logger.info("\n".join(["const params:"]+[f"{k}={v[0]}" for k, v in optim_cfg.items() if len(param_summary[k])==1]))
             cfgs = [(i, cfg) for i, cfg in enumerate(cfgs)]
+            # for cfg in cfgs:
+            #       self.backtest_process(cfg)
             p = Pool(ncpu)
             p.map(self.backtest_process, cfgs)
       
       
       def optimize(self, optim_cfg, run_backtests=True):
             # logger.remove()
-            self.data_path = Path("optimization") / f"data_{optim_cfg.period[0]}"
+            self.data_path = Path("optimization") / f"data_{optim_cfg['period'][0].value}"
             t0 = time()
             if run_backtests:
                   self.pool_handler(optim_cfg)
@@ -101,14 +98,12 @@ class Optimizer:
             for k in cfg_keys:
                   for cfg in cfgs:
                         v = cfg[k]
-                        if type(v) is EasyDict and "func" in v.keys():
-                              v = str(v.func.name)
                         opt_summary[k].append(v)
             # Remove lines with attributes consists of one elment (except ticker field)                
             for k in list(opt_summary.keys()):
                   if k == "ticker":
                         continue
-                  if len(set(opt_summary[k])) == 1:
+                  if len(set(map(str, opt_summary[k]))) == 1:
                         opt_summary.pop(k)
                                     
             for btest in btests:
@@ -130,7 +125,7 @@ class Optimizer:
                   top_runs_ids.append(opt_summary_for_ticker.index[0])
                   sum_daily_profit += btests[top_runs_ids[-1]].daily_hist.profit_csum
                   logger.info(f"\n{opt_summary_for_ticker.head(10)}\n")
-                  pd.DataFrame(btests[top_runs_ids[-1]].daily_hist.profit_csum).to_csv(f"optimization/{ticker}.{optim_cfg.period[0]}.top_{self.sortby}_sorted.csv", index=False)
+                  pd.DataFrame(btests[top_runs_ids[-1]].daily_hist.profit_csum).to_csv(f"optimization/{ticker}.{optim_cfg['period'][0].value}.top_{self.sortby}_sorted.csv", index=False)
                   
             profit_av = (sum_daily_profit / len(top_runs_ids)).values
             APR_av, maxwait_av = btests[top_runs_ids[-1]].metrics_from_profit(profit_av)
@@ -142,7 +137,7 @@ class Optimizer:
                   profit_av=profit_av, 
                   metrics_av=[("APR", APR_av), ("mwait", maxwait_av)]
                   )
-            plt.savefig(f"optimization/{optim_cfg.period[0]}.av_{self.sortby}_sorted_runs.png")
+            plt.savefig(f"optimization/{optim_cfg['period'][0].value}.av_{self.sortby}_sorted_runs.png")
             plt.clf()
             
             # Mix results
@@ -182,8 +177,6 @@ class Optimizer:
             opt_res.sort_values(by=[self.sortby], ascending=False, inplace=True)
             logger.info(f"\n{opt_res}\n\n")
 
-            # plt.figure(figsize=(8, 8))
-            # plt.subplot(2, 1, 1)
             legend = []
             for test_id in range(min(opt_res.shape[0], 5)):
                   plt.plot(btests[0].daily_hist.index, balances_av[opt_res.index[test_id]], linewidth=2 if test_id==0 else 1)
@@ -192,7 +185,7 @@ class Optimizer:
             plt.legend(legend) 
             plt.grid("on")  
             plt.tight_layout()
-            plt.savefig(f"optimization/{optim_cfg.period[0]}.av_{self.sortby}_sorted_runs_with_same_paramset.top5.png")
+            plt.savefig(f"optimization/{optim_cfg['period'][0].value}.av_{self.sortby}_sorted_runs_with_same_paramset.top5.png")
             plt.clf()
             # plt.subplot(2, 1, 2)
             i = 0
@@ -202,31 +195,6 @@ class Optimizer:
                                         balances_av[opt_res.index[i]].values, 
                                         metrics_av=[("recovery", opt_res.iloc[i].recovery)])
             plt.tight_layout()
-            plt.savefig(f"optimization/{optim_cfg.period[0]}.av_{self.sortby}_sorted_runs_with_same_paramset.top1.png")
+            plt.savefig(f"optimization/{optim_cfg['period'][0].value}.av_{self.sortby}_sorted_runs_with_same_paramset.top1.png")
             plt.clf()
-               
-                  
-if __name__ == "__main__":  
-      import argparse
-      import sys
 
-      parser = argparse.ArgumentParser(description="Optimization")
-
-      parser.add_argument("--config", type=str, help="Path to the configuration file")
-      parser.add_argument("--no-backtests", action="store_true", help="Disable backtests")
-
-      args = parser.parse_args()
-
-      if args.config:
-            print(f"Configuration file: {args.config}")
-      else:
-            print("No configuration file provided")
-
-      if args.no_backtests:
-            print("Backtests are disabled")
-      else:
-            print("Backtests are enabled")
-            
-      optim_cfg = PyConfig(args.config).optim()
-      opt = Optimizer()
-      opt.optimize(optim_cfg, run_backtests=not args.no_backtests)

@@ -7,6 +7,7 @@ from enum import Enum
 
 from loguru import logger
 
+from backtesting.optimization import Optimizer
 from common.type import RunType
 from common.utils import PyConfig
 from trade.backtest import launch as backtest_launch
@@ -14,13 +15,19 @@ from trade.bybit import launch as bybit_launch
 
 
 def run_backtest(config_path):
-    cfg = PyConfig(config_path).test()
-    cfg.save_backup = False
+    cfg = PyConfig(config_path).get_inference()
+    cfg["save_backup"] = False
     backtest_launch(cfg)
     
 
+def run_optimization(config_path):
+    cfg = PyConfig(config_path).get_optimization()
+    opt = Optimizer()
+    opt.optimize(cfg, run_backtests=True)
+    
+    
 def run_bybit(config_path):
-    cfg = PyConfig(config_path).test()
+    cfg = PyConfig(config_path).get_inference()
     cfg.save_backup = True
     cfg.save_plots = False
     cfg.visualize = False
@@ -34,7 +41,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "run_type", 
         type=str, 
-        choices=["backtest", "bybit"], 
+        choices=["backtest", "optimize", "bybit"], 
         help="Type of run: backtest or bybit"
     )
     parser.add_argument("config_path", type=str, help="Path to the configuration file")
@@ -45,7 +52,7 @@ if __name__ == "__main__":
 
     log_level = "DEBUG" if args.debug else "INFO"
     logger.remove()
-    logger.add(sys.stderr, level="DEBUG")
+    logger.add(sys.stderr, level=log_level)
     log_dir = f"logs/{run_type.value}"
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -55,5 +62,7 @@ if __name__ == "__main__":
 
     if run_type == RunType.BYBIT:
         run_bybit(args.config_path)
+    if run_type == RunType.OPTIMIZE:
+        run_optimization(args.config_path)
     elif run_type == RunType.BACKTEST:
         run_backtest(args.config_path)

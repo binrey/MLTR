@@ -18,8 +18,7 @@ import stackprinter
 import yaml
 from pybit.unified_trading import HTTP, WebSocket
 
-from experts import ByBitExpert
-from experts.base import ExpertBase
+from experts.experts import ByBitExpert
 from trade.base import BaseTradeClass, log_get_hist
 
 stackprinter.set_excepthook(style='color')

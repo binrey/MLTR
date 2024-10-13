@@ -6,7 +6,7 @@ from common.type import Side
 from common.utils import name_from_cfg
 from indicators import *
 
-from .base import ExpertBase, ExtensionBase
+from .base import DecisionMaker
 
 
 class StopsController(ABC):
@@ -34,15 +34,14 @@ class StopsController(ABC):
                 val = np.max([val, h["High"][-2], h["Open"][-1]])
         return val
 
-class StopsFixed(StopsController, ExtensionBase):
+class StopsFixed(StopsController, DecisionMaker):
     def __init__(self, cfg):
         self.cfg = cfg
         super(StopsFixed, self).__init__(cfg, name="stops_fix")
 
     def _eval_stops(self, common, h, sl_custom=None):
         dir = common.active_position.side.value
-        # tp = -common.order_dir*h.Open[-1]*(1+common.order_dir*self.cfg.tp*self.cfg.sl/100) if self.cfg.tp is not None else self.cfg.tp
-        sl, tp = self.cfg.sl, None
+        sl, tp = self.cfg["sl"], None
         if sl_custom is not None:
             sl = sl_custom
         if sl is not None:
@@ -57,6 +56,6 @@ class SLDynamic(StopsController):
         super(SLDynamic, self).__init__(cfg, name="sl_dyn")
     
     def _eval(self, **kwargs):
-        if self.cfg.sl_active:
+        if self.cfg["active"]:
             sl = self.expert.body_cls.setup_sl(self.expert.active_position.side)
         return sl

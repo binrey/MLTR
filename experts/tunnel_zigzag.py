@@ -1,7 +1,7 @@
 from .base import *
 
 
-class ClsTunZigZag(ExtensionBase):
+class ClsTunZigZag(DecisionMaker):
     def __init__(self, cfg):
         self.cfg = cfg
         super(ClsTunZigZag, self).__init__(cfg, name="tunnel_zz")

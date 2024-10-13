@@ -96,8 +96,8 @@ class DataParser():
         if database is None:
             database = os.environ.get("FINDATA", "../fin_data")
         t0 = perf_counter()
-        p = Path(database) / self.cfg.data_type / self.cfg.period.value
-        flist = [f for f in p.glob("*") if self.cfg.ticker in f.stem]
+        p = Path(database) / self.cfg["data_type"] / self.cfg["period"].value
+        flist = [f for f in p.glob("*") if self.cfg["ticker"] in f.stem]
         if len(flist):
             fpath = flist[np.argmin([len(f.name) for f in flist])]
             data = {"metatrader": self.metatrader,
@@ -105,11 +105,11 @@ class DataParser():
                     "bitfinex": self.bitfinex,
                     "yahoo": self.yahoo,
                     "bybit": self.bybit
-                    }.get(self.cfg.data_type, None)(fpath)
-            logger.info(f"Loaded {self.cfg.data_type} data from {fpath} in {perf_counter() - t0:.1f} sec")
+                    }.get(self.cfg["data_type"], None)(fpath)
+            logger.info(f"Loaded {self.cfg['data_type']} data from {fpath} in {perf_counter() - t0:.1f} sec")
             return data
         else:
-            raise FileNotFoundError(f"No data for {self.cfg.ticker} in {p}")
+            raise FileNotFoundError(f"No data for {self.cfg['ticker']} in {p}")
     
     def bybit(self, data_file):
         pd.options.mode.chained_assignment = None
@@ -264,6 +264,10 @@ class MovingWindow():
     def find_nearest_date_indx(array, target):
         idx = (np.abs(array - target)).argmin()
         return idx
+
+    @property
+    def timesteps_count(self):
+        return self.id2end - self.id2start
 
     def __getitem__(self, t):
         t0 = perf_counter()

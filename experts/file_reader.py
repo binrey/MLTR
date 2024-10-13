@@ -4,10 +4,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .base import ExtensionBase
+from experts.base import DecisionMaker
 
 
-class FileReader(ExtensionBase):
+class FileReader(DecisionMaker):
     def __init__(self, cfg):
         self.cfg = cfg
         super(FileReader, self).__init__(cfg, name="file_reader")

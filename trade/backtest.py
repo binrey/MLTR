@@ -17,7 +17,7 @@ import stackprinter
 import yaml
 
 from backtesting.backtest_broker import Broker
-from experts import BacktestExpert
+from experts.experts import BacktestExpert
 from trade.base import BaseTradeClass, log_get_hist
 
 stackprinter.set_excepthook(style='color')
@@ -51,9 +51,8 @@ def launch(cfg):
     with open("./api.yaml", "r") as f:
         creds = yaml.safe_load(f)
 
-    if cfg.save_plots:
-        # save_path = Path("backtests") / f"{cfg.body_classifier.func.name}-{cfg.ticker}-{cfg.period}"
-        save_path = Path("backtests") / f"{cfg.ticker}"
+    if cfg["save_plots"]:
+        save_path = Path("backtests") / f"{cfg['ticker']}"
         if save_path.exists():
             rmtree(save_path)
         save_path.mkdir(parents=True)
@@ -72,19 +71,18 @@ def launch(cfg):
 
     bt_res = BackTestResults(mw.date_start, mw.date_end)
     tpost = bt_res.process_backtest(backtest_session)
-    if cfg.eval_buyhold:
+    if cfg['eval_buyhold']:
         tbandh = bt_res.compute_buy_and_hold(
             dates=mw.hist["Date"][mw.id2start : mw.id2end],
             closes=mw.hist["Close"][mw.id2start : mw.id2end],
-            fuse=cfg.fuse_buyhold,
+            fuse=cfg['fuse_buyhold'],
         )
     ttotal = time() - t0
-
+    
     sformat = lambda nd: "{:>30}: {:>5.@f}".replace("@", str(nd))
-
+    
     logger.info(
-        f"{cfg.ticker}-{cfg.period}: {cfg.body_classifier.func.name}, "
-        f"sl={cfg.sl_processor.func.name}, sl-rate={cfg.trailing_stop_rate}"
+        f"{cfg['ticker']}-{cfg['period']}: {backtest_trading.exp} sl-rate={cfg['trailing_stop_rate']}"
     )
 
     logger.info(sformat(1).format("total backtest", ttotal) + " sec")
@@ -93,7 +91,7 @@ def launch(cfg):
     # logger.info(sformat(1).format("broker updates", tbrok / ttotal * 100) + " %")
     logger.info(sformat(1).format("postproc. broker", tpost / ttotal * 100) + " %")
 
-    if cfg.eval_buyhold:
+    if cfg["eval_buyhold"]:
         logger.info(sformat(1).format("Buy & Hold", tbandh / ttotal * 100) + " %")
 
     logger.info("-" * 40)
@@ -113,5 +111,5 @@ def launch(cfg):
     # logger.info(sformat(1).format("MEAN POS. DURATION", bt_res.mean_pos_duration) + " \n")
     
     bt_res.plot_results()
-    
+    return bt_res
     

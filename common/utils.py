@@ -37,37 +37,41 @@ def cache_result(func):
 
 class PyConfig():
     def __init__(self, config_file) -> None:
-        # Create a spec object
-        spec = importlib.util.spec_from_file_location("config", f"configs/{config_file}")
-        # Load the module from the spec
+        spec = importlib.util.spec_from_file_location("config", config_file)
         config_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(config_module)
         self.cfg = config_module.config
+        try:
+            self.optim = config_module.optimization
+        except:
+            pass
         
-    def test(self):
+    def get_inference(self):
         cfg = deepcopy(self.cfg)
         for k, v in cfg.items():
-            v = v.test
             if type(v) is EasyDict and "func" in v.keys():
-                params = EasyDict({pk: pv.test for pk, pv in v.params.items()})
+                params = EasyDict({pk: pv for pk, pv in v.params.items()})
                 cfg[k].func = v.func(params)
             else:
                 cfg[k] = v
         return cfg
 
-    def optim(self):
-        cfg = deepcopy(self.cfg)
+    def get_optimization(self):
+        cfg = deepcopy(self.optim)
         for k, vlist in cfg.items():
             vlist_new = []
-            for v in vlist.optim:
-                if type(v) is EasyDict and "func" in v.keys():
-                    v.params = {pk: pv.optim for pk, pv in v.params.items()}
-                    # v.func = partial(v.func, cfg=params)
-                    params_list = self.unroll_params(v.params)
-                    vlist_new += [EasyDict(func=v.func(params)) for params in params_list]
-                else:
-                    vlist_new.append(v)
-            cfg[k] = vlist_new
+            if type(vlist) is list:
+                for v in vlist:
+                    if type(v) is EasyDict and "func" in v.keys():
+                        v.params = {pk: pv for pk, pv in v.params.items()}
+                        # v.func = partial(v.func, cfg=params)
+                        params_list = self.unroll_params(v.params)
+                        vlist_new += [EasyDict(func=v.func(params)) for params in params_list]
+                    else:
+                        vlist_new.append(v)
+                cfg[k] = vlist_new
+            else:
+                cfg[k] = [vlist]
         return cfg
     
     @staticmethod

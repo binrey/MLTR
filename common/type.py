@@ -53,11 +53,12 @@ class TimePeriod(Enum):
         
 class RunType(Enum):
     BACKTEST = "backtest"
+    OPTIMIZE = "optimize"
     BYBIT = "bybit"
 
     @staticmethod
     def from_str(label):
-        if label in ('backtest', 'bybit'):
+        if label in ('backtest', 'optimize', 'bybit'):
             return RunType[label.upper()]
         else:
             raise ValueError(f"Unknown run type: {label}")

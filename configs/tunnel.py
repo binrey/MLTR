@@ -1,44 +1,43 @@
 from common.type import TimePeriod, Vis
 from common.utils import FeeRate
-from configs.library import *
+from experts.position_control import SLDynamic
+from experts.tunnel import ClsTunnel
 
-classifier = body_classifiers.tunnel
-classifier.params.ncross = Param(7, [3, 4, 5, 7, 9])
-
-sl_processor = stops_processors.sl_dynamic
-sl_processor.params.sl_active = Param(True, [True])
-# stops_processor = stops_processors.stops_fixed
-# stops_processor.params.sl = Param(2, [True])
-# stops_processor.params.tp = Param(3, [True])
-
-config = EasyDict(
-    wallet=Param(50, [100]),
-    leverage=Param(1, [1]),
-    date_start=Param("2000-01-01T00:00:00", ["2000-01-01"]),
-    date_end=Param("2024-10-01", ["2025-01-01"]),
-    no_trading_days=Param(set(), [set()]),
-    trailing_stop_rate=Param(0.004, [0.003, 0.004, 0.005, 0.006, 0.007]),
-    trailing_stop_type=Param(1, [1]),
-    body_classifier=Param(classifier, [classifier]),
-    allow_overturn=Param(False, [False]),
-    # stops_processor=Param(stops_processor, [stops_processor]),
-    sl_processor=Param(sl_processor, [sl_processor]),
-    hist_buffer_size=Param(64, [32, 64, 128]),
-    tstart=Param(0, [0]),
-    tend=Param(None, [None]),
-    period=Param(TimePeriod.M60, [TimePeriod.M60]),
-    ticker=Param("ETHUSDT", ["ETHUSDT", "BTCUSDT"]),
-    ticksize=Param(0.01, [0.001]),
-    data_type=Param("bybit", ["metatrader"]),
-    
-    save_backup=Param(False, [False]),    
-    save_plots=Param(True, [False]),
-    vis_events=Param(Vis.ON_DEAL, [False]),
-    vis_hist_length=Param(256, [64]),
-    visualize=Param(False, [False]),
-    
-    run_model_device=Param(None, [None]),
-    fee_rate=Param(FeeRate(0.1, 0.00016), [FeeRate(0.1, 0.00016)]),
-    eval_buyhold=Param(False, [False]),
-    fuse_buyhold=Param(False, [False]),
+config = dict(
+    wallet=50,
+    leverage=1,
+    date_start="2024-01-01T00:00:00",
+    date_end="2024-11-01",
+    no_trading_days=set(),
+    trailing_stop_rate=0.004,
+    trailing_stop_type=1,
+    body_classifier=dict(
+        type=ClsTunnel,
+        ncross=3
+    ),
+    allow_overturn=False,
+    sl_processor=dict(
+        type=SLDynamic,
+        active=True
+    ),
+    hist_buffer_size=64,
+    tstart=0,
+    tend=None,
+    period=TimePeriod.M60,
+    ticker="ETHUSDT",
+    ticksize=0.01,
+    data_type="bybit",
+    fee_rate=FeeRate(0.1, 0.00016),
+    save_backup=False,
+    save_plots=False,
+    vis_events=Vis.ON_DEAL,
+    vis_hist_length=256,
+    visualize=False,
+    eval_buyhold=False,
+    run_model_device=None,
 )
+
+optimization = config.copy()
+optimization.update(dict(
+    hist_buffer_size=[32, 64]
+))

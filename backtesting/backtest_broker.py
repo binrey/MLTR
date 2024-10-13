@@ -3,6 +3,7 @@ from typing import List, Optional
 
 import numpy as np
 from loguru import logger
+from tqdm import tqdm
 
 from common.type import Side
 from common.utils import date2str
@@ -39,7 +40,7 @@ class Broker:
         return np.array([p.fees_abs for p in self.positions])
 
     def trade_stream(self, callback):
-        for self.hist_window, dt in self.mw():
+        for self.hist_window, dt in tqdm(self.mw(), desc="Backtest", total=self.mw.timesteps_count):
             self.time = self.hist_window["Date"][-1]
             self.hist_id = self.hist_window["Id"][-1]
             self.open_price = self.hist_window["Open"][-1]
@@ -120,7 +121,7 @@ class Broker:
             triggered_side: Optional[Side] = None
             triggered_date: np.datetime64 = None
             if order.type == ORDER_TYPE.MARKET and order.open_indx == self.hist_id:
-                logger.info(
+                logger.debug(
                     f"process order {order.id}"
                 )
                 triggered_price = self.open_price
@@ -135,7 +136,7 @@ class Broker:
                 if (last_low > order.price and self.open_price < order.price) or (
                     last_high < order.price and self.open_price > order.price
                 ):
-                    logger.info(
+                    logger.debug(
                         f"process order {order.id}, and change price to O:{self.open_price}"
                     )
                     triggered_price = self.open_price
@@ -146,7 +147,7 @@ class Broker:
                         order.volume,
                     )
                 elif last_high >= order.price and last_low <= order.price:
-                    logger.info(
+                    logger.debug(
                         f"process order {order.id} (L:{last_low} <= {order.price:.2f} <= H:{last_high})"
                     )
                     triggered_price = order.price
@@ -185,10 +186,10 @@ class Broker:
                         side=triggered_side,
                         date=triggered_date,
                         indx=triggered_id,
-                        ticker=self.cfg.ticker,
+                        ticker=self.cfg['ticker'],
                         volume=triggered_vol,
-                        period=self.cfg.period,
-                        fee_rate=self.cfg.fee_rate,
+                        period=self.cfg['period'],
+                        fee_rate=self.cfg['fee_rate'],
                         sl=sl,
                     )
         for order in self.active_orders:
@@ -200,7 +201,7 @@ class Broker:
     def trailing_stop(self, h):
         date, p = self.hist_id, h.Close[-1]
         position = self.active_position
-        if position is None or self.cfg.trailing_stop_rate == 0:
+        if position is None or self.cfg["trailing_stop_rate"] == 0:
             return
         for order in self.active_orders:
             if date == order.open_date:
@@ -217,5 +218,5 @@ class Broker:
                 order.change(
                     date,
                     order.price
-                    + self.cfg.trailing_stop_rate * (self.open_price - order.price),
+                    + self.cfg["trailing_stop_rate"] * (self.open_price - order.price),
                 )
