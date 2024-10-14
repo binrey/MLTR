@@ -9,14 +9,14 @@ import mplfinance as mpf
 import numpy as np
 import pandas as pd
 import telebot
-from diskcache import Cache
+# from diskcache import Cache
 from easydict import EasyDict
 from loguru import logger
 from PIL import Image
 
 from common.type import Side
 
-cache = Cache(".tmp")
+# cache = Cache(".tmp")
 
 
 def name_from_cfg(cfg, name):

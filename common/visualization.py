@@ -80,7 +80,9 @@ class Visualizer:
             self.visualize(drawitems4pos, drawitems4sl, time_volume_profile)
             return None
         if self.save_plots:
-            pos_curr_side = pos_list[-1].side if pos_list[-1] else None
+            pos_curr_side = None
+            if len(pos_list) and pos_list[-1] is not None:
+                pos_curr_side = pos_list[-1].side
             return self.save(drawitems4pos, drawitems4sl, pos_curr_side)
         
 

@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 from shutil import rmtree
 from time import time
+from typing import Any
 
 import mplfinance as mpf
 import numpy as np
@@ -14,7 +15,7 @@ from data_processing.dataloading import DataParser, MovingWindow
 from indicators import *
 
 
-class IndcTester():
+class IndicatorTester():
     def __init__(self, indc, save_path=Path("indicators/test")):
         self.save_path = save_path
         self.indc = indc
@@ -77,3 +78,8 @@ class IndcTester():
                 [self.visualizer.hist2plot.index[-1], np.ones_like(hist)]]
         
         self.visualizer([], hist)
+        
+    def sigle_run(self, t: int):
+        return {ZigZag: self.test_zigzag,
+                ZigZagOpt: self.test_zigzag_opt, 
+                VolDistribution: self.test_hvol}[type(self.indc)](t)
