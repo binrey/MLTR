@@ -1,7 +1,7 @@
 from common.type import TimePeriod, Vis
 from common.utils import FeeRate
 from experts.position_control import SLDynamic
-from experts.tunnel import ClsTunnel
+from experts.vvol import VVOL
 
 config = dict(
     wallet=50,
@@ -11,7 +11,7 @@ config = dict(
     no_trading_days=set(),
     trailing_stop_rate=0.004,
     decision_maker=dict(
-        type=ClsTunnel,
+        type=VVOL,
         ncross=3
     ),
     allow_overturn=False,
@@ -29,9 +29,9 @@ config = dict(
     fee_rate=FeeRate(0.1, 0.00016),
     save_backup=False,
     save_plots=False,
-    vis_events=Vis.ON_DEAL,
+    vis_events=Vis.ON_STEP,
     vis_hist_length=256,
-    visualize=False,
+    visualize=True,
     eval_buyhold=False,
     run_model_device=None,
 )

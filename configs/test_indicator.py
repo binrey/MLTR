@@ -31,7 +31,7 @@ config = dict(
     save_plots=False,
     vis_events=Vis.ON_DEAL,
     vis_hist_length=256,
-    visualize=False,
+    visualize=True,
     eval_buyhold=False,
     run_model_device=None,
 )

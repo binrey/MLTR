@@ -57,5 +57,5 @@ class SLDynamic(StopsController):
     
     def _eval(self, **kwargs):
         if self.cfg["active"]:
-            sl = self.expert.body_cls.setup_sl(self.expert.active_position.side)
+            sl = self.expert.decision_maker.setup_sl(self.expert.active_position.side)
         return sl

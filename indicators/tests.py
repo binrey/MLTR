@@ -5,11 +5,12 @@ from time import time
 
 import mplfinance as mpf
 import numpy as np
+import pandas as pd
 
-sys.path.append(str(Path(__file__).parent.parent))
-from backtest import DataParser, MovingWindow
-
+# sys.path.append(str(Path(__file__).parent.parent))
 from common.utils import PyConfig
+from common.visualization import Visualizer
+from data_processing.dataloading import DataParser, MovingWindow
 from indicators import *
 
 
@@ -17,13 +18,17 @@ class IndcTester():
     def __init__(self, indc, save_path=Path("indicators/test")):
         self.save_path = save_path
         self.indc = indc
-        cfg = PyConfig("test.py").test()
-        self.hist_pd, self.hist = DataParser(cfg).load()
-        self.mw = MovingWindow(self.hist, cfg.hist_buffer_size)
+        cfg = PyConfig("configs/test_indicator.py").get_inference()
+        self.mw = MovingWindow(cfg)
         
         if save_path.exists():
             rmtree(save_path)
         save_path.mkdir()
+        
+        self.visualizer = Visualizer(period=cfg['period'], 
+                                show=cfg['visualize'], 
+                                save_to=self.save_path if cfg['save_plots'] else None,
+                                vis_hist_length=cfg['vis_hist_length'])  
        
     def test_zigzag_opt(self, t):
         data_wind, _ = self.mw(t)
@@ -56,36 +61,19 @@ class IndcTester():
     
 
     def test_zigzag(self, t):
-        data_wind, _ = self.mw(t)
-        ids, values, types = self.indc.update(data_wind)
+        h, _ = self.mw[t]
+        ids, values, types = self.indc.update(h)
         
-        hist2plot = self.hist_pd.iloc[ids[0]:ids[-1]+1]
-
-        line = []
-        for t, y in zip(ids, values):
-            try:
-                y = y.item()
-            except:
-                pass
-            line.append((hist2plot.index[hist2plot.Id==t][0], y))
-            
-        fig = mpf.plot(hist2plot, 
-                    type='candle', 
-                    block=False,
-                    alines=dict(alines=[line]),
-                    savefig=self.save_path / f"zz_{t}.jpg"
-                    )
-        mpf.show()    
-    
-    
-if __name__ == "__main__":
-    indc = ZigZag(8)
-    tester = IndcTester(indc)
+        self.visualizer.update_hist(h)
         
-    t0 = time()
-    for i, t in enumerate(range(990, 1050)):
-        tester.test_zigzag(t)
-    print((time()-t0)/(i+1))
-    
-    
-
+        self.visualizer([])
+        
+        
+    def test_hvol(self, t):
+        h, _ = self.mw[t]
+        self.visualizer.update_hist(h)
+        hist = self.indc.update(h)
+        hist = [[self.visualizer.hist2plot.index[0], hist],
+                [self.visualizer.hist2plot.index[-1], np.ones_like(hist)]]
+        
+        self.visualizer([], hist)

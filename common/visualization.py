@@ -48,7 +48,7 @@ class Visualizer:
             # if self.hist2plot.shape[0] > self.vis_hist_length:
             self.hist2plot = self.hist2plot.iloc[-self.vis_hist_length:] 
              
-    def __call__(self, pos_list: List[Position]):
+    def __call__(self, pos_list: List[Position], time_volume_profile):
         if not self.show and not self.save_plots:
             return
         drawitems4pos: List[DrawItem] = []
@@ -77,15 +77,19 @@ class Visualizer:
                                                    (pd.to_datetime(t), p)], 
                                              color="#000"))
         if self.show:
-            self.visualize(drawitems4pos, drawitems4sl)
+            self.visualize(drawitems4pos, drawitems4sl, time_volume_profile)
             return None
         if self.save_plots:
             pos_curr_side = pos_list[-1].side if pos_list[-1] else None
             return self.save(drawitems4pos, drawitems4sl, pos_curr_side)
         
 
-    def visualize(self, drawitems4possitions: List[DrawItem], drawitems4sl: List[DrawItem]):
+    def visualize(self, drawitems4possitions: List[DrawItem], drawitems4sl: List[DrawItem], time_volume_profile):
+        ax = fplt.create_plot('long term analysis', rows=1, maximize=False)
         fplt.candlestick_ochl(self.hist2plot[['Open', 'Close', 'High', 'Low']])
+        fplt.volume_ocv(self.hist2plot[['Open', 'Close', 'Volume']], ax=ax.overlay(scale=0.08))
+        fplt.horiz_time_volume(time_volume_profile, draw_va=0.7, draw_poc=1.0)
+        
         for drawitem in drawitems4possitions:
             rect = fplt.add_rect(drawitem.line[1], drawitem.line[0], color=drawitem.color)
             
