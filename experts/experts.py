@@ -72,11 +72,10 @@ class ExpertFormation(ExpertBase):
         self.order_dir = 0
         
         if self.cfg["allow_overturn"] or not self.formation_found:
-            lprice, sprice = self.decision_maker(h)   
-            self.formation_found = lprice or sprice
-            if self.formation_found:
-                self.lprice = lprice
-                self.sprice = sprice
+            if self.decision_maker.look_around(h):
+                self.formation_found = True
+                self.lprice = self.decision_maker.lprice
+                self.sprice = self.decision_maker.sprice
         
         logger.debug(f"found enter points: long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}")
         

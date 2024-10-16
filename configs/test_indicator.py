@@ -28,10 +28,10 @@ config = dict(
     data_type="bybit",
     fee_rate=FeeRate(0.1, 0.00016),
     save_backup=False,
-    save_plots=True,
+    save_plots=False,
     vis_events=Vis.ON_DEAL,
     vis_hist_length=256,
-    visualize=False,
+    visualize=True,
     eval_buyhold=False,
     run_model_device=None,
 )

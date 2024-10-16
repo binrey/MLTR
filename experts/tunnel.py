@@ -8,7 +8,7 @@ class ClsTunnel(DecisionMaker):
     def __init__(self, cfg):
         super(ClsTunnel, self).__init__(cfg)
 
-    def __call__(self, h) -> bool:
+    def look_around(self, h) -> bool:
         is_fig = False
         best_params = {
             "metric": 0,
@@ -43,13 +43,16 @@ class ClsTunnel(DecisionMaker):
             i = best_params["i"]
             self.sl_definer[Side.BUY] = h["Low"][-i:-1].min()
             self.sl_definer[Side.SELL] = h["High"][-i:-1].max()         
-            lprice = best_params["line_above"]
-            sprice = best_params["line_below"]
+            self.lprice = best_params["line_above"]
+            self.sprice = best_params["line_below"]
 
-        return lprice, sprice
+        return is_fig
     
     def setup_sl(self, side: Side):
         return self.sl_definer[side]
     
     def setup_tp(self, side: Side):
         return None
+
+    def update_inner_state(self, h):
+        return super().update_inner_state(h)

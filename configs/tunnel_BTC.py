@@ -13,4 +13,4 @@ hist_buffer_size = 64,
 period = TimePeriod.M60
 ))
 
-config["body_classifier"]["ncross"] = 4
+config["decision_maker"]["ncross"] = 4

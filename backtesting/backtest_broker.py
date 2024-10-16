@@ -40,7 +40,7 @@ class Broker:
         return np.array([p.fees_abs for p in self.positions])
 
     def trade_stream(self, callback):
-        for self.hist_window, dt in tqdm(self.mw(), desc="Backtest", total=self.mw.timesteps_count):
+        for self.hist_window, dt in tqdm(self.mw(), desc="Backtest", total=self.mw.timesteps_count, disable=True):
             self.time = self.hist_window["Date"][-1]
             self.hist_id = self.hist_window["Id"][-1]
             self.open_price = self.hist_window["Open"][-1]

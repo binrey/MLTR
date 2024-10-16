@@ -9,6 +9,7 @@ from loguru import logger
 
 from common.type import Vis
 from common.visualization import Visualizer
+from experts.base import ExpertBase
 from trade.utils import Position
 
 pd.options.mode.chained_assignment = None
@@ -59,7 +60,7 @@ class StepData:
 
 
 class BaseTradeClass(ABC):
-    def __init__(self, cfg, expert, telebot: Telebot) -> None:
+    def __init__(self, cfg, expert: ExpertBase, telebot: Telebot) -> None:
         self.cfg = cfg
         self.my_telebot = telebot
         self.exp = expert
@@ -155,8 +156,8 @@ class BaseTradeClass(ABC):
         self.pos.update(cur_pos)
 
     def vis(self):
-        return self.visualizer([self.pos.prev, self.pos.curr])
-        # return self.visualizer(self.get_pos_history() + [self.pos.curr])
+        # return self.visualizer([self.pos.prev, self.pos.curr], self.exp)
+        return self.visualizer(self.get_pos_history() + [self.pos.curr], self.exp)
 
     def _update(self):
         self.h = self.get_hist()
@@ -164,13 +165,13 @@ class BaseTradeClass(ABC):
             self.visualizer.update_hist(self.h)
         self.update_market_state()
         
-        if self.pos.created() or self.pos.deleted(): 
+        if self.pos.created() or self.pos.deleted() or self.pos.changed(): 
             if self.pos.deleted(): 
                 logger.debug(f"position closed {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
             if self.cfg['vis_events'] == Vis.ON_DEAL:
                 # process = multiprocessing.Process(target=self.vis())
                 # process.start()
-                saved_img_path = self.vis()
+                self.vis()
                 # if self.my_telebot is not None:
                 #     self.my_telebot.send_image(saved_img_path)
         

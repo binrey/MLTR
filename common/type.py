@@ -1,6 +1,9 @@
+from dataclasses import dataclass
 from enum import Enum
+from typing import List, Tuple
 
 import numpy as np
+import pandas as pd
 
 
 class Side(Enum):
@@ -66,3 +69,22 @@ class RunType(Enum):
 if __name__ == "__main__":
     tp = TimePeriod.M60
     print(tp.to_timedelta())
+
+
+Point = Tuple[pd.Timestamp, float]
+Bar = Tuple[float, float]
+
+@dataclass
+class Line:
+    line: List[Point]
+    color: str
+
+@dataclass
+class TimeVolumeProfile:
+    time: pd.Timestamp
+    hist: List[Bar]
+    
+    def __post_init__(self):
+        if type(self.time) is np.datetime64:
+            self.time = pd.to_datetime(self.time.astype("datetime64[m]"))
+    

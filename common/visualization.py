@@ -1,28 +1,29 @@
-from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Union
 
 import finplot as fplt
 import matplotlib
 import mplfinance as mpf
+import numpy as np
 import pandas as pd
 from loguru import logger
 from matplotlib import pyplot as plt
 
+from experts.base import ExpertBase
+
 matplotlib.use('agg')
 
-from common.type import Side, TimePeriod
+from common.type import Line, Side, TimePeriod, TimeVolumeProfile
 from common.utils import date2str
 from trade.utils import Position
 
 
-@dataclass
-class DrawItem:
-    line: List[Tuple]
-    color: str
-    
 class Visualizer:
-    def __init__(self, period: TimePeriod, show: bool, save_to: Optional[str], vis_hist_length: int) -> None:
+    def __init__(self, 
+                 period: TimePeriod, 
+                 show: bool, 
+                 save_to: Optional[str], 
+                 vis_hist_length: int) -> None:
         self.period = period
         self.show = show
         self.save_plots = True if save_to is not None else False
@@ -48,11 +49,11 @@ class Visualizer:
             # if self.hist2plot.shape[0] > self.vis_hist_length:
             self.hist2plot = self.hist2plot.iloc[-self.vis_hist_length:] 
              
-    def __call__(self, pos_list: List[Position], time_volume_profile):
+    def __call__(self, pos_list: List[Position], expert2draw: Optional[ExpertBase] = None):
         if not self.show and not self.save_plots:
             return
-        drawitems4pos: List[DrawItem] = []
-        drawitems4sl: List[DrawItem] = []
+        drawitems4pos: List[Line] = []
+        drawitems4sl: List[Line] = []
         for pos in pos_list:
             if pos is None:
                 continue
@@ -67,17 +68,23 @@ class Visualizer:
                 
             if pd.to_datetime(end_time) < self.hist2plot.index[0]:
                 continue
-            drawitem = DrawItem(line=[(pd.to_datetime(pos.open_date.astype("datetime64[m]")), pos.open_price), 
+            drawitem = Line(line=[(pd.to_datetime(pos.open_date.astype("datetime64[m]")), pos.open_price), 
                                       (pd.to_datetime(end_time), end_price)],
                                 color='#8c8' if pos.side == Side.BUY else '#c88')
             drawitems4pos.append(drawitem)
             
             for t, p in pos.sl_hist:
-                drawitems4sl.append(DrawItem(line=[(pd.to_datetime(t - self.period.to_timedelta()), p), 
+                drawitems4sl.append(Line(line=[(pd.to_datetime(t - self.period.to_timedelta()), p), 
                                                    (pd.to_datetime(t), p)], 
                                              color="#000"))
+                
+        if expert2draw is not None:
+            drawitems4expert = expert2draw.decision_maker.vis_objects
+        else:
+            drawitems4expert = []
+                
         if self.show:
-            self.visualize(drawitems4pos, drawitems4sl, time_volume_profile)
+            self.visualize(drawitems4pos, drawitems4sl, drawitems4expert)
             return None
         if self.save_plots:
             pos_curr_side = None
@@ -86,11 +93,18 @@ class Visualizer:
             return self.save(drawitems4pos, drawitems4sl, pos_curr_side)
         
 
-    def visualize(self, drawitems4possitions: List[DrawItem], drawitems4sl: List[DrawItem], time_volume_profile):
+    def visualize(self, 
+                  drawitems4possitions: List[Line], 
+                  drawitems4sl: List[Line], 
+                  drawitems4expert: List[Union[Line, TimeVolumeProfile]]) -> None:
         ax = fplt.create_plot('long term analysis', rows=1, maximize=False)
         fplt.candlestick_ochl(self.hist2plot[['Open', 'Close', 'High', 'Low']])
         fplt.volume_ocv(self.hist2plot[['Open', 'Close', 'Volume']], ax=ax.overlay(scale=0.08))
-        fplt.horiz_time_volume(time_volume_profile, draw_va=0.7, draw_poc=1.0)
+        for drawitem in drawitems4expert:
+            if type(drawitem) is TimeVolumeProfile:
+                time_vol_profile = [[self.hist2plot.index[0], drawitem.hist],
+                                    [self.hist2plot.index[-1], [(1, 1)]]]
+                fplt.horiz_time_volume(time_vol_profile, draw_va=0, draw_poc=3.0)
         
         for drawitem in drawitems4possitions:
             rect = fplt.add_rect(drawitem.line[1], drawitem.line[0], color=drawitem.color)
@@ -107,11 +121,22 @@ class Visualizer:
                           color=drawitem.color,
                           width=2, 
                           style="-")
+            
+        for drawitem in drawitems4expert:
+            if type(drawitem) is Line:
+                for i in range(2):
+                    if drawitem.line[i][0] is None:
+                        drawitem.line[i] = (self.hist2plot.index[-i], drawitem.line[i][1])
+                fplt.add_line(drawitem.line[0], 
+                            drawitem.line[1], 
+                            color=drawitem.color,
+                            width=1, 
+                            style="--")
         fplt.winh = 600
         fplt.show()
 
 
-    def save(self, drawitems4possitions: List[DrawItem], drawitems4sl: List[DrawItem], side_current: Optional[Side]):
+    def save(self, drawitems4possitions: List[Line], drawitems4sl: List[Line], side_current: Optional[Side]):
         try:
             mystyle = mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
             lines = [drawitem.line for drawitem in drawitems4possitions + drawitems4sl]
