@@ -1,7 +1,7 @@
 from common.type import TimePeriod, Vis
 from common.utils import FeeRate
 from experts.hvol import HVOL
-from experts.position_control import SLDynamic, TPFromSL
+from experts.position_control import SLDynamic, TPFromSL, SLFixed
 
 config = dict(
     wallet=100,
@@ -17,18 +17,19 @@ config = dict(
     ),
     allow_overturn=False,
     sl_processor=dict(
-        type=SLDynamic,
-        active=True
+        type=SLFixed,
+        active=True,
+        percent_value=3
     ),
     tp_processor=dict(
         type=TPFromSL,
         active=True,
-        scale=1
+        scale=6
     ),
     hist_buffer_size=128,
     tstart=0,
     tend=None,
-    period=TimePeriod.M15,
+    period=TimePeriod.M60,
     ticker="BTCUSDT",
     ticksize=0.001,
     data_type="bybit",

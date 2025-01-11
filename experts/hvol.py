@@ -29,8 +29,8 @@ class HVOL(DecisionMaker):
         
         # lprice, sprice = None, None
         if flag:
-            self.lprice = lprice
-            self.sprice = sprice
+            self.lprice = sprice
+            self.sprice = lprice
             self.tsignal = None#h["Date"][-2]
             self.sl_definer[Side.BUY] = h["Low"].min()
             self.sl_definer[Side.SELL] = h["High"].max()

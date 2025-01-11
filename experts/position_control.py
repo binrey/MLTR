@@ -47,10 +47,23 @@ class SLDynamic(StopsController):
         return sl
 
 
+class SLFixed(StopsController):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(SLFixed, self).__init__(cfg, name="sl_fix")
+    
+    def _eval(self, **kwargs):
+        sl = None
+        open_price = self.expert.active_position.open_price
+        if self.cfg["active"]:
+            sl = open_price * (1 - self.cfg["percent_value"] / 100 * self.expert.active_position.side.value)
+        return sl
+    
+
 class TPFromSL(StopsController):
     def __init__(self, cfg):
         self.cfg = cfg
-        super(TPFromSL, self).__init__(cfg, name="tp_fix")
+        super(TPFromSL, self).__init__(cfg, name="tp_from_sl")
     
     def _eval(self, **kwargs):
         tp = None
