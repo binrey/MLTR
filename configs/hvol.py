@@ -1,24 +1,29 @@
 from common.type import TimePeriod, Vis
 from common.utils import FeeRate
 from experts.hvol import HVOL
-from experts.position_control import SLDynamic
+from experts.position_control import SLDynamic, TPFromSL
 
 config = dict(
     wallet=100,
     leverage=1,
-    date_start="2000-01-01T00:00:00",
+    date_start="2000-02-01T00:00:00",
     date_end="2024-11-01",
     no_trading_days=set(),
-    trailing_stop_rate=0.0025,
+    trailing_stop_rate=0.0,
     decision_maker=dict(
         type=HVOL,
-        nbins=30,
-        sharpness=3
+        nbins=20,
+        sharpness=2
     ),
     allow_overturn=False,
     sl_processor=dict(
         type=SLDynamic,
         active=True
+    ),
+    tp_processor=dict(
+        type=TPFromSL,
+        active=True,
+        scale=1
     ),
     hist_buffer_size=128,
     tstart=0,
@@ -39,5 +44,7 @@ config = dict(
 
 optimization = config.copy()
 optimization.update(dict(
-    hist_buffer_size=[32, 64]
+    hist_buffer_size=[64, 128, 256],
+    trailing_stop_rate=[0.0025, 0.005, 0.01],
 ))
+# optimization["decision_maker"]["sharpness"] = [2, 4, 8]

@@ -40,7 +40,7 @@ class Broker:
         return np.array([p.fees_abs for p in self.positions])
 
     def trade_stream(self, callback):
-        for self.hist_window, dt in tqdm(self.mw(), desc="Backtest", total=self.mw.timesteps_count, disable=True):
+        for self.hist_window, dt in tqdm(self.mw(), desc="Backtest", total=self.mw.timesteps_count, disable=False):
             self.time = self.hist_window["Date"][-1]
             self.hist_id = self.hist_window["Id"][-1]
             self.open_price = self.hist_window["Open"][-1]
@@ -53,7 +53,7 @@ class Broker:
                     closed_position = closed_position_new
             elif closed_position_new is not None:
                 raise ValueError("closed positions disagreement!")
-            self.update_state()
+            # self.update_state()
             
         if self.active_position is not None:
             self.close_active_pos(price=self.open_price, 
@@ -71,9 +71,11 @@ class Broker:
 
     def update_sl(self, sl):
         if self.active_position is not None and sl is not None:
-            assert not (self.active_position.side == Side.BUY and self.open_price <= sl), "sl must be below price if side = BUY" 
-            assert not (self.active_position.side == Side.SELL and self.open_price >= sl), "sl must be above price if side = SELL" 
             self.active_position.update_sl(sl, self.time)
+
+    def update_tp(self, tp):
+        if self.active_position is not None and tp is not None:
+            self.active_position.update_tp(tp, self.time)
 
     def set_active_orders(self, new_orders_list: List[Order]):
         if len(new_orders_list):
@@ -110,6 +112,15 @@ class Broker:
         if self.active_position is not None and self.active_position.sl is not None:
             self.active_orders.append(Order(
                             price=self.active_position.sl, 
+                            side=Side.reverse(self.active_position.side), 
+                            type=ORDER_TYPE.STOPLOSS,
+                            volume=self.active_position.volume,
+                            indx=self.active_position.open_indx, 
+                            time=self.active_position.open_date))
+
+        if self.active_position is not None and self.active_position.tp is not None:
+            self.active_orders.append(Order(
+                            price=self.active_position.tp, 
                             side=Side.reverse(self.active_position.side), 
                             type=ORDER_TYPE.STOPLOSS,
                             volume=self.active_position.volume,
@@ -198,25 +209,25 @@ class Broker:
 
         return closed_position
 
-    def trailing_stop(self, h):
-        date, p = self.hist_id, h.Close[-1]
-        position = self.active_position
-        if position is None or self.cfg["trailing_stop_rate"] == 0:
-            return
-        for order in self.active_orders:
-            if date == order.open_date:
-                self.best_profit = 0
-            else:
-                profit_cur = 0
-                if self.active_position.side == Side.BUY:
-                    profit_cur = h.High[-2] - self.active_position.open_price
-                if self.active_position.side == Side.SELL:
-                    profit_cur = self.active_position.open_price - h.Low[-2]
-                if profit_cur >= self.best_profit:
-                    self.best_profit = profit_cur
+    # def trailing_stop(self, h):
+    #     date, p = self.hist_id, h.Close[-1]
+    #     position = self.active_position
+    #     if position is None or self.cfg["trailing_stop_rate"] == 0:
+    #         return
+    #     for order in self.active_orders:
+    #         if date == order.open_date:
+    #             self.best_profit = 0
+    #         else:
+    #             profit_cur = 0
+    #             if self.active_position.side == Side.BUY:
+    #                 profit_cur = h.High[-2] - self.active_position.open_price
+    #             if self.active_position.side == Side.SELL:
+    #                 profit_cur = self.active_position.open_price - h.Low[-2]
+    #             if profit_cur >= self.best_profit:
+    #                 self.best_profit = profit_cur
 
-                order.change(
-                    date,
-                    order.price
-                    + self.cfg["trailing_stop_rate"] * (self.open_price - order.price),
-                )
+    #             order.change(
+    #                 date,
+    #                 order.price
+    #                 + self.cfg["trailing_stop_rate"] * (self.open_price - order.price),
+    #             )

@@ -76,7 +76,6 @@ class BaseTradeClass(ABC):
         self.nmin = self.cfg['period'].minutes
         self.time = StepData()
         self.serv_time = None
-        self.update = self._update
         self.exp_update = self.exp.update
 
     @abstractmethod
@@ -159,7 +158,7 @@ class BaseTradeClass(ABC):
         # return self.visualizer([self.pos.prev, self.pos.curr], self.exp)
         return self.visualizer(self.get_pos_history() + [self.pos.curr], self.exp)
 
-    def _update(self):
+    def update(self):
         self.h = self.get_hist()
         if self.cfg['visualize'] or self.cfg['save_plots']:
             self.visualizer.update_hist(self.h)

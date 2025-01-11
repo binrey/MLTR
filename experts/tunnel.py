@@ -48,6 +48,9 @@ class ClsTunnel(DecisionMaker):
 
         return is_fig
     
+    def setup_indicator(self, cfg):
+        pass
+    
     def setup_sl(self, side: Side):
         return self.sl_definer[side]
     

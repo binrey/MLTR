@@ -10,6 +10,7 @@ class HVOL(DecisionMaker):
     
     def __init__(self, cfg):
         super().__init__(cfg)
+        self.trigger_width = 1
         
     def setup_indicator(self, cfg):
         return VolDistribution(nbins=cfg["nbins"])
@@ -18,25 +19,28 @@ class HVOL(DecisionMaker):
         flag = False
         self.indicator.update(h)
         max_vol_id = self.indicator.vol_hist.argmax()
-        if 0 < max_vol_id < len(self.indicator.vol_hist) - 1:
+        if self.trigger_width <= max_vol_id < len(self.indicator.vol_hist) - self.trigger_width:
             if self.indicator.vol_hist[max_vol_id] / self.indicator.vol_hist.mean() > self.cfg["sharpness"]:
-                flag = True
+                bin_width = self.indicator.price_bins[1] - self.indicator.price_bins[0] 
+                lprice = self.indicator.price_bins[max_vol_id+self.trigger_width]+bin_width/2
+                sprice = self.indicator.price_bins[max_vol_id-self.trigger_width]+bin_width/2
+                if sprice < h["Open"][-1] < lprice:
+                    flag = True
         
         # lprice, sprice = None, None
         if flag:
-            bin_width = self.indicator.price_bins[1] - self.indicator.price_bins[0]      
-            self.lprice = self.indicator.price_bins[max_vol_id+1]+bin_width/2
-            self.sprice = self.indicator.price_bins[max_vol_id-1]+bin_width/2
+            self.lprice = lprice
+            self.sprice = sprice
             self.tsignal = None#h["Date"][-2]
-            self.sl_definer[Side.BUY] = self.sprice
-            self.sl_definer[Side.SELL] = self.lprice
+            self.sl_definer[Side.BUY] = h["Low"].min()
+            self.sl_definer[Side.SELL] = h["High"].max()
         return flag
     
     def setup_sl(self, side: Side):
         return self.sl_definer[side]
     
     def setup_tp(self, side: Side):
-        return None
+        return self.tp_definer[side]
     
     def update_inner_state(self, h):
         return super().update_inner_state(h)

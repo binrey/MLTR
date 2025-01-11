@@ -102,7 +102,7 @@ class Visualizer:
         fplt.volume_ocv(self.hist2plot[['Open', 'Close', 'Volume']], ax=ax.overlay(scale=0.08))
         for drawitem in drawitems4expert:
             if type(drawitem) is TimeVolumeProfile:
-                time_vol_profile = [[self.hist2plot.index[0], drawitem.hist],
+                time_vol_profile = [[drawitem.time if drawitem.time in self.hist2plot.index else self.hist2plot.index[0], drawitem.hist],
                                     [self.hist2plot.index[-1], [(1, 1)]]]
                 fplt.horiz_time_volume(time_vol_profile, draw_va=0, draw_poc=3.0)
         

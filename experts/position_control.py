@@ -6,7 +6,7 @@ from common.type import Side
 from common.utils import name_from_cfg
 from indicators import *
 
-from .base import DecisionMaker
+from .base import ExpertBase
 
 
 class StopsController(ABC):
@@ -17,7 +17,7 @@ class StopsController(ABC):
     def __str__(self):
         return name_from_cfg(self.cfg, self.name)
 
-    def set_expert(self, expert):
+    def set_expert(self, expert: ExpertBase):
         self.expert = expert
 
     @abstractmethod        
@@ -26,28 +26,13 @@ class StopsController(ABC):
     
     def __call__(self, h) -> float:
         val = self._eval(hist=h)
-        if self.expert.active_position.side == Side.BUY:
-            if val:
-                val = np.min([val, h["Low"][-2], h["Open"][-1]])
-        if self.expert.active_position.side == Side.SELL:
-            if val:
-                val = np.max([val, h["High"][-2], h["Open"][-1]])
+        # if self.expert.active_position.side == Side.BUY:
+        #     if val:
+        #         val = np.min([val, h["Low"][-2], h["Open"][-1]])
+        # if self.expert.active_position.side == Side.SELL:
+        #     if val:
+        #         val = np.max([val, h["High"][-2], h["Open"][-1]])
         return val
-
-class StopsFixed(StopsController, DecisionMaker):
-    def __init__(self, cfg):
-        self.cfg = cfg
-        super(StopsFixed, self).__init__(cfg, name="stops_fix")
-
-    def _eval_stops(self, common, h, sl_custom=None):
-        dir = common.active_position.side.value
-        sl, tp = self.cfg["sl"], None
-        if sl_custom is not None:
-            sl = sl_custom
-        if sl is not None:
-            sl = h["Open"][-1]*(1 - dir*sl/100)
-            
-        return tp, sl
     
 
 class SLDynamic(StopsController):
@@ -56,6 +41,29 @@ class SLDynamic(StopsController):
         super(SLDynamic, self).__init__(cfg, name="sl_dyn")
     
     def _eval(self, **kwargs):
+        sl = None
         if self.cfg["active"]:
             sl = self.expert.decision_maker.setup_sl(self.expert.active_position.side)
         return sl
+
+
+class TPFromSL(StopsController):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super(TPFromSL, self).__init__(cfg, name="tp_fix")
+    
+    def _eval(self, **kwargs):
+        tp = None
+        open_price = self.expert.active_position.open_price
+        if self.cfg["active"]:
+            tp = open_price + self.cfg["scale"] * abs(open_price - self.expert.active_position.sl) * self.expert.active_position.side.value
+        return tp
+    
+    
+def fix_rate_trailing_sl(sl:float,
+                       open_price: float,
+                       side: Side,
+                       trailing_stop_rate:float,
+                       ticksize: float) -> float:
+    sl_new = float(sl + trailing_stop_rate*(open_price - sl))
+    return sl_new

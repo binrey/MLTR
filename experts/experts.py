@@ -6,8 +6,9 @@ from loguru import logger
 from backtesting.backtest_broker import Broker, Order
 from common.type import Side
 from experts.base import ExpertBase
+from experts.position_control import fix_rate_trailing_sl
 from indicators import *
-from trade.utils import ORDER_TYPE, fix_rate_trailing_sl
+from trade.utils import ORDER_TYPE
 
 
 def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -22,8 +23,6 @@ class ExpertFormation(ExpertBase):
         super(ExpertFormation, self).__init__(cfg)  
         self._reset_state()
         self.order_sent = False
-        self.sl = None
-        self.tp = None
         
         if self.cfg["run_model_device"] is not None:
             from ml import Net, Net2
@@ -49,7 +48,7 @@ class ExpertFormation(ExpertBase):
     def normalize_volume(self, volume):
         return round(volume/self.cfg["ticksize"], 0)*self.cfg["ticksize"]
             
-    def update_trailing_sl(self, h):
+    def create_or_update_sl(self, h):
         if self.active_position is not None:
             if self.active_position.sl is None:
                 sl = self.sl_processor(h)
@@ -62,8 +61,15 @@ class ExpertFormation(ExpertBase):
                                               ticksize=self.cfg["ticksize"])
                 self.modify_sl(sl_new)                
 
+    def create_or_update_tp(self, h):
+        if self.active_position is not None:
+            if self.active_position.tp is None:
+                tp = self.tp_processor(h)
+                self.modify_tp(tp)
+
     def get_body(self, h):
-        self.update_trailing_sl(h)
+        self.create_or_update_sl(h)
+        self.create_or_update_tp(h)
         self.decision_maker.update_inner_state(h)
         if not self.cfg["allow_overturn"] and self.active_position is not None:
             return
@@ -81,14 +87,16 @@ class ExpertFormation(ExpertBase):
         
         if self.lprice:
             if (self.sprice is None and h["Open"][-1] >= self.lprice) or h["Close"][-2] > self.lprice:
-                self.order_dir = 1
+                if h["Close"][-3] < self.lprice:
+                    self.order_dir = 1
             if self.cprice is not None and h["Open"][-1] < self.cprice:
                 self._reset_state()
                 return
             
         if self.sprice:
             if (self.lprice is None and h["Open"][-1] <= self.sprice) or h["Close"][-2] < self.sprice:
-                self.order_dir = -1
+                if h["Close"][-3] > self.sprice:
+                    self.order_dir = -1
             if self.cprice and h["Open"][-1] > self.cprice:
                 self._reset_state()
                 return            
@@ -135,7 +143,9 @@ class BacktestExpert(ExpertFormation):
     @log_modify_sl    
     def modify_sl(self, sl: Optional[float]):
         self.session.update_sl(sl)
-        
+
+    def modify_tp(self, tp: Optional[float]):
+        self.session.update_tp(tp)        
             
 class ByBitExpert(ExpertFormation):
     def __init__(self, cfg, session):

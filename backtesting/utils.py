@@ -129,7 +129,7 @@ class BackTestResults:
         self.monthly_hist.columns = ["days", "profit"]
         
     def plot_results(self):
-        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(6, 8), gridspec_kw={'height_ratios': [3, 1, 1]})
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 8), gridspec_kw={'height_ratios': [3, 1, 1]})
         
         # First subplot
         ax1.plot(

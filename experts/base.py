@@ -19,11 +19,14 @@ class ExpertBase(ABC):
         self.decision_maker: DecisionMaker = init_target_from_cfg(cfg["decision_maker"])
         self.sl_processor = init_target_from_cfg(cfg["sl_processor"])
         self.sl_processor.set_expert(self)
-        
+        self.sl = None
+        self.tp_processor = init_target_from_cfg(cfg["tp_processor"])
+        self.tp_processor.set_expert(self)
+        self.tp = None
         self.orders = []
             
     def __str__(self):
-        return f"{str(self.decision_maker)} sl: {str(self.sl_processor)}"
+        return f"{str(self.decision_maker)} sl: {str(self.sl_processor)}  tp: {str(self.tp_processor)}"
     
     @abstractmethod
     def get_body(self) -> None:
@@ -43,6 +46,7 @@ class DecisionMaker(ABC):
     def __init__(self, cfg):
         self.cfg = cfg
         self.sl_definer = {Side.BUY: None, Side.SELL: None}
+        self.tp_definer = {Side.BUY: None, Side.SELL: None}
         self.lprice, self.sprice, self.cprice, self.tsignal = None, None, None, None
         self.vis_items = []
         self.indicator = self.setup_indicator(cfg)

@@ -93,8 +93,28 @@ class Config(EasyDict):
             else:
                 out += f"{k}: {v}\n"
         return out
+
+
+def update_config(config, updates):
+    """
+    Updates the provided configuration dictionary with new values.
     
-    
+    Args:
+        config (dict): The configuration dictionary to update.
+        updates (dict): A dictionary containing the new configuration values.
+        
+    Returns:
+        dict: The updated configuration dictionary.
+    """
+    for key, value in updates.items():
+        if isinstance(value, dict) and key in config and isinstance(config[key], dict):
+            # Recursive update for nested dictionaries
+            update_config(config[key], value)
+        else:
+            # Direct update for non-dictionary values
+            config[key] = value
+    return config
+
 
 @dataclass
 class FeeModel(ABC):

@@ -34,10 +34,6 @@ class Order:
     def id(self):
         return f"{self.open_indx}-{self.str_dir}-{self.price:.2f}"
 
-    @property
-    def lines(self):
-        return self._change_hist
-
     def close(self, date):
         self.close_date = date
 
@@ -53,6 +49,7 @@ class Position:
         volume: int = 1,
         period: str = "M5",
         sl: Optional[float] = None,
+        tp: Optional[float] = None,
         fee_rate: Optional[FeeModel] = None,
     ):
         self.volume = float(volume)
@@ -64,9 +61,12 @@ class Position:
         self.open_date = np.datetime64(date)
         self.open_indx = int(indx)
         self.sl = None
+        self.tp = None
         self.sl_hist = []
-        
+        self.tp_hist = [] 
+               
         self.update_sl(sl=float(sl) if sl is not None else sl, time=self.open_date)
+        self.update_tp(tp=float(tp) if tp is not None else tp, time=self.open_date)
         self.close_price = None
         self.close_date = None
         self.profit = None
@@ -82,6 +82,8 @@ class Position:
             name += f" -> {self.close_price}"
         if self.sl:
             name += f" | sl:{self.sl}"
+        if self.tp:
+            name += f" | tp:{self.tp}"
         return name
 
     def update_sl(self, sl: float, time: np.datetime64):
@@ -89,6 +91,12 @@ class Position:
         self.sl = sl
         if sl is not None:
             self.sl_hist.append((time, sl))
+
+    def update_tp(self, tp: float, time: np.datetime64):
+        assert not (self.tp is not None and tp is None), "Set tp to None is not allowed"
+        self.tp = tp
+        if tp is not None:
+            self.tp_hist.append((time, tp))
 
     def _update_fees(self, price, volume):
         self.fees_abs += self.fee_rate.order_execution_fee(price, volume)
@@ -132,10 +140,3 @@ class Position:
         return [(self.open_indx, self.open_price), (self.close_indx, self.close_price)]
 
 
-def fix_rate_trailing_sl(sl:float, 
-                       open_price: float, 
-                       side: Side,
-                       trailing_stop_rate:float, 
-                       ticksize: float) -> float:
-    sl_new = float(sl + trailing_stop_rate*(open_price - sl))
-    return sl_new

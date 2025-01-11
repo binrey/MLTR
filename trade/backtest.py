@@ -56,25 +56,25 @@ def launch(cfg):
         if save_path.exists():
             rmtree(save_path)
         save_path.mkdir(parents=True)
-    mw = MovingWindow(cfg)
-    backtest_session = Broker(cfg)
+
+    bt_session = Broker(cfg)
     backtest_trading = BackTest(
         cfg=cfg, 
-        expert=BacktestExpert(cfg=cfg, session=backtest_session), 
+        expert=BacktestExpert(cfg=cfg, session=bt_session), 
         telebot=None,
-        session=backtest_session
+        session=bt_session
         )
     backtest_trading.test_connection()
     
     print()
-    backtest_session.trade_stream(backtest_trading.handle_trade_message)
+    bt_session.trade_stream(backtest_trading.handle_trade_message)
 
-    bt_res = BackTestResults(mw.date_start, mw.date_end)
-    tpost = bt_res.process_backtest(backtest_session)
+    bt_res = BackTestResults(bt_session.mw.date_start, bt_session.mw.date_end)
+    tpost = bt_res.process_backtest(bt_session)
     if cfg['eval_buyhold']:
         tbandh = bt_res.compute_buy_and_hold(
-            dates=mw.hist["Date"][mw.id2start : mw.id2end],
-            closes=mw.hist["Close"][mw.id2start : mw.id2end],
+            dates=bt_session.mw.hist["Date"][bt_session.mw.id2start : bt_session.mw.id2end],
+            closes=bt_session.mw.hist["Close"][bt_session.mw.id2start : bt_session.mw.id2end],
             fuse=cfg['fuse_buyhold'],
         )
     ttotal = time() - t0
