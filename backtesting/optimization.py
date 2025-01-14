@@ -17,7 +17,7 @@ from loguru import logger
 from matplotlib import pyplot as plt
 
 from backtesting.utils import BackTestResults
-from common.utils import PyConfig
+from common.utils import PyConfig, date2str
 from trade.backtest import launch as backtest_launch
 
 logger.remove()
@@ -70,8 +70,6 @@ class Optimizer:
             logger.info(f"optimization steps number: {len(cfgs)}")
 
             cfgs = [(i, cfg) for i, cfg in enumerate(cfgs)]
-            # for cfg in cfgs:
-            #       self.backtest_process(cfg)
             p = Pool(ncpu)
             p.map(self.backtest_process, cfgs)
       
@@ -92,6 +90,9 @@ class Optimizer:
                   btests.append(btest)
                   print(p)
 
+            start_dates = set([btest.date_start for btest in btests])
+            assert len(start_dates) == 1, f"Даты прогонов разные, скорее всего нужно сдвинуть вправо дату начала тестов в конф. файле оптимизации минимум до {date2str(max(start_dates))}"
+                  
             opt_summary = defaultdict(list)
             cfg_keys = list(cfgs[0].keys())
             cfg_keys.remove("no_trading_days")
@@ -99,6 +100,7 @@ class Optimizer:
                   for cfg in cfgs:
                         v = cfg[k]
                         opt_summary[k].append(v)
+                        
             # Remove lines with attributes consists of one elment (except ticker field)                
             for k in list(opt_summary.keys()):
                   if k == "ticker":
@@ -123,7 +125,7 @@ class Optimizer:
             for ticker in set(opt_summary.ticker):
                   opt_summary_for_ticker = opt_summary[opt_summary.ticker == ticker]
                   top_runs_ids.append(opt_summary_for_ticker.index[0])
-                  sum_daily_profit += btests[top_runs_ids[-1]].daily_hist.profit_csum
+                  sum_daily_profit += btests[top_runs_ids[-1]].daily_hist["profit_csum"]
                   logger.info(f"\n{opt_summary_for_ticker.head(10)}\n")
                   pd.DataFrame(btests[top_runs_ids[-1]].daily_hist.profit_csum).to_csv(f"optimization/{ticker}.{optim_cfg['period'][0].value}.top_{self.sortby}_sorted.csv", index=False)
                   

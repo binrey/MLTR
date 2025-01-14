@@ -6,8 +6,8 @@ from experts.tunnel import ClsTunnel
 config = dict(
     wallet=50,
     leverage=1,
-    date_start="2024-01-01T00:00:00",
-    date_end="2024-11-01",
+    date_start="2000-01-01T00:00:00",
+    date_end="2024-12-01",
     no_trading_days=set(),
     trailing_stop_rate=0.004,
     decision_maker=dict(
@@ -29,9 +29,9 @@ config = dict(
     fee_rate=FeeRate(0.1, 0.00016),
     save_backup=False,
     save_plots=False,
-    vis_events=Vis.ON_DEAL,
+    vis_events=Vis.ON_STEP,
     vis_hist_length=256,
-    visualize=False,
+    visualize=True,
     eval_buyhold=False,
     run_model_device=None,
 )

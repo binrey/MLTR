@@ -118,14 +118,14 @@ class Broker:
                             indx=self.active_position.open_indx, 
                             time=self.active_position.open_date))
 
-        if self.active_position is not None and self.active_position.tp is not None:
-            self.active_orders.append(Order(
-                            price=self.active_position.tp, 
-                            side=Side.reverse(self.active_position.side), 
-                            type=ORDER_TYPE.STOPLOSS,
-                            volume=self.active_position.volume,
-                            indx=self.active_position.open_indx, 
-                            time=self.active_position.open_date))
+        # if self.active_position is not None and self.active_position.tp is not None:
+        #     self.active_orders.append(Order(
+        #                     price=self.active_position.tp, 
+        #                     side=Side.reverse(self.active_position.side), 
+        #                     type=ORDER_TYPE.LIMIT,
+        #                     volume=self.active_position.volume,
+        #                     indx=self.active_position.open_indx, 
+        #                     time=self.active_position.open_date))
             
         for i, order in enumerate(self.active_orders):
             triggered_price: float = None
@@ -148,7 +148,7 @@ class Broker:
                     last_high < order.price and self.open_price > order.price
                 ):
                     logger.debug(
-                        f"process order {order.id}, and change price to O:{self.open_price}"
+                        f"process order {order.id}, and set price to {self.open_price}"
                     )
                     triggered_price = self.open_price
                     triggered_side = order.side

@@ -20,10 +20,10 @@ def run_backtest(config_path):
     backtest_launch(cfg)
     
 
-def run_optimization(config_path):
+def run_optimization(config_path, run_backtests):
     cfg = PyConfig(config_path).get_optimization()
     opt = Optimizer()
-    opt.optimize(cfg, run_backtests=True)
+    opt.optimize(cfg, run_backtests=run_backtests)
     
     
 def run_bybit(config_path):
@@ -46,6 +46,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("config_path", type=str, help="Path to the configuration file")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("--run_backtests", action="store_true", help="run backtests or use previous, default true")
     args = parser.parse_args()
 
     run_type = RunType.from_str(args.run_type)
@@ -63,6 +64,6 @@ if __name__ == "__main__":
     if run_type == RunType.BYBIT:
         run_bybit(args.config_path)
     if run_type == RunType.OPTIMIZE:
-        run_optimization(args.config_path)
+        run_optimization(args.config_path, args.run_backtests)
     elif run_type == RunType.BACKTEST:
         run_backtest(args.config_path)
