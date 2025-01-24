@@ -1,13 +1,18 @@
 from common.type import TimePeriod
-from configs.tunnel import Param, config
+from common.utils import update_config
+from configs.tunnel import config
 
-config.ticker.test = "ETHUSDT"
-config.ticksize.test = 0.01
+updates = {
+    "ticker": "BTCUSDT",
+    "equaty_step": 0.001,
+    "wallet": 100,
+    "leverage": 1,
+    "trailing_stop_rate": 0.005,
+    "hist_buffer_size": 64,
+    "period": TimePeriod.M60,
+    "decision_maker": {
+        "ncross": 4
+    }
+}
 
-config.wallet.test = 30
-config.leverage.test = 1
-
-config.body_classifier.test.params.ncross.test = 4
-config.trailing_stop_rate.test = 0.1
-config.hist_buffer_size.test = 32
-config.period.test = TimePeriod.M5
+update_config(config, updates)

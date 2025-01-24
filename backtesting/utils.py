@@ -81,7 +81,7 @@ class BackTestResults:
 
         return hist
         
-    def compute_buy_and_hold(self, dates: np.ndarray, closes: np.ndarray, fuse=False):
+    def compute_buy_and_hold(self, dates: np.ndarray, closes: np.ndarray):
         """
         Compute buy and hold strategy for the given dates and closes prices. Use self.resample_hist method to resample data to monthly frequency.
         
@@ -105,6 +105,23 @@ class BackTestResults:
         self.monthly_hist["buy_and_hold"] = (df["dp"]*self.monthly_hist["buy_and_hold_volume"]).cumsum()
         self.monthly_hist["buy_and_spend_volume"] = self.wallet/self.monthly_hist["price"]*self.leverage
         self.monthly_hist["buy_and_spend"] = (df["dp"]*self.monthly_hist["buy_and_spend_volume"]).cumsum()
+        return perf_counter() - t0
+
+    def compute_buy_and_hold_D(self, dates: np.ndarray, closes: np.ndarray):
+        """
+        Compute buy and hold strategy for the given dates and closes prices. Use self.resample_hist method to resample data to monthly frequency.
+        
+        Output pandas DataFrame with index "dates" and columns: "profits", "buy_and_hold", "buy_and_hold_reinvest".
+        dates - dates of first day of every month.
+        profits - profits from the strategy on every month.
+        buy_and_hold - Buy at the first day and sell on the last. 
+        """
+        t0 = perf_counter()
+        # create datafreame from closes and dates as index
+        df = pd.DataFrame({"price": closes}, index=dates)
+        close_prices = df.resample("D").last()["price"]
+        self.daily_hist["buy_and_hold"] = close_prices * self.wallet/closes[0]
+        self.daily_hist["buy_and_hold"].iloc[-1] = self.daily_hist["buy_and_hold"].iloc[-2]
         return perf_counter() - t0
 
     def process_daily_metrics(self):
@@ -165,11 +182,11 @@ class BackTestResults:
 
         
         # Create a secondary y-axis for buy_and_hold_reinvest
-        if "buy_and_hold" in self.monthly_hist.columns:
+        if "buy_and_hold" in self.daily_hist.columns:
             # ax1 = ax1.twinx()
             ax1.plot(
-                self.monthly_hist.index,
-                self.monthly_hist["buy_and_hold"],
+                self.daily_hist.index,
+                self.daily_hist["buy_and_hold"],
                 linewidth=2,
                 color="g",
                 alpha=0.6,

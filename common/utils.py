@@ -61,17 +61,26 @@ class PyConfig():
         cfg = deepcopy(self.optim)
         for k, vlist in cfg.items():
             vlist_new = []
-            if type(vlist) is list:
+            # If it's already a list of possible values...
+            if isinstance(vlist, list):
                 for v in vlist:
-                    if type(v) is EasyDict and "func" in v.keys():
-                        v.params = {pk: pv for pk, pv in v.params.items()}
-                        # v.func = partial(v.func, cfg=params)
+                    # If it’s something that has "func" and "params" (like your custom expansions)...
+                    if isinstance(v, EasyDict) and "func" in v:
+                        # Expand the params
                         params_list = self.unroll_params(v.params)
-                        vlist_new += [EasyDict(func=v.func(params)) for params in params_list]
+                        # For each params combination, make a *copy* so we don’t lose anything
+                        for params in params_list:
+                            new_v = deepcopy(v)
+                            new_v.params = params
+                            # Or if you used new_v.func = ...
+                            # or any extra field that must remain, e.g. new_v.type
+                            vlist_new.append(new_v)
                     else:
+                        # Otherwise just keep it as is
                         vlist_new.append(v)
                 cfg[k] = vlist_new
             else:
+                # If not a list, wrap it in one so we have a single "variant"
                 cfg[k] = [vlist]
         return cfg
     
