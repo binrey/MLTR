@@ -38,6 +38,51 @@ def plot_daily_balances_with_av(btests: List[BackTestResults], test_ids: List[in
       plt.grid("on")        
       plt.tight_layout()
                   
+
+def collect_config_combinations(config):
+      """
+      Recursively enumerates all possible parameter combinations in `config`,
+      where each key can hold either:
+            - A single value
+            - A list of values
+            - A nested dictionary following the same pattern
+      
+      Returns:
+            A list of fully expanded configuration dictionaries (the Cartesian 
+            product of all possible paths through nested lists/dictionaries).
+      """
+      # Base case: if config is not a dict, it is a single leaf-value
+      if not isinstance(config, dict):
+            return [config]
+
+      # For each key in the dict, get all expanded possibilities (list of expansions)
+      expanded_subconfigs = {}  # key -> list of expanded variants
+      for key, value in config.items():
+            # If value is a list, expand each element of that list
+            if isinstance(value, list):
+                  all_expanded_for_key = []
+                  for item in value:
+                        all_expanded_for_key.extend(collect_config_combinations(item))
+                  expanded_subconfigs[key] = all_expanded_for_key
+            # If value is a dictionary or a single value, expand it directly
+            else:
+                  expanded_subconfigs[key] = collect_config_combinations(value)
+
+      # Now do a Cartesian product across all keys to get final expansions
+      all_keys = list(expanded_subconfigs.keys())
+      list_of_expanded_lists = [expanded_subconfigs[k] for k in all_keys]
+
+      all_combinations = []
+      for combo in itertools.product(*list_of_expanded_lists):
+            # combo is a tuple with one expanded item per key
+            # Merge them into a single config dictionary
+            cfg_variant = {}
+            for i, item in enumerate(combo):
+                  cfg_variant[all_keys[i]] = item
+            all_combinations.append(cfg_variant)
+
+      return all_combinations
+           
                   
 class Optimizer:
       def __init__(self):
@@ -65,13 +110,14 @@ class Optimizer:
             ncpu = multiprocessing.cpu_count()
             logger.info(f"Number of cpu : {ncpu}")
 
-            keys, values = zip(*optim_cfg.items())
-            cfgs = [dict(zip(keys, copy(v))) for v in itertools.product(*values)]
+            cfgs = collect_config_combinations(optim_cfg)
             logger.info(f"optimization steps number: {len(cfgs)}")
 
             cfgs = [(i, cfg) for i, cfg in enumerate(cfgs)]
             p = Pool(ncpu)
             p.map(self.backtest_process, cfgs)
+            # for cfg in cfgs:
+            #       self.backtest_process(cfg)
       
       
       def optimize(self, optim_cfg, run_backtests=True):
@@ -99,7 +145,17 @@ class Optimizer:
             for k in cfg_keys:
                   for cfg in cfgs:
                         v = cfg[k]
-                        opt_summary[k].append(v)
+                        if isinstance(v, dict):
+                              description = []
+                              for kk, vv in v.items():
+                                    if kk == "type":
+                                          description.append(f"{vv.__name__}")
+                                    else:
+                                          description.append(f"{kk}:{vv}")
+                                    
+                              opt_summary[k].append("|".join(description))
+                        else:
+                              opt_summary[k].append(v)
                         
             # Remove lines with attributes consists of one elment (except ticker field)                
             for k in list(opt_summary.keys()):

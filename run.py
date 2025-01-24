@@ -28,9 +28,9 @@ def run_optimization(config_path, run_backtests):
     
 def run_bybit(config_path):
     cfg = PyConfig(config_path).get_inference()
-    cfg.save_backup = True
-    cfg.save_plots = False
-    cfg.visualize = False
+    cfg["save_backup"] = True
+    cfg["save_plots"] = False
+    cfg["visualize"] = False
     bybit_launch(cfg)
     
 
