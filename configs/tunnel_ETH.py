@@ -4,11 +4,11 @@ from configs.tunnel import config
 
 updates = {
     "ticker": "ETHUSDT",
-    "ticksize": 0.01,
+    "equaty_step": 0.01,
     "wallet": 100,
-    "leverage": 10,
+    "leverage": 4,
     "trailing_stop_rate": 0.003,
-    "hist_buffer_size": 32,
+    "hist_buffer_size": 48,
     "period": TimePeriod.M60,
     "decision_maker": {
         "ncross": 4

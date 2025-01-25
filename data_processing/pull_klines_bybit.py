@@ -76,12 +76,12 @@ class BybitDownloader:
 
 
 if __name__ == "__main__":
-    symbol = "ETHUSDT"
-    period = 5
+    symbol = "XRPUSDT"
+    period = 15
     init_data = f"/Users/andrybin/Yandex.Disk.localized/fin_data/bybit/M{period}/{symbol}.csv"
     bb_loader = BybitDownloader(symbol=symbol, 
                                 period=period, 
-                                start_date="2024-10-01",
+                                start_date="2024-01-01",
                                 init_data=init_data)
     
     h = bb_loader.get_history()

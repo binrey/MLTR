@@ -75,8 +75,6 @@ class TPFromSL(StopsController):
     
 def fix_rate_trailing_sl(sl:float,
                        open_price: float,
-                       side: Side,
-                       trailing_stop_rate:float,
-                       ticksize: float) -> float:
+                       trailing_stop_rate:float) -> float:
     sl_new = float(sl + trailing_stop_rate*(open_price - sl))
     return sl_new

@@ -99,7 +99,7 @@ class Optimizer:
                         break
                   # cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
                   locnum += 1
-                  pickle.dump((cfg, btest), open(str(self.data_path / f"btest.{num + locnum/100:05.2f}.{cfg['ticker']}.pickle"), "wb"))
+                  pickle.dump((cfg, btest), open(str(self.data_path / f"btest.{num + locnum/100:05.2f}.{cfg['ticker'].ticker}.pickle"), "wb"))
                   break
 
 
@@ -173,12 +173,13 @@ class Optimizer:
                   opt_summary["maxwait"].append(btest.metrics["maxwait"])
             
             opt_summary = pd.DataFrame(opt_summary)
+            opt_summary["symbol"] = opt_summary["symbol"].apply(lambda x: x.ticker)
             opt_summary.sort_values(by=["APR"], ascending=False, inplace=True)
             
             # Individual tests results
             top_runs_ids = []
             sum_daily_profit = 0
-            for ticker in set(opt_summary.ticker):
+            for ticker in set(opt_summary["symbol"]):
                   opt_summary_for_ticker = opt_summary[opt_summary.ticker == ticker]
                   top_runs_ids.append(opt_summary_for_ticker.index[0])
                   sum_daily_profit += btests[top_runs_ids[-1]].daily_hist["profit_csum"]
@@ -207,7 +208,7 @@ class Optimizer:
                               exphash += str(opt_summary[col].iloc[i]) + " "
                   opt_res["test_ids"].append(f".{opt_summary.index[i]}")
                   opt_res["param_set"].append(exphash)
-                  opt_res["ticker"].append(f".{opt_summary.ticker.iloc[i]}")
+                  opt_res["symbol"].append(f".{opt_summary.ticker.iloc[i]}")
                   opt_res["ndeals"].append(opt_summary.ndeals.iloc[i])
                   opt_res["final_balance"].append(opt_summary.APR.iloc[i])
 

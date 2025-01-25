@@ -4,7 +4,7 @@ from configs.tunnel import config
 
 updates = {
     "ticker": "BTCUSDT",
-    "ticksize": 0.001,
+    "equaty_step": 0.001,
     "wallet": 100,
     "leverage": 1,
     "trailing_stop_rate": 0.005,

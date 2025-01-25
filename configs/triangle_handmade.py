@@ -1,5 +1,5 @@
-from configs.library import *
 from common.utils import FeeRate
+from configs.library import *
 
 classifier = body_classifiers.custom
 classifier.params.source_file = Param("data/test.csv", ["data/test.csv"])
@@ -23,7 +23,7 @@ config = EasyDict(
     stops_processor=Param(stops_processor, [stops_processor]),
     wait_entry_point=Param(999, [999]),
     hist_buffer_size=Param(128, [8]),
-    ticksize=Param(0.001, [0.001]),
+    equaty_step=Param(0.001, [0.001]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
     period=Param("D", ["D"]),

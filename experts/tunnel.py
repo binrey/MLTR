@@ -5,6 +5,9 @@ from experts.base import DecisionMaker
 class ClsTunnel(DecisionMaker):
     type = "tunnel"
     
+    def __str__(cls):
+        return cls.type
+    
     def __init__(self, cfg):
         super(ClsTunnel, self).__init__(cfg)
 

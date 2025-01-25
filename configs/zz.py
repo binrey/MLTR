@@ -1,5 +1,5 @@
-from configs.library import *
 from common.utils import FeeRate
+from configs.library import *
 
 classifier = body_classifiers.zigzag
 classifier.params.feature_size = Param(1, [3, 5, 8, 12])
@@ -31,7 +31,7 @@ config = EasyDict(
 
     period=Param("M60", ["M60"]),
     ticker=Param("BTCUSDT", ["BTCUSDT", "ETHUSDT"]),
-    ticksize=Param(0.001, [0.001]),
+    equaty_step=Param(0.001, [0.001]),
     data_type=Param("metatrader", ["bybit"]),
     
     add_tickers_to_train=Param([], [None]),

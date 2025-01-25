@@ -55,14 +55,20 @@ class BybitTrading(BaseTradeClass):
     
     def get_pos_history(self, limit=5):
         positions = self.session.get_closed_pnl(category="linear", limit=limit)["result"]["list"]
-        positions = [self._build_position(pos) for pos in positions if pos["symbol"] == self.cfg.ticker]
+        positions = [self._build_position(pos) for pos in positions if pos["symbol"] == self.ticker]
         return positions
 
     def get_current_position(self):
-            # self.open_orders = self.session.get_open_orders(category="linear", symbol=self.cfg.ticker)["result"]["list"]
-            positions = self.session.get_positions(category="linear", symbol=self.cfg.ticker)["result"]["list"]
+            positions = self.session.get_positions(category="linear", symbol=self.ticker)["result"]["list"]
             positions = [pos for pos in positions if pos["size"] != "0"]
             return self._build_position(positions[0]) if len(positions) else None
+                
+    def get_qty_step(self):
+        msg = self.session.get_instruments_info(
+            category="linear",
+            symbol=self.ticker,
+        )["result"]
+        return float(msg["list"][0]["lotSizeFilter"]["qtyStep"])
                 
     def _build_position(self, pos: Dict[str, Any]):
         if "avgEntryPrice" in pos.keys():
@@ -95,7 +101,7 @@ class BybitTrading(BaseTradeClass):
             logger.info(f"request history data for {t}...")
             message = self.session.get_kline(
                 category="linear",
-                symbol=self.cfg.ticker,
+                symbol=self.ticker,
                 interval=str(self.cfg.period.minutes),
                 start=0,
                 end=t.astype("datetime64[ms]").astype(int),
@@ -103,37 +109,6 @@ class BybitTrading(BaseTradeClass):
             )
             data = get_bybit_hist(message["result"], self.cfg.hist_buffer_size)
         return data
-        
-
-def launch_old(cfg, demo=False):
-    with open("./api.yaml", "r") as f:
-        creds = yaml.safe_load(f)
-    if demo:
-        creds["api_secret"] = creds["api_secret_demo"]
-        creds["api_key"] = creds["api_key_demo"]
-    
-    bybit_session = HTTP(testnet=False, api_key=creds["api_key"], api_secret=creds["api_secret"])
-    bybit_trading = BybitTrading(cfg=cfg, 
-                                 expert=ByBitExpert(cfg, bybit_session), 
-                                 telebot=Telebot(creds["bot_token"]), 
-                                 bybit_session=bybit_session)
-    bybit_trading.test_connection()    
-    public = WebSocket(channel_type='linear', testnet=False)
-    public.trade_stream(symbol=cfg.ticker, callback=bybit_trading.handle_trade_message)
-    
-    print()
-    while True:
-        sleep(5)
-        if not public.is_connected():
-            logger.warning("connection lost! try to reconnect...")
-            public.exit()
-            public = WebSocket(channel_type='linear', testnet=False)
-            public.trade_stream(symbol=cfg.ticker, callback=bybit_trading.handle_trade_message)
-            sleep(1)
-            msg = f"connection was lost... websocket.is_connected = {public.is_connected()}\n"
-            logger.warning(msg)
-            if bybit_trading.my_telebot is not None:
-                bybit_trading.my_telebot.send_text(msg)
     
 
 def launch(cfg, demo=False):

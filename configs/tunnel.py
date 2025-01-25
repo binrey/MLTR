@@ -1,42 +1,50 @@
-from common.type import TimePeriod, Vis
+from copy import deepcopy
+
+from common.type import Symbols, TimePeriod, Vis
 from common.utils import FeeRate
-from experts.position_control import SLDynamic
+from experts.position_control import SLDynamic, SLFixed, TPFromSL
 from experts.tunnel import ClsTunnel
 
 config = dict(
-    wallet=50,
-    leverage=1,
-    date_start="2000-01-01T00:00:00",
-    date_end="2024-12-01",
+    wallet=100,
+    leverage=3,
+    date_start="2017-09-01T00:00:00",
+    date_end="2025-01-01",
     no_trading_days=set(),
-    trailing_stop_rate=0.004,
+    trailing_stop_rate=0.002,
     decision_maker=dict(
         type=ClsTunnel,
-        ncross=3
+        ncross=7
     ),
     allow_overturn=False,
     sl_processor=dict(
         type=SLDynamic,
         active=True
     ),
+    tp_processor=dict(
+        type=TPFromSL,
+        active=False,
+        scale=0
+    ),
     hist_buffer_size=64,
     tstart=0,
     tend=None,
-    period=TimePeriod.M60,
-    ticker="ETHUSDT",
-    ticksize=0.01,
+    period=TimePeriod.M15,
+    symbol=Symbols.BTCUSDT.value,
     data_type="bybit",
     fee_rate=FeeRate(0.1, 0.00016),
     save_backup=False,
     save_plots=False,
-    vis_events=Vis.ON_STEP,
+    vis_events=Vis.ON_DEAL,
     vis_hist_length=256,
-    visualize=True,
-    eval_buyhold=False,
+    visualize=False,
+    eval_buyhold=True,
     run_model_device=None,
 )
 
-optimization = config.copy()
-optimization.update(dict(
-    hist_buffer_size=[32, 64]
-))
+optimization = deepcopy(config)
+optimization["hist_buffer_size"] = [64]
+optimization["trailing_stop_rate"] = [0.002]
+optimization["decision_maker"]["ncross"] = [4, 5, 7, 9]
+optimization["symbol"] = [Symbols.BTCUSDT.value, 
+                          Symbols.ETHUSDT.value]

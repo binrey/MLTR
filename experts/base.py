@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from typing import Any, Callable, Optional
 
 import pandas as pd
@@ -8,8 +9,11 @@ from loguru import logger
 from backtesting.backtest_broker import Position
 from common.type import Line, Side
 
+# from experts.position_control import StopsController
+
 
 def init_target_from_cfg(cfg):
+    cfg = deepcopy(cfg)
     Target = cfg.pop("type")
     return Target(cfg)
 
@@ -17,10 +21,12 @@ class ExpertBase(ABC):
     def __init__(self, cfg):
         self.cfg = cfg
         self.decision_maker: DecisionMaker = init_target_from_cfg(cfg["decision_maker"])
+        assert "sl_processor" in cfg, "sl_processor must be defined in cfg"
         self.sl_processor = init_target_from_cfg(cfg["sl_processor"])
         self.sl_processor.set_expert(self)
         self.sl = None
-        self.tp_processor = init_target_from_cfg(cfg["tp_processor"])
+        assert "tp_processor" in cfg, "tp_processor must be defined in cfg"
+        self.tp_processor = init_target_from_cfg(cfg.get("tp_processor", None))
         self.tp_processor.set_expert(self)
         self.tp = None
         self.orders = []
@@ -48,6 +54,7 @@ class DecisionMaker(ABC):
         self.sl_definer = {Side.BUY: None, Side.SELL: None}
         self.tp_definer = {Side.BUY: None, Side.SELL: None}
         self.lprice, self.sprice, self.cprice, self.tsignal = None, None, None, None
+        self.indicator_vis_objects = None
         self.vis_items = []
         self.indicator = self.setup_indicator(cfg)
              
@@ -65,7 +72,8 @@ class DecisionMaker(ABC):
             lines.append(Line([(pd.to_datetime(self.tsignal), self.lprice), (None, self.lprice)], color="green"))
         if self.sprice is not None:
             lines.append(Line([(pd.to_datetime(self.tsignal), self.sprice), (None, self.sprice)], color="red"))
-        lines += self.indicator.vis_objects
+        if self.indicator_vis_objects is not None:
+            lines += self.indicator_vis_objects
         return lines
       
     @abstractmethod

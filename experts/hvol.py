@@ -22,18 +22,19 @@ class HVOL(DecisionMaker):
         if self.trigger_width <= max_vol_id < len(self.indicator.vol_hist) - self.trigger_width:
             if self.indicator.vol_hist[max_vol_id] / self.indicator.vol_hist.mean() > self.cfg["sharpness"]:
                 bin_width = self.indicator.price_bins[1] - self.indicator.price_bins[0] 
-                lprice = self.indicator.price_bins[max_vol_id+self.trigger_width]+bin_width/2
-                sprice = self.indicator.price_bins[max_vol_id-self.trigger_width]+bin_width/2
+                lprice = self.indicator.price_bins[max_vol_id+self.trigger_width] + bin_width/2
+                sprice = self.indicator.price_bins[max_vol_id-self.trigger_width] + bin_width/2
                 if sprice < h["Open"][-1] < lprice:
                     flag = True
         
         # lprice, sprice = None, None
         if flag:
-            self.lprice = sprice
-            self.sprice = lprice
+            self.lprice = lprice
+            self.sprice = sprice
             self.tsignal = None#h["Date"][-2]
             self.sl_definer[Side.BUY] = h["Low"].min()
             self.sl_definer[Side.SELL] = h["High"].max()
+            self.indicator_vis_objects = self.indicator.vis_objects
         return flag
     
     def setup_sl(self, side: Side):

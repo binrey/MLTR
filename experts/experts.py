@@ -46,7 +46,7 @@ class ExpertFormation(ExpertBase):
         return volume
     
     def normalize_volume(self, volume):
-        return round(volume/self.cfg["ticksize"], 0)*self.cfg["ticksize"]
+        return round(volume/self.cfg["symbol"].qty_step, 0)*self.cfg["symbol"].qty_step
             
     def create_or_update_sl(self, h):
         if self.active_position is not None:
@@ -56,9 +56,7 @@ class ExpertFormation(ExpertBase):
             else:
                 sl_new = fix_rate_trailing_sl(sl=self.active_position.sl, 
                                               open_price=h["Open"][-1],
-                                              side=self.active_position.side,
-                                              trailing_stop_rate=self.cfg["trailing_stop_rate"], 
-                                              ticksize=self.cfg["ticksize"])
+                                              trailing_stop_rate=self.cfg["trailing_stop_rate"])
                 self.modify_sl(sl_new)                
 
     def create_or_update_tp(self, h):
@@ -157,7 +155,7 @@ class ByBitExpert(ExpertFormation):
         try:
             resp = self.session.place_order(
                 category="linear",
-                symbol=self.cfg["ticker"],
+                symbol=self.cfg["symbol"].ticker,
                 side=side.name.capitalize(),
                 orderType="Market",
                 qty=volume,
@@ -177,7 +175,7 @@ class ByBitExpert(ExpertFormation):
         try:
             resp = self.session.set_trading_stop(
                 category="linear",
-                symbol=self.cfg["ticker"],
+                symbol=self.cfg["symbol"].ticker,
                 stopLoss=sl,
                 slTriggerB="IndexPrice",
                 positionIdx=0,

@@ -97,7 +97,7 @@ class DataParser():
             database = os.environ.get("FINDATA", "../fin_data")
         t0 = perf_counter()
         p = Path(database) / self.cfg["data_type"] / self.cfg["period"].value
-        flist = [f for f in p.glob("*") if self.cfg["ticker"] in f.stem]
+        flist = [f for f in p.glob("*") if self.cfg["symbol"].ticker in f.stem]
         if len(flist):
             fpath = flist[np.argmin([len(f.name) for f in flist])]
             data = {"metatrader": self.metatrader,
@@ -109,7 +109,7 @@ class DataParser():
             logger.info(f"Loaded {self.cfg['data_type']} data from {fpath} in {perf_counter() - t0:.1f} sec")
             return data
         else:
-            raise FileNotFoundError(f"No data for {self.cfg['ticker']} in {p}")
+            raise FileNotFoundError(f"No data for {self.cfg['ticker'].ticker} in {p}")
     
     def bybit(self, data_file):
         pd.options.mode.chained_assignment = None
@@ -240,7 +240,7 @@ class MovingWindow():
         self.date_start = np.datetime64(cfg["date_start"])
         self.date_end = np.datetime64(cfg["date_end"])
         self.size = cfg["hist_buffer_size"]
-        self.ticker = cfg["ticker"]
+        self.ticker = cfg["symbol"].ticker
 
         self.id2start = self.find_nearest_date_indx(
             self.hist["Date"], self.date_start)

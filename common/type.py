@@ -87,4 +87,15 @@ class TimeVolumeProfile:
     def __post_init__(self):
         if type(self.time) is np.datetime64:
             self.time = pd.to_datetime(self.time.astype("datetime64[m]"))
+
+@dataclass
+class Symbol:
+    ticker: str = None
+    tick_size: float = None
+    qty_step: float = None
     
+    
+class Symbols(Enum):
+    BTCUSDT = Symbol(ticker="BTCUSDT", tick_size=0.001, qty_step=0.001)
+    ETHUSDT = Symbol(ticker="ETHUSDT", tick_size=0.01, qty_step=0.01)
+    XRPUSDT = Symbol(ticker="XRPUSDT", tick_size=0.0001, qty_step=1)

@@ -67,7 +67,7 @@ class BaseTradeClass(ABC):
         self.h, self.time = None, StepData()
         self.pos: StepData[Position] = StepData()
      
-        self.save_path = Path("real_trading") / f"{self.cfg['ticker']}-{self.cfg['period'].value}"
+        self.save_path = Path("real_trading") / f"{self.cfg['ticker'].ticker}-{self.cfg['period'].value}"
         self.backup_path = self.save_path / "backup.pkl"
         self.visualizer = Visualizer(period=self.cfg['period'], 
                                      show=self.cfg['visualize'], 
@@ -84,6 +84,10 @@ class BaseTradeClass(ABC):
 
     @abstractmethod
     def get_current_position(self) -> Position:
+        pass
+    
+    @abstractmethod
+    def get_qty_step(self) -> float:
         pass
     
     @abstractmethod

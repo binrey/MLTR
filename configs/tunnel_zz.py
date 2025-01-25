@@ -1,5 +1,5 @@
-from configs.library import *
 from common.utils import FeeRate
+from configs.library import *
 
 classifier = body_classifiers.tunzigzag
 classifier.params.ncross = Param(5, [3, 5, 8, 12])
@@ -32,7 +32,7 @@ config = EasyDict(
     
     period=Param("M60", ["M60"]),
     ticker=Param("BTCUSDT", ["BTCUSDT"]),
-    ticksize=Param(0.001, [0.001]),
+    equaty_step=Param(0.001, [0.001]),
     data_type=Param("metatrader", ["metatrader"]),
     
     save_plots=Param(False, [False]),

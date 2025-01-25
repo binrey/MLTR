@@ -197,7 +197,7 @@ class Broker:
                         side=triggered_side,
                         date=triggered_date,
                         indx=triggered_id,
-                        ticker=self.cfg['ticker'],
+                        ticker=self.cfg["symbol"].ticker,
                         volume=triggered_vol,
                         period=self.cfg['period'],
                         fee_rate=self.cfg['fee_rate'],
