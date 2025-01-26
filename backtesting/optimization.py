@@ -99,7 +99,7 @@ class Optimizer:
                         break
                   # cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
                   locnum += 1
-                  pickle.dump((cfg, btest), open(str(self.data_path / f"btest.{num + locnum/100:05.2f}.{cfg['ticker'].ticker}.pickle"), "wb"))
+                  pickle.dump((cfg, btest), open(str(self.data_path / f"btest.{num + locnum/100:05.2f}.{cfg['symbol'].ticker}.pickle"), "wb"))
                   break
 
 

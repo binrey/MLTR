@@ -1,5 +1,5 @@
 from common.type import Side
-from experts.base import DecisionMaker
+from experts.core.expert import DecisionMaker
 
 
 class ClsTunnel(DecisionMaker):

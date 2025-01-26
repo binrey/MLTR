@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from experts.base import DecisionMaker
+from experts.core.expert import DecisionMaker
 
 
 class FileReader(DecisionMaker):

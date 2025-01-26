@@ -9,7 +9,7 @@ import pandas as pd
 from loguru import logger
 from matplotlib import pyplot as plt
 
-from experts.base import ExpertBase
+from experts.core.expert import ExpertBase
 
 matplotlib.use('agg')
 

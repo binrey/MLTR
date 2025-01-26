@@ -109,7 +109,7 @@ class DataParser():
             logger.info(f"Loaded {self.cfg['data_type']} data from {fpath} in {perf_counter() - t0:.1f} sec")
             return data
         else:
-            raise FileNotFoundError(f"No data for {self.cfg['ticker'].ticker} in {p}")
+            raise FileNotFoundError(f"No data for {self.cfg['symbol'].ticker} in {p}")
     
     def bybit(self, data_file):
         pd.options.mode.chained_assignment = None

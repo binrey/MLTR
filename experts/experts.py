@@ -5,7 +5,7 @@ from loguru import logger
 # import torch
 from backtesting.backtest_broker import Broker, Order
 from common.type import Side
-from experts.base import ExpertBase
+from experts.core.expert import ExpertBase
 from experts.position_control import fix_rate_trailing_sl
 from indicators import *
 from trade.utils import ORDER_TYPE
@@ -51,18 +51,22 @@ class ExpertFormation(ExpertBase):
     def create_or_update_sl(self, h):
         if self.active_position is not None:
             if self.active_position.sl is None:
-                sl = self.sl_processor(h)
+                sl = self.sl_processor.create(hist=h,
+                                              active_position=self.active_position,
+                                              decision_maker=self.decision_maker)
                 self.modify_sl(sl)
             else:
                 sl_new = fix_rate_trailing_sl(sl=self.active_position.sl, 
                                               open_price=h["Open"][-1],
-                                              trailing_stop_rate=self.cfg["trailing_stop_rate"])
+                                              trailing_stop_rate=self.cfg["trailing_stop"]["trailing_stop_rate"])
                 self.modify_sl(sl_new)                
 
     def create_or_update_tp(self, h):
         if self.active_position is not None:
             if self.active_position.tp is None:
-                tp = self.tp_processor(h)
+                tp = self.tp_processor.create(hist=h,
+                                              active_position=self.active_position,
+                                              decision_maker=self.decision_maker)
                 self.modify_tp(tp)
 
     def get_body(self, h):

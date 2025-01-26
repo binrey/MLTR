@@ -9,7 +9,7 @@ from loguru import logger
 
 from common.type import Vis
 from common.visualization import Visualizer
-from experts.base import ExpertBase
+from experts.core.expert import ExpertBase
 from trade.utils import Position
 
 pd.options.mode.chained_assignment = None
@@ -67,7 +67,7 @@ class BaseTradeClass(ABC):
         self.h, self.time = None, StepData()
         self.pos: StepData[Position] = StepData()
      
-        self.save_path = Path("real_trading") / f"{self.cfg['ticker'].ticker}-{self.cfg['period'].value}"
+        self.save_path = Path("real_trading") / f"{self.cfg['symbol'].ticker}-{self.cfg['period'].value}"
         self.backup_path = self.save_path / "backup.pkl"
         self.visualizer = Visualizer(period=self.cfg['period'], 
                                      show=self.cfg['visualize'], 

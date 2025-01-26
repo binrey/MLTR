@@ -55,7 +55,7 @@ def launch(cfg):
         creds = yaml.safe_load(f)
 
     if cfg["save_plots"]:
-        save_path = Path("backtests") / f"{cfg['ticker'].ticker}"
+        save_path = Path("backtests") / f"{cfg['symbol'].ticker}"
         if save_path.exists():
             rmtree(save_path)
         save_path.mkdir(parents=True)
@@ -84,7 +84,7 @@ def launch(cfg):
     sformat = lambda nd: "{:>30}: {:>5.@f}".replace("@", str(nd))
     
     logger.info(
-        f"{cfg['ticker'].ticker}-{cfg['period']}: {backtest_trading.exp} sl-rate={cfg['trailing_stop_rate']}"
+        f"{cfg['symbol'].ticker}-{cfg['period']}: {backtest_trading.exp}"
     )
 
     logger.info(sformat(1).format("total backtest", ttotal) + " sec")

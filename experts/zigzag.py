@@ -2,7 +2,7 @@ from pathlib import Path
 
 import torch
 
-from .base import *
+from .core.expert import *
 
 
 class ClsZigZag(DecisionMaker):
