@@ -2,7 +2,7 @@ from copy import deepcopy
 
 from common.type import Symbols, TimePeriod, Vis
 from common.utils import FeeRate
-from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop, TrailingStopStrategy
+from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
 from experts.tunnel import ClsTunnel
 
 config = dict(
@@ -33,8 +33,8 @@ config = dict(
     hist_buffer_size=32,
     tstart=0,
     tend=None,
-    period=TimePeriod.M60,
-    symbol=Symbols.BTCUSDT.value,
+    period=TimePeriod.M15,
+    symbol=Symbols.SOLUSDT.value,
     data_type="bybit",
     fee_rate=FeeRate(0.1, 0.00016),
     save_backup=False,
@@ -49,8 +49,8 @@ config = dict(
 )
 
 optimization = deepcopy(config)
-optimization["hist_buffer_size"] = [64]
-optimization["trailing_stop_rate"] = [0.002]
+optimization["trailing_stop"]["trailing_stop_rate"] = [1]
+optimization["hist_buffer_size"] = [16, 32, 64]
 optimization["decision_maker"]["ncross"] = [4, 5, 7, 9]
 optimization["symbol"] = [Symbols.BTCUSDT.value, 
                           Symbols.ETHUSDT.value]

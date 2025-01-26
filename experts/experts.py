@@ -6,7 +6,6 @@ from loguru import logger
 from backtesting.backtest_broker import Broker, Order
 from common.type import Side
 from experts.core.expert import ExpertBase
-from experts.position_control import fix_rate_trailing_sl
 from indicators import *
 from trade.utils import ORDER_TYPE
 
@@ -56,9 +55,7 @@ class ExpertFormation(ExpertBase):
                                               decision_maker=self.decision_maker)
                 self.modify_sl(sl)
             else:
-                sl_new = fix_rate_trailing_sl(sl=self.active_position.sl, 
-                                              open_price=h["Open"][-1],
-                                              trailing_stop_rate=self.cfg["trailing_stop"]["trailing_stop_rate"])
+                sl_new = self.trailing_stop.get_stop_loss(self.active_position, hist=h)
                 self.modify_sl(sl_new)                
 
     def create_or_update_tp(self, h):

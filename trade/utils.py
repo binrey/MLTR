@@ -12,6 +12,7 @@ class ORDER_TYPE(Enum):
     MARKET = "market"
     LIMIT = "limit"
     STOPLOSS = "stoploss"
+    TAKEPROF = "takeprofit"
     
 class Order:
     def __init__(self, price: float, side: Side, type: ORDER_TYPE, volume: int, indx: int, time: np.datetime64):

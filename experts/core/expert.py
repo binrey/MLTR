@@ -6,7 +6,7 @@ import pandas as pd
 # import torch
 from backtesting.backtest_broker import Position
 from experts.core.decision_maker import DecisionMaker
-from experts.position_control import StopsController
+from experts.position_control import StopsController, TrailingStop
 
 
 def init_target_from_cfg(cfg):
@@ -24,6 +24,8 @@ class ExpertBase(ABC):
         assert "tp_processor" in cfg, "tp_processor must be defined in cfg"
         self.tp_processor: StopsController = init_target_from_cfg(cfg.get("tp_processor", None))
         self.tp = None
+        assert "trailing_stop" in cfg, "trailing_stop must be defined in cfg"
+        self.trailing_stop: TrailingStop = init_target_from_cfg(cfg.get("trailing_stop", None))
         self.orders = []
             
     def __str__(self):

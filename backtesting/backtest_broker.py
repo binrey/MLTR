@@ -52,7 +52,8 @@ class Broker:
                 if closed_position_new is not None:
                     closed_position = closed_position_new
             elif closed_position_new is not None:
-                raise ValueError("closed positions disagreement!")
+                if self.update() is not None:
+                    raise ValueError("closed positions disagreement!")
             # self.update_state()
             
         if self.active_position is not None:
@@ -118,14 +119,14 @@ class Broker:
                             indx=self.active_position.open_indx, 
                             time=self.active_position.open_date))
 
-        # if self.active_position is not None and self.active_position.tp is not None:
-        #     self.active_orders.append(Order(
-        #                     price=self.active_position.tp, 
-        #                     side=Side.reverse(self.active_position.side), 
-        #                     type=ORDER_TYPE.LIMIT,
-        #                     volume=self.active_position.volume,
-        #                     indx=self.active_position.open_indx, 
-        #                     time=self.active_position.open_date))
+        if self.active_position is not None and self.active_position.tp is not None:
+            self.active_orders.append(Order(
+                            price=self.active_position.tp, 
+                            side=Side.reverse(self.active_position.side), 
+                            type=ORDER_TYPE.TAKEPROF,
+                            volume=self.active_position.volume,
+                            indx=self.active_position.open_indx, 
+                            time=self.active_position.open_date))
             
         for i, order in enumerate(self.active_orders):
             triggered_price: float = None
@@ -143,7 +144,7 @@ class Broker:
                     order.volume,
                 )
                 # order.change(self.hist_id, self.open_price)
-            if (order.type == ORDER_TYPE.LIMIT or order.type == ORDER_TYPE.STOPLOSS) and order.open_indx != self.hist_id:
+            if order.type in (ORDER_TYPE.LIMIT, ORDER_TYPE.STOPLOSS, ORDER_TYPE.TAKEPROF) and order.open_indx != self.hist_id:
                 if (last_low > order.price and self.open_price < order.price) or (
                     last_high < order.price and self.open_price > order.price
                 ):
@@ -175,7 +176,7 @@ class Broker:
                 if self.active_position is not None:
                     if self.active_position.side.value * triggered_side.value < 0:
                         closed_position = self.close_active_pos(triggered_price, triggered_date, triggered_id)
-                        if order.type == ORDER_TYPE.LIMIT or order.type == ORDER_TYPE.STOPLOSS :
+                        if order.type in (ORDER_TYPE.LIMIT, ORDER_TYPE.STOPLOSS, ORDER_TYPE.TAKEPROF):
                             triggered_vol = 0
                     else:
                         raise NotImplementedError("Добор позиции не реализован")
@@ -204,7 +205,7 @@ class Broker:
                         sl=sl,
                     )
         for order in self.active_orders:
-            if order.type == ORDER_TYPE.STOPLOSS:
+            if order.type in (ORDER_TYPE.STOPLOSS, ORDER_TYPE.TAKEPROF):
                 self.active_orders.remove(order)
 
         return closed_position

@@ -54,6 +54,7 @@ class Visualizer:
             return
         drawitems4pos: List[Line] = []
         drawitems4sl: List[Line] = []
+        drawitems4tp: List[Line] = []
         for pos in pos_list:
             if pos is None:
                 continue
@@ -77,6 +78,11 @@ class Visualizer:
                 drawitems4sl.append(Line(line=[(pd.to_datetime(t - self.period.to_timedelta()), p), 
                                                    (pd.to_datetime(t), p)], 
                                              color="#000"))
+
+            for t, p in pos.tp_hist:
+                drawitems4tp.append(Line(line=[(pd.to_datetime(t - self.period.to_timedelta()), p), 
+                                                   (pd.to_datetime(t), p)], 
+                                             color="#000"))
                 
         if expert2draw is not None:
             drawitems4expert = expert2draw.decision_maker.vis_objects
@@ -84,18 +90,19 @@ class Visualizer:
             drawitems4expert = []
                 
         if self.show:
-            self.visualize(drawitems4pos, drawitems4sl, drawitems4expert)
+            self.visualize(drawitems4pos, drawitems4sl, drawitems4tp, drawitems4expert)
             return None
         if self.save_plots:
             pos_curr_side = None
             if len(pos_list) and pos_list[-1] is not None:
                 pos_curr_side = pos_list[-1].side
-            return self.save(drawitems4pos, drawitems4sl, pos_curr_side)
+            return self.save(drawitems4pos, drawitems4sl, drawitems4tp, pos_curr_side)
         
 
     def visualize(self, 
                   drawitems4possitions: List[Line], 
                   drawitems4sl: List[Line], 
+                  drawitems4tp: List[Line], 
                   drawitems4expert: List[Union[Line, TimeVolumeProfile]]) -> None:
         ax = fplt.create_plot('long term analysis', rows=1, maximize=False)
         fplt.candlestick_ochl(self.hist2plot[['Open', 'Close', 'High', 'Low']])
@@ -115,7 +122,7 @@ class Visualizer:
                                  width=2, 
                                  style="--")
             
-        for drawitem in drawitems4sl:
+        for drawitem in drawitems4sl + drawitems4tp:
             fplt.add_line(drawitem.line[0], 
                           drawitem.line[1], 
                           color=drawitem.color,
@@ -136,10 +143,10 @@ class Visualizer:
         fplt.show()
 
 
-    def save(self, drawitems4possitions: List[Line], drawitems4sl: List[Line], side_current: Optional[Side]):
+    def save(self, drawitems4possitions: List[Line], drawitems4sl: List[Line], drawitems4tp: List[Line], side_current: Optional[Side]):
         try:
             mystyle = mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
-            lines = [drawitem.line for drawitem in drawitems4possitions + drawitems4sl]
+            lines = [drawitem.line for drawitem in drawitems4possitions + drawitems4sl + drawitems4tp]
             for line in lines:
                 for i, point in enumerate(line):
                     if point[0] < self.hist2plot.index[0]:
@@ -147,7 +154,7 @@ class Visualizer:
                     if point[0] > self.hist2plot.index[-1]:
                         line[i] = (self.hist2plot.index[-1], point[1])                    
             
-            colors = [drawitem.color for drawitem in drawitems4possitions + drawitems4sl]
+            colors = [drawitem.color for drawitem in drawitems4possitions + drawitems4sl + drawitems4tp]
             kwargs = dict(
                 type='candle',
                 block=False,

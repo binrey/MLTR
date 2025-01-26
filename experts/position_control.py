@@ -44,7 +44,7 @@ class SLFixed(StopsController):
         self.cfg = cfg
         super(SLFixed, self).__init__(cfg, name="sl_fix")
     
-    def _eval(self, **kwargs):
+    def create(self, **kwargs):
         active_position = kwargs["active_position"]
         sl = None
         open_price = active_position.open_price
@@ -62,16 +62,9 @@ class TPFromSL(StopsController):
         active_position = kwargs["active_position"]
         tp = None
         open_price = active_position.open_price
-        if self.cfg["active"]:
+        if self.cfg["active"] and active_position.sl is not None:
             tp = open_price + self.cfg["scale"] * abs(open_price - active_position.sl) * active_position.side.value
         return tp
-    
-    
-def fix_rate_trailing_sl(sl:float,
-                       open_price: float,
-                       trailing_stop_rate:float) -> float:
-    sl_new = float(sl + trailing_stop_rate*(open_price - sl))
-    return sl_new
 
 
 class TrailingStopStrategy(Enum):
@@ -79,14 +72,26 @@ class TrailingStopStrategy(Enum):
 
 class TrailingStop:
     FIX_RATE = "fix_rate"
+    MA_ACCELERATED = "ma_accelerated"
     
     def __init__(self, cfg):
         self.cfg = cfg
     
-    def get_stop_loss(self, open_price: float):
-        return {self.FIX_RATE: self.fix_rate_trailing_sl(open_price)}[self.cfg["trailing_stop"]["strategy"]]
+    def get_stop_loss(self, active_position: Position, hist: np.ndarray):
+        return {self.FIX_RATE: self.fix_rate_trailing_sl(active_position, hist, self.cfg["trailing_stop_rate"]),
+                self.MA_ACCELERATED: self.ma_accelerated_trailing_sl(active_position, hist)
+                }[self.cfg["strategy"]]
         
-    def fix_rate_trailing_sl(self, open_price: float) -> float:
-        trailing_stop_rate = self.cfg["trailing_stop_rate"]
-        sl_new = float(self.sl + trailing_stop_rate*(open_price - self.sl))
+    def fix_rate_trailing_sl(self, active_position: Position, hist: np.ndarray, rate: float) -> float:
+        last_price = hist["Open"][-1]
+        sl_new = float(active_position.sl + rate*(last_price - active_position.sl))
+        return sl_new
+    
+    def ma_accelerated_trailing_sl(self, active_position: Position, hist: np.ndarray) -> float:
+        ma_curr = hist["Close"][-8:].mean()
+        ma_prev = hist["Close"][-9:-1].mean()
+        dma = abs(ma_curr - ma_prev) / ma_prev * 100
+        
+        acceleration = max((dma // 1) * 1, 0) * 0.1
+        sl_new = self.fix_rate_trailing_sl(active_position, hist, self.cfg["trailing_stop_rate"] * acceleration)
         return sl_new

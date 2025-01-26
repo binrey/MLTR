@@ -17,6 +17,7 @@ from loguru import logger
 from matplotlib import pyplot as plt
 
 from backtesting.utils import BackTestResults
+from common.type import Symbol
 from common.utils import PyConfig, date2str
 from trade.backtest import launch as backtest_launch
 
@@ -155,11 +156,13 @@ class Optimizer:
                                     
                               opt_summary[k].append("|".join(description))
                         else:
+                              if isinstance(v, Symbol):
+                                    v = v.ticker
                               opt_summary[k].append(v)
                         
-            # Remove lines with attributes consists of one elment (except ticker field)                
+            # Remove lines with attributes consists of one elment (except symbol field)                
             for k in list(opt_summary.keys()):
-                  if k == "ticker":
+                  if k == "symbol":
                         continue
                   if len(set(map(str, opt_summary[k]))) == 1:
                         opt_summary.pop(k)
@@ -173,18 +176,17 @@ class Optimizer:
                   opt_summary["maxwait"].append(btest.metrics["maxwait"])
             
             opt_summary = pd.DataFrame(opt_summary)
-            opt_summary["symbol"] = opt_summary["symbol"].apply(lambda x: x.ticker)
             opt_summary.sort_values(by=["APR"], ascending=False, inplace=True)
             
             # Individual tests results
             top_runs_ids = []
             sum_daily_profit = 0
-            for ticker in set(opt_summary["symbol"]):
-                  opt_summary_for_ticker = opt_summary[opt_summary.ticker == ticker]
+            for symbol in set(opt_summary["symbol"]):
+                  opt_summary_for_ticker = opt_summary[opt_summary["symbol"] == symbol]
                   top_runs_ids.append(opt_summary_for_ticker.index[0])
                   sum_daily_profit += btests[top_runs_ids[-1]].daily_hist["profit_csum"]
                   logger.info(f"\n{opt_summary_for_ticker.head(10)}\n")
-                  pd.DataFrame(btests[top_runs_ids[-1]].daily_hist.profit_csum).to_csv(f"optimization/{ticker}.{optim_cfg['period'][0].value}.top_{self.sortby}_sorted.csv", index=False)
+                  pd.DataFrame(btests[top_runs_ids[-1]].daily_hist.profit_csum).to_csv(f"optimization/{symbol}.{optim_cfg['period'][0].value}.top_{self.sortby}_sorted.csv", index=False)
                   
             profit_av = (sum_daily_profit / len(top_runs_ids)).values
             APR_av, maxwait_av = btests[top_runs_ids[-1]].metrics_from_profit(profit_av)
@@ -200,15 +202,15 @@ class Optimizer:
             plt.clf()
             
             # Mix results
-            opt_res = {"param_set":[], "ticker":[], "final_balance":[], "ndeals":[], "test_ids":[]}
+            opt_res = {"param_set":[], "symbol":[], "final_balance":[], "ndeals":[], "test_ids":[]}
             for i in range(opt_summary.shape[0]):
                   exphash, test_ids = "", ""
                   for col in opt_summary.columns:
-                        if col not in ["ticker", "APR", "ndeals", "recovery", "maxwait", "final_profit", "loss_max_rel"]:
+                        if col not in ["symbol", "APR", "ndeals", "recovery", "maxwait", "final_profit", "loss_max_rel"]:
                               exphash += str(opt_summary[col].iloc[i]) + " "
                   opt_res["test_ids"].append(f".{opt_summary.index[i]}")
                   opt_res["param_set"].append(exphash)
-                  opt_res["symbol"].append(f".{opt_summary.ticker.iloc[i]}")
+                  opt_res["symbol"].append(f".{opt_summary['symbol'].iloc[i]}")
                   opt_res["ndeals"].append(opt_summary.ndeals.iloc[i])
                   opt_res["final_balance"].append(opt_summary.APR.iloc[i])
 
