@@ -10,7 +10,7 @@ class HVOL(DecisionMaker):
     
     def __init__(self, cfg):
         super().__init__(cfg)
-        self.trigger_width = 1
+        self.trigger_width = (cfg["nbins"] - 2)//2
         
     def setup_indicator(self, cfg):
         return VolDistribution(nbins=cfg["nbins"])

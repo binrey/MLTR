@@ -1,28 +1,27 @@
 from common.type import Symbols, TimePeriod, Vis
-from common.utils import FeeRate
+from common.utils import FeeRate, update_config
 from experts.hvol import HVOL
 from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
 
 config = dict(
     wallet=100,
-    leverage=1,
+    leverage=3,
     date_start="2017-09-01T00:00:00",
     date_end="2025-01-01",
     no_trading_days=set(),
-    trailing_stop_rate=0.01,
     decision_maker=dict(
         type=HVOL,
-        nbins=16,
-        sharpness=4
+        nbins=10,
+        sharpness=3
     ),
     sl_processor=dict(
         type=SLFixed,
         active=False,
-        percent_value=3
+        percent_value=2
     ),
     tp_processor=dict(
         type=TPFromSL,
-        active=True,
+        active=False,
         scale=2
     ),
     trailing_stop=dict(
@@ -31,11 +30,11 @@ config = dict(
         trailing_stop_rate=0.0,
     ),
     allow_overturn=True,
-    hist_buffer_size=256,
+    hist_buffer_size=64,
     tstart=0,
     tend=None,
-    period=TimePeriod.M15,
-    symbol=Symbols.SOLUSDT.value,
+    period=TimePeriod.M60,
+    symbol=Symbols.BTCUSDT,
     equaty_step=0.001,
     data_type="bybit",
     fee_rate=FeeRate(0.1, 0.00016),
@@ -44,13 +43,12 @@ config = dict(
     vis_events=Vis.ON_DEAL,
     vis_hist_length=1024,
     visualize=False,
-    eval_buyhold=False,
+    eval_buyhold=True,
     run_model_device=None,
 )
 
-optimization = config.copy()
-optimization.update(dict(
-    hist_buffer_size=[64, 128, 256, 512],
-    trailing_stop_rate=[0.0],
-))
-# optimization["decision_maker"]["sharpness"] = [2, 4, 8]
+
+optimization = update_config(
+    config, 
+    hist_buffer_size=[64, 128, 256], 
+    decision_maker={"sharpness": [2, 3, 4]})

@@ -95,7 +95,7 @@ class Symbol:
     qty_step: float = None
     
     
-class Symbols(Enum):
+class Symbols:
     BTCUSDT = Symbol(ticker="BTCUSDT", tick_size=0.001, qty_step=0.001)
     ETHUSDT = Symbol(ticker="ETHUSDT", tick_size=0.01, qty_step=0.01)
     XRPUSDT = Symbol(ticker="XRPUSDT", tick_size=0.0001, qty_step=1)

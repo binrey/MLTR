@@ -104,25 +104,18 @@ class Config(EasyDict):
         return out
 
 
-def update_config(config, updates):
-    """
-    Updates the provided configuration dictionary with new values.
-    
-    Args:
-        config (dict): The configuration dictionary to update.
-        updates (dict): A dictionary containing the new configuration values.
-        
-    Returns:
-        dict: The updated configuration dictionary.
-    """
-    for key, value in updates.items():
-        if isinstance(value, dict) and key in config and isinstance(config[key], dict):
-            # Recursive update for nested dictionaries
-            update_config(config[key], value)
+import copy
+
+
+def update_config(config, **kwargs):
+    new_config = copy.deepcopy(config)
+    for key, value in kwargs.items():
+        if isinstance(value, dict):
+            for sub_key, sub_value in value.items():
+                new_config[key][sub_key] = sub_value
         else:
-            # Direct update for non-dictionary values
-            config[key] = value
-    return config
+            new_config[key] = value
+    return new_config
 
 
 @dataclass
