@@ -1,18 +1,18 @@
 from common.type import Symbols, TimePeriod, Vis
 from common.utils import FeeRate, update_config
-from experts.hvol import HVOL
+from experts.ma import ClsMACross
 from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
 
 config = dict(
     wallet=100,
-    leverage=3,
-    date_start="2017-09-01T00:00:00",
+    leverage=4,
+    date_start="2018-01-01T00:00:00",
     date_end="2025-01-01",
     no_trading_days=set(),
     decision_maker=dict(
-        type=HVOL,
-        nbins=13,
-        sharpness=5
+        type=ClsMACross,
+        ma_fast_period=64,
+        ma_slow_period=512
     ),
     sl_processor=dict(
         type=SLFixed,
@@ -21,7 +21,7 @@ config = dict(
     ),
     tp_processor=dict(
         type=TPFromSL,
-        active=True,
+        active=False,
         scale=2
     ),
     trailing_stop=dict(
@@ -30,7 +30,7 @@ config = dict(
         trailing_stop_rate=0.0,
     ),
     allow_overturn=True,
-    hist_buffer_size=64,
+    hist_buffer_size=512,
     tstart=0,
     tend=None,
     period=TimePeriod.M60,
@@ -41,7 +41,7 @@ config = dict(
     save_backup=False,
     save_plots=False,
     vis_events=Vis.ON_DEAL,
-    vis_hist_length=2048,
+    vis_hist_length=1024,
     visualize=False,
     eval_buyhold=True,
     run_model_device=None,
@@ -51,9 +51,8 @@ config = dict(
 optimization = update_config(
     config, 
     symbol=[Symbols.BTCUSDT, Symbols.ETHUSDT],
-    hist_buffer_size=[32, 64, 128], 
     decision_maker={
-        "nbins": [9, 11, 13, 15],
-        "sharpness": [3, 4, 5]
+        "ma_fast_period": [256, 128, 64],
+        "ma_slow_period": [512, 256, 128]
         }
     )

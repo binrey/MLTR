@@ -22,6 +22,9 @@ def run_backtest(config_path):
 
 def run_optimization(config_path, run_backtests):
     cfg = PyConfig(config_path).get_optimization()
+    cfg["visualize"] = False
+    cfg["save_backup"] = False
+    cfg["save_plots"] = False
     opt = Optimizer()
     opt.optimize(cfg, run_backtests=run_backtests)
     

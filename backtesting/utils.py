@@ -42,14 +42,6 @@ class BackTestResults:
         return perf_counter() - t0
 
     def process_profits(self, dates: Iterable, profits: Iterable, fees: Iterable):
-        """
-        Processes the profits, fees, and dates to generate historical data and metrics.
-
-            dates (Iterable): An iterable of dates corresponding to each deal.
-            profits (Iterable): An iterable of absolute profit values (with fees) for each deal.
-            fees (Iterable): An iterable of fee values for each deal.
-        """
-
         self.ndeals = len(profits)
         if self.ndeals:
             self.deals_hist = pd.DataFrame(
@@ -122,6 +114,8 @@ class BackTestResults:
         close_prices = df.resample("D").last()["price"]
         self.daily_hist["buy_and_hold"] = close_prices * self.wallet/closes[0]
         self.daily_hist["buy_and_hold"].iloc[-1] = self.daily_hist["buy_and_hold"].iloc[-2]
+        
+        self.daily_hist["unrealized_profit"] = -self.daily_hist["buy_and_hold"].diff() * np.sign(self.daily_hist["profit_nofees"])
         return perf_counter() - t0
 
     def process_daily_metrics(self):

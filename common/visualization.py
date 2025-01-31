@@ -69,18 +69,18 @@ class Visualizer:
                 
             if pd.to_datetime(end_time) < self.hist2plot.index[0]:
                 continue
-            drawitem = Line(line=[(pd.to_datetime(pos.open_date.astype("datetime64[m]")), pos.open_price), 
+            drawitem = Line(points=[(pd.to_datetime(pos.open_date.astype("datetime64[m]")), pos.open_price), 
                                       (pd.to_datetime(end_time), end_price)],
                                 color='#8c8' if pos.side == Side.BUY else '#c88')
             drawitems4pos.append(drawitem)
             
             for t, p in pos.sl_hist:
-                drawitems4sl.append(Line(line=[(pd.to_datetime(t - self.period.to_timedelta()), p), 
+                drawitems4sl.append(Line(points=[(pd.to_datetime(t - self.period.to_timedelta()), p), 
                                                    (pd.to_datetime(t), p)], 
                                              color="#000"))
 
             for t, p in pos.tp_hist:
-                drawitems4tp.append(Line(line=[(pd.to_datetime(t - self.period.to_timedelta()), p), 
+                drawitems4tp.append(Line(points=[(pd.to_datetime(t - self.period.to_timedelta()), p), 
                                                    (pd.to_datetime(t), p)], 
                                              color="#000"))
                 
@@ -112,30 +112,42 @@ class Visualizer:
                 time_vol_profile = [[drawitem.time if drawitem.time in self.hist2plot.index else self.hist2plot.index[0], drawitem.hist],
                                     [self.hist2plot.index[-1], [(1, 1)]]]
                 fplt.horiz_time_volume(time_vol_profile, draw_va=0, draw_poc=3.0)
+            else:
+                if drawitem.points[0][0]:
+                    for point1, point2 in zip(drawitem.points[:-1], drawitem.points[1:]):
+                        fplt.add_line(
+                            p0=point1, 
+                            p1=point2, 
+                            color=drawitem.color,
+                            width=2, 
+                            style="-")
+
         
         for drawitem in drawitems4possitions:
-            rect = fplt.add_rect(drawitem.line[1], drawitem.line[0], color=drawitem.color)
+            rect = fplt.add_rect(drawitem.points[1], drawitem.points[0], color=drawitem.color)
             
-            line = fplt.add_line(drawitem.line[0], 
-                                 drawitem.line[1], 
+            fplt.add_line(drawitem.points[0], 
+                                 drawitem.points[1], 
                                  color="#000",
                                  width=2, 
                                  style="--")
             
         for drawitem in drawitems4sl + drawitems4tp:
-            fplt.add_line(drawitem.line[0], 
-                          drawitem.line[1], 
+            fplt.add_line(drawitem.points[0], 
+                          drawitem.points[1], 
                           color=drawitem.color,
                           width=2, 
                           style="-")
             
         for drawitem in drawitems4expert:
             if type(drawitem) is Line:
+                if len(drawitem.points) < 2:
+                    continue
                 for i in range(2):
-                    if drawitem.line[i][0] is None:
-                        drawitem.line[i] = (self.hist2plot.index[-i], drawitem.line[i][1])
-                fplt.add_line(drawitem.line[0], 
-                            drawitem.line[1], 
+                    if drawitem.points[i][0] is None:
+                        drawitem.points[i] = (self.hist2plot.index[-i], drawitem.points[i][1])
+                fplt.add_line(drawitem.points[0], 
+                            drawitem.points[1], 
                             color=drawitem.color,
                             width=1, 
                             style="--")
@@ -146,7 +158,7 @@ class Visualizer:
     def save(self, drawitems4possitions: List[Line], drawitems4sl: List[Line], drawitems4tp: List[Line], side_current: Optional[Side]):
         try:
             mystyle = mpf.make_mpf_style(base_mpf_style='yahoo',rc={'axes.labelsize':'small'})
-            lines = [drawitem.line for drawitem in drawitems4possitions + drawitems4sl + drawitems4tp]
+            lines = [drawitem.points for drawitem in drawitems4possitions + drawitems4sl + drawitems4tp]
             for line in lines:
                 for i, point in enumerate(line):
                     if point[0] < self.hist2plot.index[0]:
@@ -170,7 +182,7 @@ class Visualizer:
             fig, axlist = mpf.plot(data=self.hist2plot, **kwargs)
 
             if side_current is not None:
-                x, y = self.hist2plot.shape[0]-2, drawitems4possitions[-1].line[0][1]
+                x, y = self.hist2plot.shape[0]-2, drawitems4possitions[-1].points[0][1]
                 id4scale = min(self.hist2plot.shape[0], 10)
                 arrow_size = (self.hist2plot.iloc[-id4scale:].High - self.hist2plot.iloc[-id4scale:].Low).mean()
                 axlist[0].annotate("", (x, y + arrow_size*side_current.value), fontsize=20, xytext=(x, y),

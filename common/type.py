@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Tuple
 
@@ -76,8 +76,14 @@ Bar = Tuple[float, float]
 
 @dataclass
 class Line:
-    line: List[Point]
-    color: str
+    """Represents a line with points and color attributes.
+    
+    Attributes:
+        points (List[Point]): List of (timestamp, value) points defining the line
+        color (str): Color of the line for visualization
+    """
+    points: List[Point] = field(default_factory=list)
+    color: str = "black"
 
 @dataclass
 class TimeVolumeProfile:

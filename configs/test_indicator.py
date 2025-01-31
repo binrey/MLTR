@@ -1,7 +1,7 @@
-from common.type import TimePeriod, Vis
-from common.utils import FeeRate
-from experts.position_control import SLDynamic
-from experts.tunnel import ClsTunnel
+from common.type import Symbols, TimePeriod, Vis
+from common.utils import FeeRate, update_config
+from experts.hvol import HVOL
+from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
 
 config = dict(
     wallet=50,
@@ -11,7 +11,7 @@ config = dict(
     no_trading_days=set(),
     trailing_stop_rate=0.004,
     decision_maker=dict(
-        type=ClsTunnel,
+        type=HVOL,
         ncross=3
     ),
     allow_overturn=False,
@@ -23,7 +23,7 @@ config = dict(
     tstart=0,
     tend=None,
     period=TimePeriod.M60,
-    ticker="BTCUSDT",
+    symbol=Symbols.BTCUSDT,
     equaty_step=0.01,
     data_type="bybit",
     fee_rate=FeeRate(0.1, 0.00016),
