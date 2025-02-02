@@ -8,10 +8,9 @@ class DecisionMaker(ABC):
         self.cfg = cfg
         self.sl_definer = {Side.BUY: None, Side.SELL: None}
         self.tp_definer = {Side.BUY: None, Side.SELL: None}
-        self.lprice, self.sprice, self.cprice, self.tsignal = None, None, None, None
+        self.lprice, self.sprice, self.cprice = None, None, None
         self.indicator_vis_objects = None
         self.vis_items = []
-        self.target_volume_fraction = None
         self.setup_indicators(cfg)
              
     def __str__(self):
@@ -40,6 +39,12 @@ class DecisionMaker(ABC):
     def update_inner_state(self, h):
         pass
 
-    
+    def _reset_state(self):
+        """Reset all state variables to their initial values"""
+        self.lprice = None
+        self.sprice = None
+        self.cprice = None
+        self.sl_definer = {Side.BUY: None, Side.SELL: None}
+        self.tp_definer = {Side.BUY: None, Side.SELL: None}    
 
 

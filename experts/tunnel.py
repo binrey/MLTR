@@ -1,5 +1,6 @@
 from common.type import Side
 from experts.core.expert import DecisionMaker
+from loguru import logger
 
 
 class ClsTunnel(DecisionMaker):
@@ -12,7 +13,7 @@ class ClsTunnel(DecisionMaker):
         super(ClsTunnel, self).__init__(cfg)
 
     def look_around(self, h) -> bool:
-        is_fig = False
+        order_side, target_volume_fraction = None, 1
         best_params = {
             "metric": 0,
             "i": 0,
@@ -38,18 +39,24 @@ class ClsTunnel(DecisionMaker):
                     )
 
         if best_params["metric"] > self.cfg["ncross"]:
-            is_fig = True
-            # break
-
-        lprice, sprice = None, None
-        if is_fig:
             i = best_params["i"]
             self.sl_definer[Side.BUY] = h["Low"][-i:-1].min()
             self.sl_definer[Side.SELL] = h["High"][-i:-1].max()         
             self.lprice = best_params["line_above"]
             self.sprice = best_params["line_below"]
-            self.target_volume_fraction = 1
-        return self.lprice, self.sprice, self.cprice
+
+        if self.lprice:
+            if h["Close"][-3] < self.lprice and h["Close"][-2] > self.lprice:
+                order_side = Side.BUY
+
+        if self.sprice:
+            if h["Close"][-3] > self.sprice and h["Close"][-2] < self.sprice:
+                order_side = Side.SELL
+            
+        if self.lprice or self.sprice:
+            logger.debug(f"found enter points: long: {self.lprice}, short: {self.sprice}")
+
+        return order_side, target_volume_fraction
     
     def setup_indicators(self, cfg):
         pass
