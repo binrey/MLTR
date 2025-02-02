@@ -12,8 +12,8 @@ class HVOL(DecisionMaker):
         super().__init__(cfg)
         self.trigger_width = 1
         
-    def setup_indicator(self, cfg):
-        return VolDistribution(nbins=cfg["nbins"])
+    def setup_indicators(self, cfg):
+        self.indicator = VolDistribution(nbins=cfg["nbins"])
 
     def look_around(self, h) -> bool:
         flag = False
@@ -31,11 +31,13 @@ class HVOL(DecisionMaker):
         if flag:
             self.lprice = lprice
             self.sprice = sprice
+            self.target_volume_fraction = 1
             self.tsignal = None#h["Date"][-2]
             self.sl_definer[Side.BUY] = h["Low"].min()
             self.sl_definer[Side.SELL] = h["High"].max()
             self.indicator_vis_objects = self.indicator.vis_objects
-        return flag
+        return self.lprice, self.sprice, self.cprice
+
     
     def setup_sl(self, side: Side):
         return self.sl_definer[side]

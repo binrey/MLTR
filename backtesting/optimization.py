@@ -23,7 +23,9 @@ from trade.backtest import launch as backtest_launch
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
+pd.set_option('display.max_colwidth', 256)
     
+
 def plot_daily_balances_with_av(btests: List[BackTestResults], test_ids: List[int], profit_av: np.ndarray, metrics_av: List[Tuple[str, float]]):
       legend = []
       for test_id in test_ids:

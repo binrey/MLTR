@@ -172,14 +172,21 @@ class Broker:
 
             if triggered_price is not None:
                 self.close_orders(triggered_id, i)
-
                 if self.active_position is not None:
                     if self.active_position.side.value * triggered_side.value < 0:
-                        closed_position = self.close_active_pos(triggered_price, triggered_date, triggered_id)
-                        if order.type in (ORDER_TYPE.LIMIT, ORDER_TYPE.STOPLOSS, ORDER_TYPE.TAKEPROF):
-                            triggered_vol = 0
+                        if triggered_vol >= self.active_position.volume:
+                            # If triggered volume is greater or equal to position volume,
+                            # close entire position and reduce triggered volume
+                            closed_position = self.close_active_pos(triggered_price, triggered_date, triggered_id)
+                            triggered_vol -= closed_position.volume
+                        else:
+                            raise NotImplementedError("Position volume reduction not implemented")
                     else:
-                        raise NotImplementedError("Добор позиции не реализован")
+                        # Add volume to the existing position
+                        self.active_position.add_to_position(triggered_vol, triggered_price, triggered_date)
+                        triggered_vol = 0
+                        logger.debug(f"Added to existing position with volume {triggered_vol} at price {triggered_price}")
+
 
                 # Открытие новой позиции
                 if triggered_vol:
@@ -204,6 +211,7 @@ class Broker:
                         fee_rate=self.cfg['fee_rate'],
                         sl=sl,
                     )
+                    triggered_vol = 0
         for order in self.active_orders:
             if order.type in (ORDER_TYPE.STOPLOSS, ORDER_TYPE.TAKEPROF):
                 self.active_orders.remove(order)

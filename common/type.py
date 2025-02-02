@@ -84,6 +84,7 @@ class Line:
     """
     points: List[Point] = field(default_factory=list)
     color: str = "black"
+    width: int = 1
 
 @dataclass
 class TimeVolumeProfile:

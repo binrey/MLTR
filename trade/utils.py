@@ -1,11 +1,12 @@
 from enum import Enum
 from typing import Any, List, Optional
-
+import pandas as pd
 import numpy as np
 from loguru import logger
 
 from common.type import Side
 from common.utils import FeeConst, FeeModel, date2str
+from common.type import Line
 
 
 class ORDER_TYPE(Enum):
@@ -13,7 +14,8 @@ class ORDER_TYPE(Enum):
     LIMIT = "limit"
     STOPLOSS = "stoploss"
     TAKEPROF = "takeprofit"
-    
+
+
 class Order:
     def __init__(self, price: float, side: Side, type: ORDER_TYPE, volume: int, indx: int, time: np.datetime64):
         self.price = price
@@ -64,10 +66,15 @@ class Position:
         self.sl = None
         self.tp = None
         self.sl_hist = []
-        self.tp_hist = [] 
-               
+        self.tp_hist = []
+        self.enter_points_hist: List[Point] = []
+        self.enter_price_hist: List[Point] = []
+        self.volume_hist: List[Point] = []
+
+        # Record the initial stop-loss and take-profit if provided.
         self.update_sl(sl=float(sl) if sl is not None else sl, time=self.open_date)
         self.update_tp(tp=float(tp) if tp is not None else tp, time=self.open_date)
+
         self.close_price = None
         self.close_date = None
         self.profit = None
@@ -77,13 +84,19 @@ class Position:
         self.fees_abs = 0
         self._update_fees(self.open_price, self.volume)
 
+        # Record price change events. Each tuple is (date, price)
+        
+        self.enter_points_hist.append((pd.to_datetime(self.open_date), self.open_price))
+        self.enter_price_hist.append((pd.to_datetime(self.open_date), self.open_price))
+        self.volume_hist.append((pd.to_datetime(self.open_date), self.volume))
+
     def __str__(self):
         name = f"pos {self.ticker} {self.side} {self.volume}: {self.open_price}"
-        if self.close_price:
+        if self.close_price is not None:
             name += f" -> {self.close_price}"
-        if self.sl:
+        if self.sl is not None:
             name += f" | sl:{self.sl}"
-        if self.tp:
+        if self.tp is not None:
             name += f" | tp:{self.tp}"
         return name
 
@@ -101,7 +114,7 @@ class Position:
 
     def _update_fees(self, price, volume):
         self.fees_abs += self.fee_rate.order_execution_fee(price, volume)
-        if self.close_date and self.open_date:
+        if self.close_date is not None and self.open_date is not None:
             self.fees_abs += self.fee_rate.position_suply_fee(
                 self.open_date,
                 self.close_date,
@@ -120,9 +133,7 @@ class Position:
 
     @property
     def id(self):
-        return (
-            f"{self.open_indx}-{self.str_dir}-{self.open_price:.2f}-{self.volume:.2f} sl:{self.sl}"
-        )
+        return f"{self.open_indx}-{self.str_dir}-{self.open_price:.2f}-{self.volume:.2f} sl:{self.sl}"
 
     def close(self, price, date, indx):
         self.close_price = abs(price)
@@ -133,11 +144,46 @@ class Position:
         self.profit_abs -= self.fees_abs
         self.profit = self.profit_abs / self.open_price * 100
 
+        self.enter_points_hist.append((self.close_date, self.close_price))
+        self.enter_price_hist.append((self.close_date, self.open_price))
+
     def cur_profit(self, price):
         return (price - self.open_price) * self.side.value * self.volume
 
     @property
     def lines(self):
-        return [(self.open_indx, self.open_price), (self.close_indx, self.close_price)]
+        """
+        Return all (date, price) pairs that represent changes in the position's effective price.
+        This includes the open event, any add-to-position events, and the closing event.
+        """
+        return self.enter_points_hist
 
+    def add_to_position(self, 
+                        additional_volume: int, 
+                        price: float, 
+                        time: np.datetime64):
+        """
+        Add to the existing position by increasing the volume and updating fees.
+        Also record the event as a price change.
+        
+        :param additional_volume: The volume to add to the current position.
+        :param price: The price at which the additional volume is added.
+        :param time: The timestamp for this volume change. If not provided, the current time is used.
+        """
+        if additional_volume <= 0:
+            return
+        self.open_price = self.open_price * self.volume + price * additional_volume
+        self.volume += additional_volume
+        self.open_price /= self.volume
+        self._update_fees(price, additional_volume)
+        
+        self.enter_points_hist.append((pd.to_datetime(time), price))
+        self.enter_price_hist.append((pd.to_datetime(time), self.open_price))
+        self.volume_hist.append((pd.to_datetime(self.open_date), self.volume))
+        logger.debug(f"Added {additional_volume} to position {self.id} at price {price}")
 
+    def get_drawitem(self):
+        return {"enter_points": Line(points=self.enter_points_hist, color='#8c8' if self.side == Side.BUY else '#c88'),
+                "enter_price": Line(points=self.enter_price_hist),
+                "volume": Line(points=self.volume_hist)}
+        

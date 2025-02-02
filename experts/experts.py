@@ -34,7 +34,7 @@ class ExpertFormation(ExpertBase):
     def _reset_state(self):
         self.lprice = None
         self.sprice = None
-        self.cprice = None
+        cprice = None
         self.formation_found = False
         self.order_dir = 0
             
@@ -70,35 +70,35 @@ class ExpertFormation(ExpertBase):
         self.create_or_update_sl(h)
         self.create_or_update_tp(h)
         self.decision_maker.update_inner_state(h)
-        if not self.cfg["allow_overturn"] and self.active_position is not None:
-            return
+        # if not self.cfg["allow_overturn"] and self.active_position is not None:
+        #     return
         
         self.order_sent = False
         self.order_dir = 0
         
-        if self.cfg["allow_overturn"] or not self.formation_found:
-            if self.decision_maker.look_around(h):
-                self.formation_found = True
-                self.lprice = self.decision_maker.lprice
-                self.sprice = self.decision_maker.sprice
+        if not self.cfg["allow_overturn"] and self.active_position:
+            return
+
+        lprice, sprice, cprice = self.decision_maker.look_around(h)
+            # self.formation_found = True
+            # self.lprice = self.decision_maker.lprice
+            # self.sprice = self.decision_maker.sprice
         
-        logger.debug(f"found enter points: long: {self.lprice}, short: {self.sprice}, cancel: {self.cprice}")
+        logger.debug(f"found enter points: long: {lprice}, short: {sprice}, cancel: {cprice}")
         
-        if self.lprice:
-            if (self.sprice is None and h["Open"][-1] >= self.lprice) or h["Close"][-2] > self.lprice:
-                if h["Close"][-3] < self.lprice:
-                    self.order_dir = 1
-            if self.cprice is not None and h["Open"][-1] < self.cprice:
+        if lprice:
+            if (sprice is None and h["Open"][-1] >= lprice) or h["Close"][-2] > lprice:
+                self.order_dir = 1
+            if cprice is not None and h["Open"][-1] < cprice:
                 self._reset_state()
                 return
             
-        if self.sprice:
-            if (self.lprice is None and h["Open"][-1] <= self.sprice) or h["Close"][-2] < self.sprice:
-                if h["Close"][-3] > self.sprice:
-                    self.order_dir = -1
-            if self.cprice and h["Open"][-1] > self.cprice:
+        if sprice:
+            if (lprice is None and h["Open"][-1] <= sprice) or h["Close"][-2] < sprice:
+                self.order_dir = -1
+            if cprice and h["Open"][-1] > cprice:
                 self._reset_state()
-                return            
+                return
         
         if h["Date"][-1] in self.cfg["no_trading_days"]:
             self._reset_state()
@@ -115,14 +115,24 @@ class ExpertFormation(ExpertBase):
             
         
         if self.order_dir != 0:
-            if self.active_position is None or self.active_position.side.value*self.order_dir < 0:
-                
+            max_volume = self.estimate_volume(h) 
+            if self.active_position is None:
+                # Open new position
+                order_volume = max_volume * self.decision_maker.target_volume_fraction
+            else:
+                if self.active_position.side.value*self.order_dir < 0:
+                    # Close old and open new
+                    order_volume = self.active_position.volume + max_volume * self.decision_maker.target_volume_fraction
+                else:
+                    # Add to old
+                    order_volume = max(0, max_volume * self.decision_maker.target_volume_fraction - self.active_position.volume)
+            if order_volume > 0:
                 self.create_orders(side=Side.from_int(self.order_dir), 
-                                   volume=self.estimate_volume(h),
-                                   time_id=h["Id"][-1])
+                                    volume=order_volume,
+                                    time_id=h["Id"][-1])
                 self.order_sent = True
-                if not self.cfg["allow_overturn"]:
-                    self._reset_state()
+                # if not self.cfg["allow_overturn"]:
+                #     self._reset_state()
             
 
             

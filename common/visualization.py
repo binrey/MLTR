@@ -69,10 +69,8 @@ class Visualizer:
                 
             if pd.to_datetime(end_time) < self.hist2plot.index[0]:
                 continue
-            drawitem = Line(points=[(pd.to_datetime(pos.open_date.astype("datetime64[m]")), pos.open_price), 
-                                      (pd.to_datetime(end_time), end_price)],
-                                color='#8c8' if pos.side == Side.BUY else '#c88')
-            drawitems4pos.append(drawitem)
+
+            drawitems4pos.append(pos.get_drawitem())
             
             for t, p in pos.sl_hist:
                 drawitems4sl.append(Line(points=[(pd.to_datetime(t - self.period.to_timedelta()), p), 
@@ -119,18 +117,21 @@ class Visualizer:
                             p0=point1, 
                             p1=point2, 
                             color=drawitem.color,
-                            width=2, 
+                            width=drawitem.width, 
                             style="-")
 
         
         for drawitem in drawitems4possitions:
-            rect = fplt.add_rect(drawitem.points[1], drawitem.points[0], color=drawitem.color)
+            rect = fplt.add_rect(drawitem["enter_points"].points[-1], 
+                                 drawitem["enter_points"].points[0], 
+                                 color=drawitem["enter_points"].color)
             
-            fplt.add_line(drawitem.points[0], 
-                                 drawitem.points[1], 
-                                 color="#000",
-                                 width=2, 
-                                 style="--")
+            for point1, point2 in zip(drawitem["enter_price"].points[:-1], 
+                                      drawitem["enter_price"].points[1:]):
+                fplt.add_line(p0=point1, p1=point2, color="#000", width=2, style="--")
+                
+            for point, (date, volume) in zip(drawitem["enter_price"].points, drawitem["volume"].points):
+                fplt.add_text(pos=point, s=f"{volume:.4f}")
             
         for drawitem in drawitems4sl + drawitems4tp:
             fplt.add_line(drawitem.points[0], 

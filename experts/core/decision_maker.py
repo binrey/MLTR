@@ -11,13 +11,14 @@ class DecisionMaker(ABC):
         self.lprice, self.sprice, self.cprice, self.tsignal = None, None, None, None
         self.indicator_vis_objects = None
         self.vis_items = []
-        self.indicator = self.setup_indicator(cfg)
+        self.target_volume_fraction = None
+        self.setup_indicators(cfg)
              
     def __str__(self):
         return self.type + ": " + "|".join([f"{k}:{v}" for k, v in self.cfg.items()])
     
     @abstractmethod
-    def setup_indicator(self, cfg):
+    def setup_indicators(self, cfg):
         pass
     
     @property
@@ -39,6 +40,6 @@ class DecisionMaker(ABC):
     def update_inner_state(self, h):
         pass
 
-
+    
 
 

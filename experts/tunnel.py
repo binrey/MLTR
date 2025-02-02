@@ -48,10 +48,10 @@ class ClsTunnel(DecisionMaker):
             self.sl_definer[Side.SELL] = h["High"][-i:-1].max()         
             self.lprice = best_params["line_above"]
             self.sprice = best_params["line_below"]
-
-        return is_fig
+            self.target_volume_fraction = 1
+        return self.lprice, self.sprice, self.cprice
     
-    def setup_indicator(self, cfg):
+    def setup_indicators(self, cfg):
         pass
     
     def setup_sl(self, side: Side):

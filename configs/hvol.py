@@ -5,7 +5,7 @@ from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
 
 config = dict(
     wallet=100,
-    leverage=3,
+    leverage=1,
     date_start="2017-09-01T00:00:00",
     date_end="2025-01-01",
     no_trading_days=set(),
@@ -15,21 +15,21 @@ config = dict(
         sharpness=5
     ),
     sl_processor=dict(
-        type=SLFixed,
-        active=False,
+        type=SLDynamic,
+        active=True,
         percent_value=2
     ),
     tp_processor=dict(
         type=TPFromSL,
-        active=True,
+        active=False,
         scale=2
     ),
     trailing_stop=dict(
         type=TrailingStop,
         strategy=TrailingStop.FIX_RATE,
-        trailing_stop_rate=0.0,
+        trailing_stop_rate=0.01,
     ),
-    allow_overturn=True,
+    allow_overturn=False,
     hist_buffer_size=64,
     tstart=0,
     tend=None,
@@ -41,8 +41,8 @@ config = dict(
     save_backup=False,
     save_plots=False,
     vis_events=Vis.ON_DEAL,
-    vis_hist_length=2048,
-    visualize=False,
+    vis_hist_length=512,
+    visualize=True,
     eval_buyhold=True,
     run_model_device=None,
 )
