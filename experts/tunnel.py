@@ -1,4 +1,3 @@
-from common.type import Side
 from experts.core.expert import DecisionMaker
 from loguru import logger
 
@@ -12,7 +11,7 @@ class ClsTunnel(DecisionMaker):
     def __init__(self, cfg):
         super(ClsTunnel, self).__init__(cfg)
 
-    def look_around(self, h) -> bool:
+    def look_around(self, h) -> DecisionMaker.Response:
         order_side, target_volume_fraction = None, 1
         best_params = {
             "metric": 0,
@@ -56,8 +55,10 @@ class ClsTunnel(DecisionMaker):
         if self.lprice or self.sprice:
             logger.debug(f"found enter points: long: {self.lprice}, short: {self.sprice}")
 
-        return order_side, target_volume_fraction
-    
+        return DecisionMaker.Response(
+            side=order_side,
+            volume_fraction=target_volume_fraction)
+
     def setup_indicators(self, cfg):
         pass
     

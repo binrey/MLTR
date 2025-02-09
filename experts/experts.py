@@ -20,8 +20,6 @@ def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
 class ExpertFormation(ExpertBase):
     def __init__(self, cfg):
         super(ExpertFormation, self).__init__(cfg)  
-        # self._reset_state()
-        # self.order_sent = False
         
         if self.cfg["run_model_device"] is not None:
             from ml import Net, Net2
@@ -30,13 +28,6 @@ class ExpertFormation(ExpertBase):
             # self.model.set_threshold(0.6)
             self.model.eval()
             self.model.to(self.cfg["run_model_device"])
-        
-    # def _reset_state(self):
-    #     self.lprice = None
-    #     self.sprice = None
-    #     cprice = None
-        # self.formation_found = False
-        # self.order_dir = 0
             
     def estimate_volume(self, h):
         volume = self.cfg["wallet"]/h["Open"][-1]*self.cfg["leverage"]
@@ -70,34 +61,11 @@ class ExpertFormation(ExpertBase):
         self.create_or_update_sl(h)
         self.create_or_update_tp(h)
         self.decision_maker.update_inner_state(h)
-        # if not self.cfg["allow_overturn"] and self.active_position is not None:
-        #     return
-        
-        # self.order_sent = False
-        self.order_dir = 0
         
         if not self.cfg["allow_overturn"] and self.active_position:
             return
 
-        order_side, target_volume_fraction = self.decision_maker.look_around(h)
-            # self.formation_found = True
-            # self.lprice = self.decision_maker.lprice
-            # self.sprice = self.decision_maker.sprice
-        
-        
-        # if lprice:
-        #     if (sprice is None and h["Open"][-1] >= lprice) or h["Close"][-2] > lprice:
-        #         self.order_dir = 1
-        #     if cprice is not None and h["Open"][-1] < cprice:
-        #         self._reset_state()
-        #         return
-            
-        # if sprice:
-        #     if (lprice is None and h["Open"][-1] <= sprice) or h["Close"][-2] < sprice:
-        #         self.order_dir = -1
-        #     if cprice and h["Open"][-1] > cprice:
-        #         self._reset_state()
-        #         return
+        target_state = self.decision_maker.look_around(h)
         
         if h["Date"][-1] in self.cfg["no_trading_days"]:
             self._reset_state()
@@ -113,13 +81,15 @@ class ExpertFormation(ExpertBase):
         #     y = [0.5, 1, 2, 4, 8][self.model.predict(x).item()]
             
         
-        if order_side is not None:
+        if target_state.is_active:
+            target_volume_fraction = target_state.volume_fraction
+            order_side = target_state.side
             max_volume = self.estimate_volume(h) 
             if self.active_position is None:
                 # Open new position
                 order_volume = max_volume * target_volume_fraction
             else:
-                if self.active_position.side.value*order_side.value < 0:
+                if self.active_position.side.value * order_side.value < 0:
                     # Close old and open new
                     order_volume = self.active_position.volume + max_volume * target_volume_fraction
                     if order_volume < self.active_position.volume:
@@ -131,11 +101,7 @@ class ExpertFormation(ExpertBase):
                 self.create_orders(side=order_side, 
                                    volume=order_volume,
                                    time_id=h["Id"][-1])
-                # self.order_sent = True
-                # if not self.cfg["allow_overturn"]:
-                #     self._reset_state()
             
-
             
 class BacktestExpert(ExpertFormation):
     def __init__(self, cfg, session: Broker):

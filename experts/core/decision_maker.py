@@ -1,9 +1,19 @@
 from abc import ABC, abstractmethod
 import pandas as pd
 from common.type import Line, Side
+from dataclasses import dataclass
 
 
 class DecisionMaker(ABC):
+    @dataclass
+    class Response:
+        side: Side | None
+        volume_fraction: float = 1.0
+
+        @property
+        def is_active(self):
+            return self.side is not None
+
     def __init__(self, cfg):
         self.cfg = cfg
         self.sl_definer = {Side.BUY: None, Side.SELL: None}
@@ -32,7 +42,7 @@ class DecisionMaker(ABC):
         return lines
       
     @abstractmethod
-    def look_around(self, h) -> bool:
+    def look_around(self, h) -> "DecisionMaker.Response":
         pass
     
     @abstractmethod

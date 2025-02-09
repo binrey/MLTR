@@ -6,15 +6,13 @@ from typing import List
 
 
 class MovingAverage:
-    def __init__(self, period=20, ma_type="sma", levels_count=0, levels_step=1):
+    def __init__(self, period=20, levels_count=0, levels_step=1):
         """
         Initialize Moving Average indicator
         Args:
             period (int): Period for moving average calculation
-            ma_type (str): Type of moving average - 'sma' or 'ema'
         """
         self.period = period
-        self.ma_type = ma_type.lower()
         self.main_ma_values = -np.ones(period)
         self.current_index = 0
         self.main_line: Line = Line()
@@ -25,7 +23,8 @@ class MovingAverage:
             self.levels = [0]
         else:
             self.levels = np.arange(self.levels_count//2, -self.levels_count//2-1, -1)
-        self.last_ma_values = {level: None for level in self.levels}
+        self.current_ma_values = {level: None for level in self.levels}
+        self.previous_ma_values = {level: None for level in self.levels}
         self.last_ma_directions = {level: None for level in self.levels}
         self.levels_lines: List[Line] = {level: Line(width=((level==0)+1)*3) for level in self.levels}
 
@@ -43,16 +42,17 @@ class MovingAverage:
             level_cur = ma_current_value + level * level_step_value
             self.levels_lines[level].points.append((h["Date"][-2], level_cur))
             # Determine direction: 1 for growing, 0 for flat, -1 for downgrading
-            if self.last_ma_values[level] is not None:
-                if level_cur > self.last_ma_values[level]:
+            if self.current_ma_values[level] is not None:
+                if level_cur > self.current_ma_values[level]:
                     self.last_ma_directions[level] = 1
-                elif level_cur < self.last_ma_values[level]:
+                elif level_cur < self.current_ma_values[level]:
                     self.last_ma_directions[level] = -1
                 else:
                     self.last_ma_directions[level] = 0
             else:
                 self.last_ma_directions[level] = 0  # Default to flat if no previous value
-            self.last_ma_values[level] = level_cur
+            self.previous_ma_values[level] = self.current_ma_values[level]
+            self.current_ma_values[level] = level_cur
         # shift all values to the left
         self.main_ma_values[:-1] = self.main_ma_values[1:]
         # append new value to the right

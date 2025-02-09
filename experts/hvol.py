@@ -15,7 +15,7 @@ class HVOL(DecisionMaker):
     def setup_indicators(self, cfg):
         self.indicator = VolDistribution(nbins=cfg["nbins"])
 
-    def look_around(self, h) -> bool:
+    def look_around(self, h) -> DecisionMaker.Response:
         order_side, target_volume_fraction = None, 1
         self.indicator.update(h)
         max_vol_id = self.indicator.vol_hist.argmax()
@@ -27,6 +27,7 @@ class HVOL(DecisionMaker):
                 if sprice < h["Open"][-1] < lprice:
                     self.lprice = lprice
                     self.sprice = sprice
+                    self.tsignal = None#h["Date"][-2]
                     self.sl_definer[Side.BUY] = h["Low"].min()
                     self.sl_definer[Side.SELL] = h["High"].max()
                     self.indicator_vis_objects = self.indicator.vis_objects
@@ -42,7 +43,9 @@ class HVOL(DecisionMaker):
         if self.lprice or self.sprice:
             logger.debug(f"found enter points: long: {self.lprice}, short: {self.sprice}")
 
-        return order_side, target_volume_fraction
+        return DecisionMaker.Response(
+            side=order_side,
+            volume_fraction=target_volume_fraction)
 
     
     def setup_sl(self, side: Side):
