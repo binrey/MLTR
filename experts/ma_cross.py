@@ -18,46 +18,42 @@ class ClsMACross(DecisionMaker):
 
     def setup_indicators(self, cfg):
         self.ma_fast = MovingAverage(
-            cfg["ma_fast_period"],
+            cfg["ma_fast_period"])
+        self.ma_slow = MovingAverage(
+            cfg["ma_slow_period"],
             levels_count=cfg["levels_count"],
             levels_step=cfg["levels_step"])
-        self.ma_slow = MovingAverage(
-            cfg["ma_slow_period"])
         return self.ma_fast
 
     def look_around(self, h) -> bool:
-        order_side, target_volume_fraction = None, 0
+        order_side, volume_fraction = None, 0
         self.ma_fast.update(h)
         self.ma_slow.update(h)
-        levels_curr, levels_prev = self.ma_fast.current_ma_values, self.ma_fast.previous_ma_values
-        ma_fast_prev, ma_fast_curr = levels_prev[0], levels_curr[0]
-        ma_slow_curr = self.ma_slow.current_ma_values[0]
-        close_prev, close_curr = h["Close"][-3:-1]
+        levels_curr, levels_prev = self.ma_slow.current_ma_values, self.ma_slow.previous_ma_values
+        ma_slow_prev, ma_slow_curr = levels_prev[0], levels_curr[0]
+        ma_fast_prev, ma_fast_curr = self.ma_fast.previous_ma_values[0], self.ma_fast.current_ma_values[0]
         
         if self.mode == "trend":
             if ma_fast_curr > ma_slow_curr:
                 oreder_side = Side.BUY
-                target_volume_fraction = 1
+                volume_fraction = 1
             elif ma_fast_curr < ma_slow_curr:
                 oreder_side = Side.SELL
-                target_volume_fraction = 1
+                volume_fraction = 1
 
         elif self.mode == "contrtrend":
-
-            if ma_fast_curr and ma_fast_prev:
-                # if ma_fast_curr < ma_slow_curr:
-                for level in range(self.ma_fast.levels_count//2, 0, -1):
+            if ma_slow_curr and ma_slow_prev:
+                for level in range(self.ma_slow.levels_count//2, 0, -1):
                     if levels_curr[level]:
-                        if close_prev > levels_prev[level] and close_curr < levels_curr[level]:
+                        if ma_fast_prev > levels_prev[level] and ma_fast_curr < levels_curr[level]:
                             order_side = Side.SELL
-                            target_volume_fraction = level/self.ma_fast.levels_count*2
+                            volume_fraction = 1/self.ma_slow.levels_count*2
                             break
-                # if ma_fast_curr > ma_slow_curr:
-                for level in range(-self.ma_fast.levels_count//2, 0, 1):
+                for level in range(-self.ma_slow.levels_count//2, 0, 1):
                     if levels_curr[level]:
-                        if close_prev < levels_prev[level] and close_curr > levels_curr[level]:
+                        if ma_fast_prev < levels_prev[level] and ma_fast_curr > levels_curr[level]:
                             order_side = Side.BUY
-                            target_volume_fraction = abs(level)/self.ma_fast.levels_count*2
+                            volume_fraction = 1/self.ma_slow.levels_count*2
                             break
         else:
             raise Exception("Unknown mode")         
@@ -69,7 +65,9 @@ class ClsMACross(DecisionMaker):
 
         return DecisionMaker.Response(
             side=order_side,
-            volume_fraction=target_volume_fraction)
+            # target_volume_fraction=volume_fraction,
+            increment_volume_fraction=volume_fraction
+            )
     
     def setup_sl(self, side: Side):
         return self.sl_definer[side]

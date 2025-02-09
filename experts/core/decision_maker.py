@@ -8,7 +8,8 @@ class DecisionMaker(ABC):
     @dataclass
     class Response:
         side: Side | None
-        volume_fraction: float = 1.0
+        target_volume_fraction: float = 1.0 #  Define position volume have to be
+        increment_volume_fraction: float = 1.0 #  How mutch increase position, target isn't defined
 
         @property
         def is_active(self):

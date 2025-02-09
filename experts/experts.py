@@ -82,9 +82,19 @@ class ExpertFormation(ExpertBase):
             
         
         if target_state.is_active:
-            target_volume_fraction = target_state.volume_fraction
             order_side = target_state.side
-            max_volume = self.estimate_volume(h) 
+            max_volume = self.estimate_volume(h)             
+            if target_state.target_volume_fraction:
+                target_volume_fraction = target_state.target_volume_fraction
+            if target_state.increment_volume_fraction:
+                if self.active_position and self.active_position.side.value * order_side.value > 0:
+                    target_volume_fraction = min(1, self.active_position.volume / max_volume + target_state.increment_volume_fraction)
+                else:
+                    target_volume_fraction = target_state.increment_volume_fraction
+
+            if order_side == Side.SELL:
+                target_volume_fraction = 0
+
             if self.active_position is None:
                 # Open new position
                 order_volume = max_volume * target_volume_fraction
