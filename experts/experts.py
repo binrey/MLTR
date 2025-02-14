@@ -62,7 +62,7 @@ class ExpertFormation(ExpertBase):
         self.create_or_update_tp(h)
         self.decision_maker.update_inner_state(h)
         
-        if not self.cfg["allow_overturn"] and self.active_position:
+        if self.cfg["close_only_by_stops"] and self.active_position:
             return
 
         target_state = self.decision_maker.look_around(h)
@@ -84,16 +84,16 @@ class ExpertFormation(ExpertBase):
         if target_state.is_active:
             order_side = target_state.side
             max_volume = self.estimate_volume(h)             
-            if target_state.target_volume_fraction:
+            if target_state.target_volume_fraction is not None:
                 target_volume_fraction = target_state.target_volume_fraction
-            if target_state.increment_volume_fraction:
+            if target_state.increment_volume_fraction is not None:
                 if self.active_position and self.active_position.side.value * order_side.value > 0:
                     target_volume_fraction = min(1, self.active_position.volume / max_volume + target_state.increment_volume_fraction)
                 else:
                     target_volume_fraction = target_state.increment_volume_fraction
 
-            if order_side == Side.SELL:
-                target_volume_fraction = 0
+            # if order_side == Side.SELL:
+            #     target_volume_fraction = 0
 
             if self.active_position is None:
                 # Open new position

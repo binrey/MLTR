@@ -6,23 +6,32 @@ from typing import List
 
 
 class MovingAverage:
-    def __init__(self, period=20, levels_count=0, levels_step=1):
+    def __init__(self, period=20, upper_levels=0, lower_levels=0, min_step=1, speed=1.0):
         """
         Initialize Moving Average indicator
         Args:
             period (int): Period for moving average calculation
+            upper_levels (int): Number of levels above the main MA
+            lower_levels (int): Number of levels below the main MA
+            min_step (float): Minimum step size for the first level
+            speed (float): Growth rate of step size between levels
         """
         self.period = period
         self.main_ma_values = -np.ones(period)
         self.current_index = 0
         self.main_line: Line = Line()
-        self.levels_count = levels_count*2
-        self.levels_step = levels_step
+        self.min_step = min_step
+        self.speed = speed
+        self.upper_levels = upper_levels
+        self.lower_levels = lower_levels
         
-        if levels_count == 0:
+        if self.upper_levels == 0 and self.lower_levels == 0:
             self.levels = [0]
         else:
-            self.levels = np.arange(self.levels_count//2, -self.levels_count//2-1, -1)
+            upper = np.arange(self.upper_levels, 0, -1) if self.upper_levels > 0 else []
+            lower = np.arange(-1, -(self.lower_levels + 1), -1) if self.lower_levels > 0 else []
+            self.levels = np.concatenate(([0], upper, lower)) if self.upper_levels > 0 or lower_levels > 0 else [0]
+        
         self.current_ma_values = {level: None for level in self.levels}
         self.previous_ma_values = {level: None for level in self.levels}
         self.last_ma_directions = {level: None for level in self.levels}
@@ -32,14 +41,15 @@ class MovingAverage:
         """
         Update moving average values based on new data
         """        
-        # append point to Line object
         ma_current_value = h["Close"][-self.period-1:-2].mean()
-        # Calculate standard deviation
-        std_dev = h["Close"][-self.period-1:-2].std()
-        level_step_value = std_dev * self.levels_step
+        # Calculate standard deviation as base for level steps
+        base_step = h["Close"][-self.period-1:-2].std() * self.min_step
+        
         # Calculate levels
         for level in self.levels:
-            level_cur = ma_current_value + level * level_step_value
+            # Calculate dynamic step size that grows with level number
+            level_multiplier = pow(abs(level), self.speed) if level != 0 else 0
+            level_cur = ma_current_value + np.sign(level) * level_multiplier * base_step
             self.levels_lines[level].points.append((h["Date"][-2], level_cur))
             # Determine direction: 1 for growing, 0 for flat, -1 for downgrading
             if self.current_ma_values[level] is not None:

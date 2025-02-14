@@ -45,7 +45,7 @@ class HVOL(DecisionMaker):
 
         return DecisionMaker.Response(
             side=order_side,
-            volume_fraction=target_volume_fraction)
+            target_volume_fraction=target_volume_fraction)
 
     
     def setup_sl(self, side: Side):

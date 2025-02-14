@@ -17,12 +17,13 @@ class ClsMACross(DecisionMaker):
             self.model = torch.jit.load("model.pt")
 
     def setup_indicators(self, cfg):
-        self.ma_fast = MovingAverage(
-            cfg["ma_fast_period"])
+        self.ma_fast = MovingAverage(period=cfg["ma_fast_period"])
         self.ma_slow = MovingAverage(
-            cfg["ma_slow_period"],
-            levels_count=cfg["levels_count"],
-            levels_step=cfg["levels_step"])
+            period=cfg["ma_slow_period"],
+            upper_levels=cfg["upper_levels"],
+            lower_levels=cfg["lower_levels"],
+            min_step=cfg["min_step"],
+            speed=cfg["speed"])
         return self.ma_fast
 
     def look_around(self, h) -> bool:
@@ -43,17 +44,17 @@ class ClsMACross(DecisionMaker):
 
         elif self.mode == "contrtrend":
             if ma_slow_curr and ma_slow_prev:
-                for level in range(self.ma_slow.levels_count//2, 0, -1):
+                for level in range(self.ma_slow.upper_levels, -1, -1): #self.ma_slow.levels_count//2, 0, -1):
                     if levels_curr[level]:
                         if ma_fast_prev > levels_prev[level] and ma_fast_curr < levels_curr[level]:
                             order_side = Side.SELL
-                            volume_fraction = 1/self.ma_slow.levels_count*2
+                            volume_fraction = 0#abs(level)/self.ma_slow.levels_count*2
                             break
-                for level in range(-self.ma_slow.levels_count//2, 0, 1):
+                for level in range(-self.ma_slow.lower_levels, 1, 1):
                     if levels_curr[level]:
                         if ma_fast_prev < levels_prev[level] and ma_fast_curr > levels_curr[level]:
                             order_side = Side.BUY
-                            volume_fraction = 1/self.ma_slow.levels_count*2
+                            volume_fraction = abs(level)/len(self.ma_slow.levels)*2
                             break
         else:
             raise Exception("Unknown mode")         

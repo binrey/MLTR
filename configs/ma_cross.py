@@ -12,10 +12,12 @@ config = dict(
     decision_maker=dict(
         type=ClsMACross,
         mode = "contrtrend",
-        ma_fast_period=4,
-        ma_slow_period=128,
-        levels_count=30,
-        levels_step=1
+        ma_fast_period=32,
+        ma_slow_period=256,
+        upper_levels = 1,
+        lower_levels = 7,
+        min_step=0.1,
+        speed=1.5
     ),
     sl_processor=dict(
         type=SLFixed,
@@ -32,7 +34,7 @@ config = dict(
         strategy=TrailingStop.FIX_RATE,
         trailing_stop_rate=0.0,
     ),
-    allow_overturn=True,
+    close_only_by_stops=False,
     hist_buffer_size=1028,
     tstart=0,
     tend=None,

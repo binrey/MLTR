@@ -5,14 +5,14 @@ from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
 
 config = dict(
     wallet=100,
-    leverage=3,
-    date_start="2017-09-01T00:00:00",
+    leverage=5,
+    date_start="2018-01-01T00:00:00",
     date_end="2025-01-01T00:00:00",
     no_trading_days=set(),
     decision_maker=dict(
         type=HVOL,
         nbins=13,
-        sharpness=5
+        sharpness=4
     ),
     sl_processor=dict(
         type=SLDynamic,
@@ -29,7 +29,7 @@ config = dict(
         strategy=TrailingStop.FIX_RATE,
         trailing_stop_rate=0.01,
     ),
-    allow_overturn=True,
+    close_only_by_stops=True,
     hist_buffer_size=64,
     tstart=0,
     tend=None,

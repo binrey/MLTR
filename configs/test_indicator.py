@@ -14,7 +14,7 @@ config = dict(
         type=HVOL,
         ncross=3
     ),
-    allow_overturn=False,
+    close_only_by_stops=False,
     sl_processor=dict(
         type=SLDynamic,
         active=True
