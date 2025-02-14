@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 
 import finplot as fplt
 import matplotlib
@@ -98,10 +98,10 @@ class Visualizer:
         
 
     def visualize(self, 
-                  drawitems4possitions: List[Line], 
+                  drawitems4possitions: List[Dict[str, Line]], 
                   drawitems4sl: List[Line], 
                   drawitems4tp: List[Line], 
-                  drawitems4expert: List[Union[Line, TimeVolumeProfile]]) -> None:
+                  drawitems4expert: List[Line | TimeVolumeProfile]) -> None:
         ax = fplt.create_plot('long term analysis', rows=1, maximize=False)
         fplt.candlestick_ochl(self.hist2plot[['Open', 'Close', 'High', 'Low']])
         fplt.volume_ocv(self.hist2plot[['Open', 'Close', 'Volume']], ax=ax.overlay(scale=0.08))
@@ -111,21 +111,20 @@ class Visualizer:
                                     [self.hist2plot.index[-1], [(1, 1)]]]
                 fplt.horiz_time_volume(time_vol_profile, draw_va=0, draw_poc=3.0)
             else:
-                if drawitem.points[0][0]:
-                    for point1, point2 in zip(drawitem.points[:-1], drawitem.points[1:]):
-                        fplt.add_line(
-                            p0=point1, 
-                            p1=point2, 
-                            color=drawitem.color,
-                            width=drawitem.width, 
-                            style="-")
-
+                fplt.plot(drawitem.to_dataframe(),
+                          color=drawitem.color,
+                          width=drawitem.width, 
+                          style="-")
         
         for drawitem in drawitems4possitions:
             rect = fplt.add_rect(drawitem["enter_points"].points[-1], 
                                  drawitem["enter_points"].points[0], 
                                  color=drawitem["enter_points"].color)
             
+            # fplt.plot(drawitem["enter_price"].to_dataframe(),
+            #               color="#000",
+            #               width=6, 
+            #               style="--")
             for point1, point2 in zip(drawitem["enter_price"].points[:-1], 
                                       drawitem["enter_price"].points[1:]):
                 fplt.add_line(p0=point1, p1=point2, color="#000", width=2, style="--")
@@ -153,6 +152,7 @@ class Visualizer:
                             width=1, 
                             style="--")
         fplt.winh = 600
+        # fplt.YScale.set_scale()
         fplt.show()
 
 

@@ -86,6 +86,11 @@ class Line:
     color: str = "black"
     width: int = 1
 
+    def to_dataframe(cls):
+        df = pd.DataFrame(cls.points, columns=["Date", "Close"])
+        df["Date"] = pd.to_datetime(df["Date"])
+        return df
+
 @dataclass
 class TimeVolumeProfile:
     time: pd.Timestamp
