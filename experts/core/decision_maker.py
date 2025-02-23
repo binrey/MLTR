@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import pandas as pd
+from typing import Optional
 from common.type import Line, Side
 from dataclasses import dataclass
 
@@ -8,8 +9,9 @@ class DecisionMaker(ABC):
     @dataclass
     class Response:
         side: Side | None
-        target_volume_fraction: float = 1.0 #  Define position volume have to be
-        increment_volume_fraction: float = 1.0 #  How mutch increase position, target isn't defined
+        target_volume_fraction: Optional[float] = None #  Define position volume have to be
+        increment_volume_fraction: Optional[float] = None #  How mutch increase position, target isn't defined
+        increment_by_num_lots: Optional[int] = None
 
         @property
         def is_active(self):

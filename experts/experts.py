@@ -81,36 +81,39 @@ class ExpertFormation(ExpertBase):
         #     y = [0.5, 1, 2, 4, 8][self.model.predict(x).item()]
             
         
-        if target_state.is_active:
-            order_side = target_state.side
-            max_volume = self.estimate_volume(h)             
-            if target_state.target_volume_fraction is not None:
-                target_volume_fraction = target_state.target_volume_fraction
+        if not target_state.is_active:
+            return
+
+        order_side = target_state.side
+        max_volume = self.estimate_volume(h)             
+        if target_state.target_volume_fraction is not None:
+            target_volume_fraction = target_state.target_volume_fraction
+        else:
             if target_state.increment_volume_fraction is not None:
-                if self.active_position and self.active_position.side.value * order_side.value > 0:
-                    target_volume_fraction = min(1, self.active_position.volume / max_volume + target_state.increment_volume_fraction)
-                else:
-                    target_volume_fraction = target_state.increment_volume_fraction
-
-            # if order_side == Side.SELL:
-            #     target_volume_fraction = 0
-
-            if self.active_position is None:
-                # Open new position
-                order_volume = max_volume * target_volume_fraction
+                addition = target_state.increment_volume_fraction
             else:
-                if self.active_position.side.value * order_side.value < 0:
-                    # Close old and open new
-                    order_volume = self.active_position.volume + max_volume * target_volume_fraction
-                    if order_volume < self.active_position.volume:
-                        return
-                else:
-                    # Add to old
-                    order_volume = max(0, max_volume * target_volume_fraction - self.active_position.volume)
-            if order_volume > 0:
-                self.create_orders(side=order_side, 
-                                   volume=order_volume,
-                                   time_id=h["Id"][-1])
+                addition = target_state.increment_by_num_lots * self.cfg["lot"]            
+            if self.active_position and self.active_position.side.value * order_side.value > 0:
+                target_volume_fraction = min(1, self.active_position.volume / max_volume + addition)
+            else:
+                target_volume_fraction = addition
+
+        if self.active_position is None:
+            # Open new position
+            order_volume = max_volume * target_volume_fraction
+        else:
+            if self.active_position.side.value * order_side.value < 0:
+                # Close old and open new
+                order_volume = self.active_position.volume + max_volume * target_volume_fraction
+                if order_volume < self.active_position.volume:
+                    return
+            else:
+                # Add to old
+                order_volume = max(0, max_volume * target_volume_fraction - self.active_position.volume)
+        if order_volume > 0:
+            self.create_orders(side=order_side, 
+                                volume=order_volume,
+                                time_id=h["Id"][-1])
             
             
 class BacktestExpert(ExpertFormation):
