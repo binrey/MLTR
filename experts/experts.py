@@ -21,13 +21,13 @@ class ExpertFormation(ExpertBase):
     def __init__(self, cfg):
         super(ExpertFormation, self).__init__(cfg)  
         
-        if self.cfg["run_model_device"] is not None:
-            from ml import Net, Net2
-            self.model = Net2(4, 32)
-            self.model.load_state_dict(torch.load("model.pth"))
-            # self.model.set_threshold(0.6)
-            self.model.eval()
-            self.model.to(self.cfg["run_model_device"])
+        # if self.cfg["run_model_device"] is not None:
+        #     from ml import Net, Net2
+        #     self.model = Net2(4, 32)
+        #     self.model.load_state_dict(torch.load("model.pth"))
+        #     # self.model.set_threshold(0.6)
+        #     self.model.eval()
+        #     self.model.to(self.cfg["run_model_device"])
             
     def estimate_volume(self, h):
         volume = self.cfg["wallet"]/h["Open"][-1]*self.cfg["leverage"]
@@ -87,29 +87,36 @@ class ExpertFormation(ExpertBase):
         order_side = target_state.side
         max_volume = self.estimate_volume(h)             
         if target_state.target_volume_fraction is not None:
-            target_volume_fraction = target_state.target_volume_fraction
+            target_volume = target_state.target_volume_fraction
         else:
             if target_state.increment_volume_fraction is not None:
                 addition = target_state.increment_volume_fraction
             else:
-                addition = target_state.increment_by_num_lots * self.cfg["lot"]            
-            if self.active_position and self.active_position.side.value * order_side.value > 0:
-                target_volume_fraction = min(1, self.active_position.volume / max_volume + addition)
-            else:
-                target_volume_fraction = addition
+                addition = target_state.increment_by_num_lots * self.cfg["lot"]   
+                
+            target_volume = addition             
+            if self.active_position:
+                if self.active_position.side.value * order_side.value > 0:
+                    target_volume = min(1, self.active_position.volume / max_volume + addition)
+                if self.active_position.side.value * order_side.value < 0:
+                    target_volume = max(-1, self.active_position.volume / max_volume - addition)
+                    # Do not trim position:
+                    target_volume = -addition
+        
+        target_volume *= max_volume
 
         if self.active_position is None:
             # Open new position
-            order_volume = max_volume * target_volume_fraction
+            order_volume = target_volume
         else:
             if self.active_position.side.value * order_side.value < 0:
                 # Close old and open new
-                order_volume = self.active_position.volume + max_volume * target_volume_fraction
-                if order_volume < self.active_position.volume:
-                    return
+                order_volume = self.active_position.volume - target_volume
+                # if order_volume < self.active_position.volume:
+                #     return
             else:
                 # Add to old
-                order_volume = max(0, max_volume * target_volume_fraction - self.active_position.volume)
+                order_volume = max(0, target_volume - self.active_position.volume)
         if order_volume > 0:
             self.create_orders(side=order_side, 
                                 volume=order_volume,

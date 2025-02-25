@@ -49,12 +49,13 @@ class BackTestResults:
                 )       
             self.deals_hist.set_index("dates", inplace=True)
             self.daily_hist = self.resample_hist(self.deals_hist, "D")
+            
             # add column with cumulative sum of profits
-            self.daily_hist["profit_csum"] = self.daily_hist["profits"].cumsum()
+            self.daily_hist["profit_nofees"] = self.daily_hist["profits"].cumsum()
             # add column with cumulative sum of fees
             self.daily_hist["fees_csum"] = self.daily_hist["fees"].cumsum()
             # add column with cumulative sum of profits without fees
-            self.daily_hist["profit_nofees"] = self.daily_hist["profits"].cumsum() + self.daily_hist["fees"].cumsum()   
+            self.daily_hist["profit_csum"] = self.daily_hist["profit_nofees"] - self.daily_hist["fees_csum"]   
             self.monthly_hist = self.resample_hist(self.deals_hist, "M")
             self.process_daily_metrics()
             # self.update_monthly_profit()
@@ -72,34 +73,8 @@ class BackTestResults:
         hist = hist.reindex(target_dates, fill_value=0)
 
         return hist
-        
-    def compute_buy_and_hold(self, dates: np.ndarray, closes: np.ndarray):
-        """
-        Compute buy and hold strategy for the given dates and closes prices. Use self.resample_hist method to resample data to monthly frequency.
-        
-        Output pandas DataFrame with index "dates" and columns: "profits", "buy_and_hold", "buy_and_hold_reinvest".
-        dates - dates of first day of every month.
-        profits - profits from the strategy on every month.
-        buy_and_hold - Buy at the first day and sell on the last. 
-        """
-        t0 = perf_counter()
-        # create datafreame from closes and dates as index
-        df = pd.DataFrame({"price": closes}, index=dates)
-        # compute profits column as difference between Close prices
-        df["dp"] = df["price"].diff().fillna(0)
-        # feel fees column with zeros
-        df["fees"] = 0
-        first_prices = df.resample("M").first()["price"]
-        # resample hist to monthly data
-        df = self.resample_hist(df, "M")
-        self.monthly_hist["price"] = first_prices
-        self.monthly_hist["buy_and_hold_volume"] = self.wallet/self.monthly_hist["price"].iloc[0]
-        self.monthly_hist["buy_and_hold"] = (df["dp"]*self.monthly_hist["buy_and_hold_volume"]).cumsum()
-        self.monthly_hist["buy_and_spend_volume"] = self.wallet/self.monthly_hist["price"]*self.leverage
-        self.monthly_hist["buy_and_spend"] = (df["dp"]*self.monthly_hist["buy_and_spend_volume"]).cumsum()
-        return perf_counter() - t0
 
-    def compute_buy_and_hold_D(self, dates: np.ndarray, closes: np.ndarray):
+    def compute_buy_and_hold(self, dates: np.ndarray, closes: np.ndarray):
         """
         Compute buy and hold strategy for the given dates and closes prices. Use self.resample_hist method to resample data to monthly frequency.
         
@@ -186,7 +161,7 @@ class BackTestResults:
                 alpha=0.6,
             )
             legend_ax1.append("buy & hold")
-            ax1.set_ylabel("Buy & Hold")
+            # ax1.set_ylabel("Buy & Hold")
 
         # Second subplot
         ax2.plot(

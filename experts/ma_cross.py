@@ -27,7 +27,7 @@ class ClsMACross(DecisionMaker):
         return self.ma_fast
 
     def look_around(self, h) -> bool:
-        order_side, lots_to_order = None, None
+        order_side, lots_to_order, volume_fraction = None, None, None
         self.ma_fast.update(h)
         self.ma_slow.update(h)
         levels_curr, levels_prev = self.ma_slow.current_ma_values, self.ma_slow.previous_ma_values
@@ -36,10 +36,10 @@ class ClsMACross(DecisionMaker):
         
         if self.mode == "trend":
             if ma_fast_curr > ma_slow_curr:
-                oreder_side = Side.BUY
+                order_side = Side.BUY
                 volume_fraction = 1
             elif ma_fast_curr < ma_slow_curr:
-                oreder_side = Side.SELL
+                order_side = Side.SELL
                 volume_fraction = 1
 
         elif self.mode == "contrtrend":
@@ -64,7 +64,9 @@ class ClsMACross(DecisionMaker):
             self.sl_definer[Side.SELL] = h["High"].max()
             self.indicator_vis_objects = self.ma_fast.get_vis_objects() + self.ma_slow.get_vis_objects()
 
-        return DecisionMaker.Response(side=order_side, increment_by_num_lots = lots_to_order)
+        return DecisionMaker.Response(side=order_side, 
+                                      target_volume_fraction=volume_fraction,
+                                      increment_by_num_lots = lots_to_order)
     
     def setup_sl(self, side: Side):
         return self.sl_definer[side]

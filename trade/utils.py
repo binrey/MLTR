@@ -1,12 +1,12 @@
 from enum import Enum
 from typing import Any, List, Optional
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from loguru import logger
 
-from common.type import Side
+from common.type import Line, Point, Side
 from common.utils import FeeConst, FeeModel, date2str
-from common.type import Line
 
 
 class ORDER_TYPE(Enum):
@@ -123,6 +123,11 @@ class Position:
             )
         self.fees = self.fees_abs / self.volume / self.open_price * 100
 
+    def _update_profit_abs(self, price, volume):
+        if self.profit_abs is None:
+            self.profit_abs = 0
+        self.profit_abs += (price - self.open_price) * self.side.value * volume        
+
     @property
     def str_dir(self):
         return "BUY" if self.side.value > 0 else "SELL"
@@ -140,10 +145,8 @@ class Position:
         self.close_date = np.datetime64(date)
         self.close_indx = indx
         self._update_fees(self.close_price, self.volume)
-        self.profit_abs = (self.close_price - self.open_price) * self.side.value * self.volume
-        self.profit_abs -= self.fees_abs
-        self.profit = self.profit_abs / self.open_price * 100
-
+        self._update_profit_abs(self.close_price, self.volume)
+        self.profit = (self.profit_abs - self.fees_abs) / self.open_price * 100
         self.enter_points_hist.append((self.close_date, self.close_price))
         self.enter_price_hist.append((self.close_date, self.open_price))
 
@@ -182,6 +185,28 @@ class Position:
         self.volume_hist.append((pd.to_datetime(self.open_date), self.volume))
         logger.debug(f"Added {additional_volume} to position {self.id} at price {price}")
 
+    def trim_position(self, 
+                      trim_volume: int, 
+                      price: float, 
+                      time: np.datetime64):
+        """
+        Trim existing position by decreasing the volume and updating fees and partial profit.
+        
+        Parameters:
+            trim_volume (int): The volume to trim (i.e. exit) from the current position.
+            price (float): The execution price for the trimmed volume.
+            time (np.datetime64): The timestamp of the trim event.
+        """
+        assert trim_volume < self.volume, "Cannot trim more or equal than current position"
+
+        self._update_profit_abs(price, trim_volume)
+        self._update_fees(price, trim_volume)
+        self.volume -= trim_volume
+        self.enter_points_hist.append((pd.to_datetime(time), price))
+        self.enter_price_hist.append((pd.to_datetime(time), self.open_price))
+        self.volume_hist.append((pd.to_datetime(time), self.volume))
+        logger.debug(f"Remove {trim_volume} from position {self.id} at price {price}")
+        
     def get_drawitem(self):
         return {"enter_points": Line(points=self.enter_points_hist, color='#8c8' if self.side == Side.BUY else '#c88'),
                 "enter_price": Line(points=self.enter_price_hist),
