@@ -1,8 +1,10 @@
 from pathlib import Path
 
 import torch
-from indicators.ma import MovingAverage
+
 from common.type import Side
+from indicators.ma import MovingAverage
+
 from .core.expert import DecisionMaker
 
 
@@ -24,7 +26,7 @@ class ClsMACross(DecisionMaker):
             lower_levels=cfg["lower_levels"],
             min_step=cfg["min_step"],
             speed=cfg["speed"])
-        return self.ma_fast
+        return [self.ma_fast, self.ma_slow]
 
     def look_around(self, h) -> bool:
         order_side, lots_to_order, volume_fraction = None, None, None
@@ -62,7 +64,7 @@ class ClsMACross(DecisionMaker):
         if order_side:
             self.sl_definer[Side.BUY] = h["Low"].min()
             self.sl_definer[Side.SELL] = h["High"].max()
-            self.indicator_vis_objects = self.ma_fast.get_vis_objects() + self.ma_slow.get_vis_objects()
+            self.set_vis_objects(h["Date"][-2])
 
         return DecisionMaker.Response(side=order_side, 
                                       target_volume_fraction=volume_fraction,

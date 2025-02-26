@@ -1,5 +1,6 @@
+from copy import deepcopy
 from pathlib import Path
-from typing import List, Optional, Union, Dict
+from typing import Dict, List, Optional, Union
 
 import finplot as fplt
 import matplotlib
@@ -83,10 +84,10 @@ class Visualizer:
                                              color="#000"))
                 
         if expert2draw is not None:
-            drawitems4expert = expert2draw.decision_maker.vis_objects
+            drawitems4expert = expert2draw.decision_maker.draw_items
         else:
             drawitems4expert = []
-                
+                            
         if self.show:
             self.visualize(drawitems4pos, drawitems4sl, drawitems4tp, drawitems4expert)
             return None
@@ -95,36 +96,47 @@ class Visualizer:
             if len(pos_list) and pos_list[-1] is not None:
                 pos_curr_side = pos_list[-1].side
             return self.save(drawitems4pos, drawitems4sl, drawitems4tp, pos_curr_side)
-        
 
     def visualize(self, 
                   drawitems4possitions: List[Dict[str, Line]], 
                   drawitems4sl: List[Line], 
                   drawitems4tp: List[Line], 
-                  drawitems4expert: List[Line | TimeVolumeProfile]) -> None:
+                  drawitems4expert: List[Line]) -> None:
+        
         ax = fplt.create_plot('long term analysis', rows=1, maximize=False)
         fplt.candlestick_ochl(self.hist2plot[['Open', 'Close', 'High', 'Low']])
         fplt.volume_ocv(self.hist2plot[['Open', 'Close', 'Volume']], ax=ax.overlay(scale=0.08))
         for drawitem in drawitems4expert:
+            if type(drawitem) is Line:            
+                if len(drawitem.points) < 2:
+                    continue
+                elif len(drawitem.points) == 2:
+                    drawitem = deepcopy(drawitem)
+                    for i in range(2):
+                        if drawitem.points[i][0] is None:
+                            drawitem.points[i] = (self.hist2plot.index[-i], drawitem.points[i][1])
+                    fplt.add_line(drawitem.points[0], 
+                                drawitem.points[1], 
+                                color=drawitem.color,
+                                width=2, 
+                                style="-") 
+                else:               
+                    fplt.plot(drawitem.to_dataframe(),
+                    color=drawitem.color,
+                    width=drawitem.width, 
+                    style="-")
+
             if type(drawitem) is TimeVolumeProfile:
                 time_vol_profile = [[drawitem.time if drawitem.time in self.hist2plot.index else self.hist2plot.index[0], drawitem.hist],
                                     [self.hist2plot.index[-1], [(1, 1)]]]
-                fplt.horiz_time_volume(time_vol_profile, draw_va=0, draw_poc=3.0)
-            else:
-                fplt.plot(drawitem.to_dataframe(),
-                          color=drawitem.color,
-                          width=drawitem.width, 
-                          style="-")
+                fplt.horiz_time_volume(time_vol_profile, draw_va=0, draw_poc=3.0) 
+        
         
         for drawitem in drawitems4possitions:
-            rect = fplt.add_rect(drawitem["enter_points"].points[-1], 
-                                 drawitem["enter_points"].points[0], 
-                                 color=drawitem["enter_points"].color)
+            fplt.add_rect(drawitem["enter_points"].points[-1], 
+                          drawitem["enter_points"].points[0], 
+                          color=drawitem["enter_points"].color)
             
-            # fplt.plot(drawitem["enter_price"].to_dataframe(),
-            #               color="#000",
-            #               width=6, 
-            #               style="--")
             for point1, point2 in zip(drawitem["enter_price"].points[:-1], 
                                       drawitem["enter_price"].points[1:]):
                 fplt.add_line(p0=point1, p1=point2, color="#000", width=2, style="--")
@@ -139,18 +151,6 @@ class Visualizer:
                           width=2, 
                           style="-")
             
-        for drawitem in drawitems4expert:
-            if type(drawitem) is Line:
-                if len(drawitem.points) < 2:
-                    continue
-                for i in range(2):
-                    if drawitem.points[i][0] is None:
-                        drawitem.points[i] = (self.hist2plot.index[-i], drawitem.points[i][1])
-                fplt.add_line(drawitem.points[0], 
-                            drawitem.points[1], 
-                            color=drawitem.color,
-                            width=1, 
-                            style="--")
         fplt.winh = 600
         # fplt.YScale.set_scale()
         fplt.show()

@@ -12,11 +12,11 @@ config = dict(
     decision_maker=dict(
         type=HVOL,
         nbins=13,
-        sharpness=4
+        sharpness=2
     ),
     sl_processor=dict(
         type=SLDynamic,
-        active=False,
+        active=True,
         percent_value=2
     ),
     tp_processor=dict(
@@ -42,7 +42,7 @@ config = dict(
     save_plots=False,
     vis_events=Vis.ON_DEAL,
     vis_hist_length=512,
-    visualize=False,
+    visualize=True,
     eval_buyhold=True,
     run_model_device=None,
 )

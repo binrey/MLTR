@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
-import pandas as pd
-from typing import Optional
-from common.type import Line, Side
 from dataclasses import dataclass
+from typing import List, Optional
+
+import pandas as pd
+
+from common.type import Line, Side, TimeVolumeProfile
 
 
 class DecisionMaker(ABC):
@@ -22,28 +24,26 @@ class DecisionMaker(ABC):
         self.sl_definer = {Side.BUY: None, Side.SELL: None}
         self.tp_definer = {Side.BUY: None, Side.SELL: None}
         self.lprice, self.sprice, self.cprice = None, None, None
-        self.indicator_vis_objects = None
         self.vis_items = []
-        self.setup_indicators(cfg)
+        self.indicators = self.setup_indicators(cfg)
              
     def __str__(self):
         return self.type + ": " + "|".join([f"{k}:{v}" for k, v in self.cfg.items()])
     
     @abstractmethod
-    def setup_indicators(self, cfg):
+    def setup_indicators(self, cfg):  # TODO
         pass
     
-    @property
-    def vis_objects(self):
-        lines = []
-        if self.lprice is not None:
-            lines.append(Line([(pd.to_datetime(self.tsignal), self.lprice), (None, self.lprice)], color="green"))
-        if self.sprice is not None:
-            lines.append(Line([(pd.to_datetime(self.tsignal), self.sprice), (None, self.sprice)], color="red"))
-        if self.indicator_vis_objects is not None:
-            lines += self.indicator_vis_objects
-        return lines
-      
+    def set_vis_objects(self, time=None):
+        self.draw_items = []
+        if self.lprice is not None and time:
+            self.draw_items.append(Line([(pd.to_datetime(time), self.lprice), (None, self.lprice)], color="green"))
+        if self.sprice is not None and time:
+            self.draw_items.append(Line([(pd.to_datetime(time), self.sprice), (None, self.sprice)], color="red"))
+            
+        for indicator in self.indicators:
+            self.draw_items += indicator.vis_objects
+    
     @abstractmethod
     def look_around(self, h) -> "DecisionMaker.Response":
         pass

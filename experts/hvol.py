@@ -1,5 +1,6 @@
 import numpy as np
 from loguru import logger
+
 from common.type import Side
 from experts.core.expert import DecisionMaker
 from indicators.vol_distribution import VolDistribution
@@ -14,6 +15,7 @@ class HVOL(DecisionMaker):
         
     def setup_indicators(self, cfg):
         self.indicator = VolDistribution(nbins=cfg["nbins"])
+        return [self.indicator]
 
     def look_around(self, h) -> DecisionMaker.Response:
         order_side, target_volume_fraction = None, 1
@@ -27,10 +29,10 @@ class HVOL(DecisionMaker):
                 if sprice < h["Open"][-1] < lprice:
                     self.lprice = lprice
                     self.sprice = sprice
-                    self.tsignal = None#h["Date"][-2]
                     self.sl_definer[Side.BUY] = h["Low"].min()
                     self.sl_definer[Side.SELL] = h["High"].max()
-                    self.indicator_vis_objects = self.indicator.vis_objects
+                    self.set_vis_objects(h["Date"][-2])
+                    
         
         if self.lprice:
             if h["Close"][-3] < self.lprice and h["Close"][-2] > self.lprice:

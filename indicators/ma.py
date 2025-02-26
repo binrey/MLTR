@@ -1,8 +1,10 @@
-import numpy as np
-import pandas as pd
-from common.type import Line
 from copy import deepcopy
 from typing import List
+
+import numpy as np
+import pandas as pd
+
+from common.type import Line
 
 
 class MovingAverage:
@@ -70,5 +72,6 @@ class MovingAverage:
         
         return ma_current_value
 
-    def get_vis_objects(self) -> List[Line]:
+    @property
+    def vis_objects(self) -> List[Line]:
         return list(self.levels_lines.values())
