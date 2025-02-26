@@ -1,12 +1,11 @@
-from time import perf_counter
 from typing import List, Optional
 
 import numpy as np
+import pandas as pd
 from loguru import logger
 from tqdm import tqdm
 
 from common.type import Side
-from common.utils import date2str
 from data_processing.dataloading import MovingWindow
 from trade.utils import ORDER_TYPE, Order, Position
 
@@ -18,7 +17,7 @@ class Broker:
         self.active_position: Position = None
         self.positions: List[Position] = []
         self.orders = []
-        self.best_profit = 0
+        self.profit_hist = {"dates": [], "profit_nofees": [], "fees_csum": []}
         
         self.time = None
         self.hist_id = None
@@ -46,7 +45,7 @@ class Broker:
             self.open_price = self.hist_window["Open"][-1]
             
             closed_position = self.update()
-            callback({"timestamp": self.time}) #TODO remove time
+            callback({"timestamp": self.time})  # TODO remove time
             closed_position_new = self.update()
             if closed_position is None:
                 if closed_position_new is not None:
@@ -60,11 +59,33 @@ class Broker:
             self.close_active_pos(price=self.open_price, 
                                   time=self.time,
                                   hist_id=self.hist_id)
+            self.update_profit_curve()
+        self.profit_hist = pd.DataFrame(self.profit_hist)
 
     def update_profit_curve(self):
         """
-        Update cumulative profit curve from current state and active position. 
+        Update cumulative profit curve from current state and active position.
+        This method computes the cumulative profit from all closed positions and adds
+        the unrealized profit from the active position (if any) using the current open price.
+        It also updates the best profit record if the current cumulative profit exceeds it.
         """
+        # Cumulative profit from closed positions
+        cumulative_profit = self.profits_abs.sum()
+        
+        # If an active position exists, add its unrealized profit
+        if self.active_position is not None:
+            if self.active_position.side == Side.BUY:
+                active_profit = (self.open_price - self.active_position.open_price) * self.active_position.volume
+            elif self.active_position.side == Side.SELL:
+                active_profit = (self.active_position.open_price - self.open_price) * self.active_position.volume
+            else:
+                active_profit = 0
+            cumulative_profit += active_profit
+        
+        # Append current cumulative profit to the profit curve
+        self.profit_hist["dates"].append(pd.to_datetime(self.time))        
+        self.profit_hist["profit_nofees"].append(cumulative_profit)
+        self.profit_hist["fees_csum"].append(self.fees_abs.sum())
 
     def close_orders(self, hist_id, i=None):
         if i is not None:
@@ -87,19 +108,6 @@ class Broker:
         if len(new_orders_list):
             self.close_orders(self.hist_id)
             self.active_orders = new_orders_list
-
-    def update_state(self):
-        t0 = perf_counter()
-        closed_position = self.update()
-        # self.set_active_orders(h, new_orders_list)
-        # closed_position_new = self.update(h)
-        # if closed_position is None:
-        #     if closed_position_new is not None:
-        #         closed_position = closed_position_new
-        # elif closed_position_new is not None:
-        #     raise ValueError("closed positions disagreement!")
-        # self.trailing_stop(h)
-        return closed_position, perf_counter() - t0
 
     def close_active_pos(self, price, time, hist_id):
         self.active_position.close(price, time, hist_id)
@@ -192,8 +200,7 @@ class Broker:
                         self.active_position.add_to_position(triggered_vol, triggered_price, triggered_date)
                         triggered_vol = 0
 
-
-                # Открытие новой позиции
+                # Open new position if there is remaining volume
                 if triggered_vol:
                     sl = None
                     for order in self.active_orders:
@@ -222,4 +229,3 @@ class Broker:
                 self.active_orders.remove(order)
 
         return closed_position
-

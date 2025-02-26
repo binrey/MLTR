@@ -28,6 +28,7 @@ class BackTestResults:
         self.buy_and_hold = None
         self.tickers = None
         self.wallet = wallet
+        self.ndeals = None
 
     def process_backtest(self, bktest_broker: Broker, leverage=None):
         t0 = perf_counter()
@@ -35,11 +36,21 @@ class BackTestResults:
         self.wallet = bktest_broker.cfg["wallet"] if self.wallet is None else self.wallet
 
         self.tickers = "+".join(set([pos.ticker for pos in bktest_broker.positions]))
+        self.process_profit_hist(bktest_broker.profit_hist)
         self.process_profits(dates=[pd.to_datetime(pos.close_date) for pos in bktest_broker.positions],
                              profits=bktest_broker.profits_abs,
                              fees=bktest_broker.fees_abs)
         self.num_years_on_trade = self.compute_n_years(bktest_broker.positions)
+        self.ndeals = len(bktest_broker.positions)
         return perf_counter() - t0
+
+    def process_profit_hist(self, profit_hist: pd.DataFrame):
+        profit_hist.set_index("dates", inplace=True)
+        self.daily_hist = self.resample_hist(profit_hist, "D", func="last")
+        self.daily_hist["profit_csum"] = self.daily_hist["profit_nofees"] - self.daily_hist["fees_csum"]   
+        self.process_daily_metrics()
+        # self.update_monthly_profit()
+        self.fees = profit_hist["fees_csum"][-1]
 
     def process_profits(self, dates: Iterable, profits: Iterable, fees: Iterable):
         self.ndeals = len(profits)
@@ -48,30 +59,33 @@ class BackTestResults:
                 {"dates": dates, "profits": profits, "fees":fees}
                 )       
             self.deals_hist.set_index("dates", inplace=True)
-            self.daily_hist = self.resample_hist(self.deals_hist, "D")
+            # self.daily_hist = self.resample_hist(self.deals_hist, "D")
             
-            # add column with cumulative sum of profits
-            self.daily_hist["profit_nofees"] = self.daily_hist["profits"].cumsum()
-            # add column with cumulative sum of fees
-            self.daily_hist["fees_csum"] = self.daily_hist["fees"].cumsum()
-            # add column with cumulative sum of profits without fees
-            self.daily_hist["profit_csum"] = self.daily_hist["profit_nofees"] - self.daily_hist["fees_csum"]   
+            # # add column with cumulative sum of profits
+            # self.daily_hist["profit_nofees"] = self.daily_hist["profits"].cumsum()
+            # # add column with cumulative sum of fees
+            # self.daily_hist["fees_csum"] = self.daily_hist["fees"].cumsum()
+            # # add column with cumulative sum of profits without fees
+            # self.daily_hist["profit_csum"] = self.daily_hist["profit_nofees"] - self.daily_hist["fees_csum"]   
             self.monthly_hist = self.resample_hist(self.deals_hist, "M")
-            self.process_daily_metrics()
+            # self.process_daily_metrics()
             # self.update_monthly_profit()
-            self.fees = sum(fees)
+            # self.fees = sum(fees)
 
-    def resample_hist(self, hist, period="D"):
-        hist = hist.resample(period).sum()
-        # Set the index to the first day of each month
-        # monthly_sum.index = monthly_sum.index.to_period('M').to_timestamp('M')
-        # generate dates based on start and end dates
+    def resample_hist(self, hist, period="D", func="sum"):
         target_dates = pd.date_range(start=pd.to_datetime(self.date_start).date(), 
                                      end=pd.to_datetime(self.date_end).date(), 
-                                     freq=period)
-        # fill missing dates with zeros
-        hist = hist.reindex(target_dates, fill_value=0)
-
+                                     freq=period) 
+               
+        hist = hist.resample(period)
+        if func == "sum":
+            hist = hist.sum() 
+            hist = hist.reindex(target_dates, fill_value=0)
+        elif func == "last":
+            hist = hist.last()
+            hist = hist.reindex(target_dates, method="ffill")
+        else:
+            raise ValueError("func must be 'sum' or 'last'")
         return hist
 
     def compute_buy_and_hold(self, dates: np.ndarray, closes: np.ndarray):
@@ -125,13 +139,7 @@ class BackTestResults:
             color="b",
             alpha=0.6,
         )
-        ax1.plot(
-            self.deals_hist["profits"].index,
-            self.deals_hist["profits"].cumsum(),
-            linewidth=1,
-            color="b",
-            alpha=0.6,
-        )
+
         ax1.plot(
             self.daily_hist.index,
             self.daily_hist.profit_nofees,
@@ -139,7 +147,9 @@ class BackTestResults:
             color="r",
             alpha=0.6,
         )
-        legend_ax1 = ["sum. profit", "profit from strategy", "profit without fees"]
+        
+        legend_ax1 = ["profit", "profit without fees"]
+        
         if "buy_and_spend" in self.monthly_hist.columns:
             ax1.plot(
                 self.monthly_hist.index,
@@ -149,7 +159,6 @@ class BackTestResults:
             )
             legend_ax1.append("buy & spend")
 
-        
         # Create a secondary y-axis for buy_and_hold_reinvest
         if "buy_and_hold" in self.daily_hist.columns:
             # ax1 = ax1.twinx()
@@ -161,7 +170,6 @@ class BackTestResults:
                 alpha=0.6,
             )
             legend_ax1.append("buy & hold")
-            # ax1.set_ylabel("Buy & Hold")
 
         # Second subplot
         ax2.plot(
