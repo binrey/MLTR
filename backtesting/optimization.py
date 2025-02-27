@@ -98,7 +98,7 @@ class Optimizer:
             locnum = 0
             while True:
                   btest = backtest_launch(cfg)
-                  if btest.ndeals == 0:
+                  if btest.ndeals_per_month < cfg["min_deals_per_month"]:
                         break
                   # cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
                   locnum += 1

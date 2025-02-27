@@ -74,6 +74,10 @@ def launch(cfg):
 
     bt_res = BackTestResults(bt_session.mw.date_start, bt_session.mw.date_end)
     tpost = bt_res.process_backtest(bt_session)
+    if bt_res.ndeals == 0:
+        logger.warning("No trades!")
+        return bt_res
+    
     if cfg['eval_buyhold']:
         tbandh = bt_res.compute_buy_and_hold(
             dates=bt_session.mw.hist["Date"][bt_session.mw.id2start : bt_session.mw.id2end],

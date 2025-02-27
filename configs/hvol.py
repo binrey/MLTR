@@ -12,11 +12,11 @@ config = dict(
     decision_maker=dict(
         type=HVOL,
         nbins=13,
-        sharpness=2
+        sharpness=4
     ),
     sl_processor=dict(
         type=SLDynamic,
-        active=True,
+        active=False,
         percent_value=2
     ),
     tp_processor=dict(
@@ -29,7 +29,7 @@ config = dict(
         strategy=TrailingStop.FIX_RATE,
         trailing_stop_rate=0.01,
     ),
-    close_only_by_stops=True,
+    close_only_by_stops=False,
     hist_buffer_size=64,
     tstart=0,
     tend=None,
@@ -42,14 +42,15 @@ config = dict(
     save_plots=False,
     vis_events=Vis.ON_DEAL,
     vis_hist_length=512,
-    visualize=True,
+    visualize=False,
     eval_buyhold=True,
     run_model_device=None,
 )
 
 
 optimization = update_config(
-    config, 
+    config,
+    min_deals_per_month=1,
     symbol=[Symbols.BTCUSDT, Symbols.ETHUSDT],
     hist_buffer_size=[32, 64, 128], 
     decision_maker={

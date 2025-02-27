@@ -45,9 +45,7 @@ class HVOL(DecisionMaker):
         if self.lprice or self.sprice:
             logger.debug(f"found enter points: long: {self.lprice}, short: {self.sprice}")
 
-        return DecisionMaker.Response(
-            side=order_side,
-            target_volume_fraction=target_volume_fraction)
+        return DecisionMaker.Response(side=order_side, target_volume_fraction=target_volume_fraction)
 
     
     def setup_sl(self, side: Side):

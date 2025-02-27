@@ -27,21 +27,20 @@ class BackTestResults:
         self.monthly_hist = None
         self.buy_and_hold = None
         self.tickers = None
-        self.wallet = wallet
+        self.wallet = None
         self.ndeals = None
 
-    def process_backtest(self, bktest_broker: Broker, leverage=None):
+    def process_backtest(self, bktest_broker: Broker):
         t0 = perf_counter()
-        self.leverage = bktest_broker.cfg["leverage"] if leverage is None else leverage
-        self.wallet = bktest_broker.cfg["wallet"] if self.wallet is None else self.wallet
-
-        self.tickers = "+".join(set([pos.ticker for pos in bktest_broker.positions]))
-        self.process_profit_hist(bktest_broker.profit_hist)
-        self.process_profits(dates=[pd.to_datetime(pos.close_date) for pos in bktest_broker.positions],
-                             profits=bktest_broker.profits_abs,
-                             fees=bktest_broker.fees_abs)
-        self.num_years_on_trade = self.compute_n_years(bktest_broker.positions)
         self.ndeals = len(bktest_broker.positions)
+        self.num_years_on_trade = self.compute_n_years(bktest_broker.positions)
+        self.wallet = bktest_broker.cfg["wallet"]
+        self.tickers = "+".join({pos.ticker for pos in bktest_broker.positions})
+        if self.ndeals:
+            self.process_profit_hist(bktest_broker.profit_hist)
+            self.process_profits(dates=[pd.to_datetime(pos.close_date) for pos in bktest_broker.positions],
+                                profits=bktest_broker.profits_abs,
+                                fees=bktest_broker.fees_abs)
         return perf_counter() - t0
 
     def process_profit_hist(self, profit_hist: pd.DataFrame):
@@ -50,7 +49,7 @@ class BackTestResults:
         self.daily_hist["profit_csum"] = self.daily_hist["profit_nofees"] - self.daily_hist["fees_csum"]   
         self.process_daily_metrics()
         # self.update_monthly_profit()
-        self.fees = profit_hist["fees_csum"][-1]
+        self.fees = profit_hist["fees_csum"].iloc[-1]
 
     def process_profits(self, dates: Iterable, profits: Iterable, fees: Iterable):
         self.ndeals = len(profits)
@@ -149,15 +148,6 @@ class BackTestResults:
         )
         
         legend_ax1 = ["profit", "profit without fees"]
-        
-        if "buy_and_spend" in self.monthly_hist.columns:
-            ax1.plot(
-                self.monthly_hist.index,
-                self.monthly_hist["buy_and_spend"],
-                linewidth=2,
-                alpha=0.6,
-            )
-            legend_ax1.append("buy & spend")
 
         # Create a secondary y-axis for buy_and_hold_reinvest
         if "buy_and_hold" in self.daily_hist.columns:
