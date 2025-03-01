@@ -18,8 +18,8 @@ class HVOL(DecisionMaker):
     
     def __init__(self, cfg):
         super().__init__(cfg)
-        self.long_trigger_width = cfg.get("long_trigger_width", 1)
-        self.short_trigger_width = cfg.get("short_trigger_width", 1)
+        self.long_bin = cfg.get("long_bin", 1)
+        self.short_bin = cfg.get("short_bin", 1)
         self.sharpness = cfg["sharpness"]
         self.strategy = cfg["strategy"]
 
@@ -29,10 +29,10 @@ class HVOL(DecisionMaker):
 
     def _find_prices_manual_levels(self, h, max_vol_id):
         """Manual levels strategy: Uses volume distribution bins directly"""
-        if self.short_trigger_width <= max_vol_id < len(self.indicator.vol_hist) - self.long_trigger_width:    
+        if self.short_bin <= max_vol_id < len(self.indicator.vol_hist) - self.long_bin:    
             bin_width = self.indicator.price_bins[1] - self.indicator.price_bins[0] 
-            lprice = self.indicator.price_bins[max_vol_id+self.long_trigger_width] + bin_width/2
-            sprice = self.indicator.price_bins[max_vol_id-self.short_trigger_width] + bin_width/2
+            lprice = self.indicator.price_bins[max_vol_id+self.long_bin] + bin_width/2
+            sprice = self.indicator.price_bins[max_vol_id-self.short_bin] + bin_width/2
             if sprice < h["Open"][-1] < lprice:
                 return lprice, sprice
         return None, None

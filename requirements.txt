@@ -13,3 +13,4 @@ pybit
 diskcache
 tqdm
 torch
+line-profiler==4.1.3

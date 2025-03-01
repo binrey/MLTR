@@ -1,9 +1,7 @@
 import argparse
 import os
 import sys
-from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
 
 from loguru import logger
 
@@ -56,13 +54,13 @@ if __name__ == "__main__":
 
     log_level = "DEBUG" if args.debug else "INFO"
     logger.remove()
-    logger.add(sys.stderr, level=log_level)
+    logger.add(sys.stderr, level=log_level, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>")
     log_dir = f"logs/{run_type.value}"
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     
     log_file_path = os.path.join(log_dir, f"{datetime.now()}.log")
-    logger.add(log_file_path, level=log_level)
+    logger.add(log_file_path, level=log_level, format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}")
 
     if run_type == RunType.BYBIT:
         run_bybit(args.config_path)

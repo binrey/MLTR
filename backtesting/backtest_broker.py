@@ -9,6 +9,8 @@ from common.type import Side
 from data_processing.dataloading import MovingWindow
 from trade.utils import ORDER_TYPE, Order, Position
 
+from .profiling import line_profile_function, profile_function
+
 
 class Broker:
     def __init__(self, cfg: Optional[dict] = None):
@@ -38,6 +40,8 @@ class Broker:
     def fees_abs(self):
         return np.array([p.fees_abs for p in self.positions])
 
+    @profile_function
+    # @line_profile_function
     def trade_stream(self, callback):
         for self.hist_window, dt in tqdm(self.mw(), desc="Backtest", total=self.mw.timesteps_count, disable=False):
             self.time = self.hist_window["Date"][-1]

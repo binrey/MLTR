@@ -5,8 +5,8 @@ from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
 
 config = dict(
     wallet=100,
-    lot=0.01,
-    leverage=5,
+    lot=0.02,
+    leverage=1,
     date_start="2018-01-01T00:00:00",
     date_end="2025-01-01",
     no_trading_days=set(),
@@ -15,7 +15,7 @@ config = dict(
         mode = "contrtrend",
         ma_fast_period=16,
         ma_slow_period=256,
-        upper_levels = 0,
+        upper_levels = 2,
         lower_levels = 20,
         min_step=0.25,
         speed=0.5

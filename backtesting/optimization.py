@@ -94,7 +94,7 @@ class Optimizer:
 
       def backtest_process(self, args):
             num, cfg = args
-            logger.info(f"start backtest {num}: {cfg}")
+            logger.debug(f"start backtest {num}: {cfg}")
             locnum = 0
             while True:
                   btest = backtest_launch(cfg)
@@ -124,7 +124,6 @@ class Optimizer:
       
       
       def optimize(self, optim_cfg, run_backtests=True):
-            # logger.remove()
             self.data_path = Path("optimization") / f"data_{optim_cfg['period'][0].value}"
             t0 = time()
             if run_backtests:

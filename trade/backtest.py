@@ -1,24 +1,19 @@
+from trade.base import BaseTradeClass, log_get_hist
+from experts.experts import BacktestExpert
+from backtesting.backtest_broker import Broker
+import stackprinter
+import numpy as np
 from pathlib import Path
 from shutil import rmtree
-from time import time
 
 import pandas as pd
 from loguru import logger
 
 from backtesting.utils import BackTestResults
-from data_processing.dataloading import MovingWindow
 from trade.utils import Position
 
 pd.options.mode.chained_assignment = None
 
-import numpy as np
-import pandas as pd
-import stackprinter
-import yaml
-
-from backtesting.backtest_broker import Broker
-from experts.experts import BacktestExpert
-from trade.base import BaseTradeClass, log_get_hist
 
 stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
@@ -29,31 +24,25 @@ class BackTest(BaseTradeClass):
     def __init__(self, cfg, expert, telebot, session: Broker) -> None:
         super().__init__(cfg=cfg, expert=expert, telebot=telebot)
         self.session = session
-            
+
     def get_server_time(self) -> np.datetime64:
         return self.session.time
-        
-    def update_trailing_stop(self, sl_new: float) -> None:
-        pass
 
     def get_current_position(self) -> Position:
         return self.session.active_position
-    
+
     @log_get_hist
     def get_hist(self):
         return self.session.hist_window
-    
+
     def get_pos_history(self):
         return self.session.positions
-    
+
     def get_qty_step(self):
         return self.cfg["equaty_step"]
 
-def launch(cfg):
-    t0 = time()
-    with open("./api.yaml", "r") as f:
-        creds = yaml.safe_load(f)
 
+def launch(cfg):
     if cfg["save_plots"]:
         save_path = Path("backtests") / f"{cfg['symbol'].ticker}"
         if save_path.exists():
@@ -62,43 +51,32 @@ def launch(cfg):
 
     bt_session = Broker(cfg)
     backtest_trading = BackTest(
-        cfg=cfg, 
-        expert=BacktestExpert(cfg=cfg, session=bt_session), 
+        cfg=cfg,
+        expert=BacktestExpert(cfg=cfg, session=bt_session),
         telebot=None,
         session=bt_session
-        )
+    )
     backtest_trading.test_connection()
-    
     print()
     bt_session.trade_stream(backtest_trading.handle_trade_message)
 
     bt_res = BackTestResults(bt_session.mw.date_start, bt_session.mw.date_end)
-    tpost = bt_res.process_backtest(bt_session)
+    bt_res.process_backtest(bt_session)
     if bt_res.ndeals == 0:
         logger.warning("No trades!")
         return bt_res
-    
+
     if cfg['eval_buyhold']:
-        tbandh = bt_res.compute_buy_and_hold(
-            dates=bt_session.mw.hist["Date"][bt_session.mw.id2start : bt_session.mw.id2end],
-            closes=bt_session.mw.hist["Close"][bt_session.mw.id2start : bt_session.mw.id2end],
+        bt_res.compute_buy_and_hold(
+            dates=bt_session.mw.hist["Date"][bt_session.mw.id2start: bt_session.mw.id2end],
+            closes=bt_session.mw.hist["Close"][bt_session.mw.id2start: bt_session.mw.id2end],
         )
-    ttotal = time() - t0
-    
-    sformat = lambda nd: "{:>30}: {:>5.@f}".replace("@", str(nd))
-    
+
+    def sformat(nd): return "{:>30}: {:>5.@f}".replace("@", str(nd))
+
     logger.info(
         f"{cfg['symbol'].ticker}-{cfg['period']}: {backtest_trading.exp}"
     )
-
-    logger.info(sformat(1).format("total backtest", ttotal) + " sec")
-    # logger.info(sformat(1).format("data loadings", tdata / ttotal * 100) + " %")
-    # logger.info(sformat(1).format("expert updates", texp / ttotal * 100) + " %")
-    # logger.info(sformat(1).format("broker updates", tbrok / ttotal * 100) + " %")
-    logger.info(sformat(1).format("postproc. broker", tpost / ttotal * 100) + " %")
-
-    if cfg["eval_buyhold"]:
-        logger.info(sformat(1).format("Buy & Hold", tbandh / ttotal * 100) + " %")
 
     logger.info("-" * 40)
     logger.info(sformat(0).format("APR", bt_res.APR) + f" %")
@@ -111,11 +89,12 @@ def launch(cfg):
         sformat(2).format("DEALS/MONTH", bt_res.ndeals_per_month)
         + f"   ({bt_res.ndeals} total)"
     )
-    logger.info(sformat(0).format("MAXLOSS", bt_res.metrics["loss_max_rel"]) + " %")
-    logger.info(sformat(0).format("RECOVRY FACTOR", bt_res.metrics["recovery"]))
-    logger.info(sformat(0).format("MAXWAIT", bt_res.metrics["maxwait"]) + " days")
-    # logger.info(sformat(1).format("MEAN POS. DURATION", bt_res.mean_pos_duration) + " \n")
-    
+    logger.info(sformat(0).format(
+        "MAXLOSS", bt_res.metrics["loss_max_rel"]) + " %")
+    logger.info(sformat(0).format(
+        "RECOVRY FACTOR", bt_res.metrics["recovery"]))
+    logger.info(sformat(0).format(
+        "MAXWAIT", bt_res.metrics["maxwait"]) + " days")
+
     bt_res.plot_results()
     return bt_res
-    
