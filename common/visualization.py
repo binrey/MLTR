@@ -128,6 +128,7 @@ class Visualizer:
                               style="-")
 
             if isinstance(drawitem, TimeVolumeProfile):
+                drawitem.to_datetime()
                 time_vol_profile = [[drawitem.time if drawitem.time in self.hist2plot.index else self.hist2plot.index[0], drawitem.hist],
                                     [self.hist2plot.index[-1], [(1, 1)]]]
                 fplt.horiz_time_volume(

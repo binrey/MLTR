@@ -1,5 +1,6 @@
 import cProfile
 import io
+import os
 import pstats
 from functools import wraps
 
@@ -18,7 +19,21 @@ def profile_function(func):
         pr.disable()
         s = io.StringIO()
         ps = pstats.Stats(pr, stream=s)
-        ps.sort_stats('cumulative').print_stats(10)  # Show top 10 entries with module names
+        
+        # Get project root directory (2 levels up from this file)
+        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        # Process stats to show relative paths
+        stats_dict = ps.stats
+        new_stats = {}
+        for (filename, line, name), value in stats_dict.items():
+            if filename and isinstance(filename, str):
+                if filename.startswith(project_dir):
+                    filename = os.path.relpath(filename, project_dir)
+            new_stats[(filename, line, name)] = value
+            
+        ps.stats = new_stats
+        ps.sort_stats('cumulative').print_stats(10)  # Show top 10 entries with relative paths
         print(s.getvalue())
         return result
     return wrapper

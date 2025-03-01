@@ -93,12 +93,15 @@ class Line:
 
 @dataclass
 class TimeVolumeProfile:
-    time: pd.Timestamp
+    time: np.datetime64
     hist: List[Bar]
     
     def __post_init__(self):
         if type(self.time) is np.datetime64:
-            self.time = pd.to_datetime(self.time.astype("datetime64[m]"))
+            self.time = self.time.astype("datetime64[m]")
+            
+    def to_datetime(self):
+        self.time = pd.to_datetime(self.time, format="%Y-%m-%d", cache=True)
 
 @dataclass
 class Symbol:

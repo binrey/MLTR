@@ -7,7 +7,7 @@ from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
 config = dict(
     wallet=100,
     leverage=1,
-    date_start="2024-01-01T00:00:00",
+    date_start="2018-01-01T00:00:00",
     date_end="2025-01-01T00:00:00",
     no_trading_days=set(),
     decision_maker=dict(
@@ -37,7 +37,7 @@ config = dict(
     hist_buffer_size=128,
     tstart=0,
     tend=None,
-    period=TimePeriod.M15,
+    period=TimePeriod.M60,
     symbol=Symbols.BTCUSDT,
     equaty_step=0.001,
     data_type="bybit",
