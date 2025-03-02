@@ -6,7 +6,7 @@
 
 from datetime import timedelta
 from time import perf_counter
-from typing import Iterable
+from typing import Iterable, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -52,7 +52,7 @@ class BackTestResults:
         # self.update_monthly_profit()
         self.fees = profit_hist["fees_csum"].iloc[-1]
 
-    def process_profits(self, dates: Iterable, profits: Iterable, fees: Iterable):
+    def process_profits(self, dates: Iterable, profits: List[float], fees: list[float]):
         self.ndeals = len(profits)
         if self.ndeals:
             self.deals_hist = pd.DataFrame(

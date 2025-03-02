@@ -33,7 +33,7 @@ def profile_function(func):
             new_stats[(filename, line, name)] = value
             
         ps.stats = new_stats
-        ps.sort_stats('cumulative').print_stats(10)  # Show top 10 entries with relative paths
+        ps.sort_stats('tottime').print_stats(20)
         print(s.getvalue())
         return result
     return wrapper
