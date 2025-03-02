@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from common.type import to_datetime
 from experts.core.expert import DecisionMaker
 
 
@@ -21,10 +22,10 @@ class FileReader(DecisionMaker):
         # self.model = load('random_forest_model.joblib')
         
     def __call__(self, common, h) -> bool:
-        t = pd.to_datetime(h.Date[-1])
+        t = to_datetime(h.Date[-1])
         # Set the new time
         new_time = datetime.time(0, 0, 0)
-        t = pd.to_datetime(datetime.datetime.combine(t.date(), new_time))
+        t = to_datetime(datetime.datetime.combine(t.date(), new_time))
 
         side = 0
         if t in self.signals.index:

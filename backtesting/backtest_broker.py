@@ -5,7 +5,7 @@ import pandas as pd
 from loguru import logger
 from tqdm import tqdm
 
-from common.type import Side
+from common.type import Side, to_datetime
 from data_processing.dataloading import MovingWindow
 from trade.utils import ORDER_TYPE, Order, Position
 
@@ -86,7 +86,7 @@ class Broker:
             cumulative_profit += active_profit
         
         # Append current cumulative profit to the profit curve
-        self.profit_hist["dates"].append(pd.to_datetime(self.time))        
+        self.profit_hist["dates"].append(to_datetime(self.time))        
         self.profit_hist["profit_nofees"].append(cumulative_profit)
         self.profit_hist["fees_csum"].append(self.fees_abs.sum())
 

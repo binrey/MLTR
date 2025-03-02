@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
-
-import pandas as pd
+from common.type import to_datetime
 
 from common.type import Line, Side, SLDefiner, TPDefiner
 
@@ -37,9 +36,9 @@ class DecisionMaker(ABC):
     def set_vis_objects(self, time=None):
         self.draw_items = []
         if self.lprice is not None and time:
-            self.draw_items.append(Line([(pd.to_datetime(time), self.lprice), (None, self.lprice)], color="green"))
+            self.draw_items.append(Line([(to_datetime(time), self.lprice), (None, self.lprice)], color="green"))
         if self.sprice is not None and time:
-            self.draw_items.append(Line([(pd.to_datetime(time), self.sprice), (None, self.sprice)], color="red"))
+            self.draw_items.append(Line([(to_datetime(time), self.sprice), (None, self.sprice)], color="red"))
             
         for indicator in self.indicators:
             self.draw_items += indicator.vis_objects

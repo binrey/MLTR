@@ -9,6 +9,8 @@ from easydict import EasyDict
 from loguru import logger
 from tqdm import tqdm
 
+from common.type import to_datetime
+
 # Define the dtype for the structured array
 DTYPE = [('Date', np.dtype('<M8[m]')), 
          ('Open', np.dtype('float64')), 
@@ -35,7 +37,7 @@ def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=Non
     # x = np.vstack([x, np.ones(x.shape[1])*sl*10])
     # x = np.vstack([x, np.ones(x.shape[1])*trailing_stop_rate*1000])
     if open_date is not None:
-        odate = pd.to_datetime(open_date)
+        odate = to_datetime(open_date)
         odate = odate.year*10000 + odate.month*100 + odate.day
         x = np.vstack([x, np.ones(x.shape[1])*odate])
     if timeframe is not None:
@@ -122,11 +124,11 @@ class DataParser():
     def metatrader(self, data_file):
         pd.options.mode.chained_assignment = None
         hist = pd.read_csv(data_file, sep=",")
-        hist.TIME = pd.to_datetime(hist.TIME, utc=True)
+        hist.TIME = to_datetime(hist.TIME, utc=True)
         hist.columns = map(str.capitalize, hist.columns)
         # if "Time" not in hist.columns:
         #     hist["Time"] = ["00:00:00"]*hist.shape[0]
-        # hist["Date"] = pd.to_datetime([" ".join([d, t]) for d, t in zip(
+        # hist["Date"] = to_datetime([" ".join([d, t]) for d, t in zip(
         #     hist.Date.values, hist.Time.values)], utc=True)
         hist.drop(["Tick_volume", "Spread"], axis=1, inplace=True)
         hist.rename(columns={"Real_volume": "Volume", "Time": "Date"}, inplace=True)
@@ -139,7 +141,7 @@ class DataParser():
     def bitfinex(self, data_file):
         hist = pd.read_csv(data_file, header=1)
         hist = hist[::-1]
-        hist["Date"] = pd.to_datetime(hist.date.values)
+        hist["Date"] = to_datetime(hist.date.values)
         hist.set_index("Date", inplace=True, drop=False)
         hist["Id"] = list(range(hist.shape[0]))
         hist.drop(["unix", "symbol", "date"], axis=1, inplace=True)
@@ -150,7 +152,7 @@ class DataParser():
 
     def yahoo(self, data_file):
         hist = pd.read_csv(data_file)
-        hist["Date"] = pd.to_datetime(hist.Date, utc=True)
+        hist["Date"] = to_datetime(hist.Date, utc=True)
         hist["Id"] = list(range(hist.shape[0]))
         hist_dict = EasyDict({c: hist[c].values for c in hist.columns})
         hist.set_index("Date", inplace=True, drop=True)

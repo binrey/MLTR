@@ -9,7 +9,7 @@ import pandas as pd
 from loguru import logger
 from matplotlib import pyplot as plt
 
-from common.type import Line, Side, TimePeriod, TimeVolumeProfile
+from common.type import Line, Side, TimePeriod, TimeVolumeProfile, to_datetime
 from common.utils import date2str
 from experts.core.expert import ExpertBase
 from trade.utils import Position
@@ -37,11 +37,11 @@ class Visualizer:
             return
         if self.hist2plot is None:
             self.hist2plot = pd.DataFrame(h)
-            self.hist2plot["Date"] = pd.to_datetime(self.hist2plot["Date"])
+            self.hist2plot["Date"] = to_datetime(self.hist2plot["Date"])
             self.hist2plot.set_index("Date", drop=True, inplace=True)
         else:
             h = pd.DataFrame(h).iloc[-2:]
-            h["Date"] = pd.to_datetime(h["Date"])
+            h["Date"] = to_datetime(h["Date"])
             h.set_index("Date", drop=True, inplace=True)
             # self.hist2plot.iloc[-1, :] = h.iloc[0]
             self.hist2plot = pd.concat([self.hist2plot.iloc[:-1, :], h])
@@ -66,19 +66,19 @@ class Visualizer:
             else:
                 end_time = end_time.astype("datetime64[m]")
 
-            if pd.to_datetime(end_time) < self.hist2plot.index[0]:
+            if to_datetime(end_time) < self.hist2plot.index[0]:
                 continue
 
             drawitems4pos.append(pos.get_drawitem())
 
             for t, p in pos.sl_hist:
-                drawitems4sl.append(Line(points=[(pd.to_datetime(t - self.period.to_timedelta()), p),
-                                                 (pd.to_datetime(t), p)],
+                drawitems4sl.append(Line(points=[(to_datetime(t - self.period.to_timedelta()), p),
+                                                 (to_datetime(t), p)],
                                          color="#000"))
 
             for t, p in pos.tp_hist:
-                drawitems4tp.append(Line(points=[(pd.to_datetime(t - self.period.to_timedelta()), p),
-                                                 (pd.to_datetime(t), p)],
+                drawitems4tp.append(Line(points=[(to_datetime(t - self.period.to_timedelta()), p),
+                                                 (to_datetime(t), p)],
                                          color="#000"))
 
         if expert2draw is not None:

@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from backtesting.backtest_broker import Broker
+from common.type import to_datetime
 
 
 class BackTestResults:
@@ -20,7 +21,7 @@ class BackTestResults:
         self.date_start = date_start
         self.date_end = date_end
         # self.target_dates = [
-        #     pd.to_datetime(d).date()
+        #     to_datetime(d).date()
         #     for d in pd.date_range(start=date_start, end=date_end, freq="D")
         # ]
         self.daily_hist = None
@@ -38,7 +39,7 @@ class BackTestResults:
         self.tickers = "+".join({pos.ticker for pos in bktest_broker.positions})
         if self.ndeals:
             self.process_profit_hist(bktest_broker.profit_hist)
-            self.process_profits(dates=[pd.to_datetime(pos.close_date) for pos in bktest_broker.positions],
+            self.process_profits(dates=[to_datetime(pos.close_date) for pos in bktest_broker.positions],
                                 profits=bktest_broker.profits_abs,
                                 fees=bktest_broker.fees_abs)
         return perf_counter() - t0
@@ -72,8 +73,8 @@ class BackTestResults:
             # self.fees = sum(fees)
 
     def resample_hist(self, hist, period="D", func="sum"):
-        target_dates = pd.date_range(start=pd.to_datetime(self.date_start).date(), 
-                                     end=pd.to_datetime(self.date_end).date(), 
+        target_dates = pd.date_range(start=to_datetime(self.date_start).date(), 
+                                     end=to_datetime(self.date_end).date(), 
                                      freq=period) 
                
         hist = hist.resample(period)
@@ -120,7 +121,7 @@ class BackTestResults:
         # Create a temporary DataFrame with a DatetimeIndex for resampling
         temp_df = self.daily_hist.copy()
         temp_df.set_index("days", inplace=True)
-        temp_df.index = pd.to_datetime(temp_df.index)
+        temp_df.index = to_datetime(temp_df.index)
 
         # Calculate monthly profits
         self.monthly_hist = temp_df['profit'].resample('M').sum()

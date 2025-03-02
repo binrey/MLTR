@@ -40,6 +40,10 @@ class Side(Enum):
 SLDefiner = dict[Side, float | None]
 TPDefiner = dict[Side, float | None]
 
+def to_datetime(time: np.datetime64):
+    return pd.to_datetime(time, format="%Y-%m-%d", cache=True)
+
+
 class Vis(Enum):
     ON_STEP = 0
     ON_DEAL = 1
@@ -92,20 +96,22 @@ class Line:
 
     def to_dataframe(cls):
         df = pd.DataFrame(cls.points, columns=["Date", "Close"])
-        df["Date"] = pd.to_datetime(df["Date"])
+        df["Date"] = to_datetime(df["Date"])
         return df
+
 
 @dataclass
 class TimeVolumeProfile:
     time: np.datetime64
     hist: List[Bar]
-    
+
     def __post_init__(self):
-        if type(self.time) is np.datetime64:
+        if isinstance(self.time, np.datetime64):
             self.time = self.time.astype("datetime64[m]")
-            
-    def to_datetime(self):
-        self.time = pd.to_datetime(self.time, format="%Y-%m-%d", cache=True)
+
+    def to_datetime(self) -> None:
+        self.time = to_datetime(self.time)
+
 
 @dataclass
 class Symbol:

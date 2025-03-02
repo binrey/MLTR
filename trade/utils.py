@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from common.type import Line, Point, Side
+from common.type import Line, Point, Side, to_datetime
 from common.utils import FeeConst, FeeModel, date2str
 
 
@@ -86,9 +86,9 @@ class Position:
 
         # Record price change events. Each tuple is (date, price)
         
-        self.enter_points_hist.append((pd.to_datetime(self.open_date), self.open_price))
-        self.enter_price_hist.append((pd.to_datetime(self.open_date), self.open_price))
-        self.volume_hist.append((pd.to_datetime(self.open_date), self.volume))
+        self.enter_points_hist.append((to_datetime(self.open_date), self.open_price))
+        self.enter_price_hist.append((to_datetime(self.open_date), self.open_price))
+        self.volume_hist.append((to_datetime(self.open_date), self.volume))
 
     def __str__(self):
         name = f"pos {self.ticker} {self.side} {self.volume}: {self.open_price}"
@@ -180,9 +180,9 @@ class Position:
         self.open_price /= self.volume
         self._update_fees(price, additional_volume)
         
-        self.enter_points_hist.append((pd.to_datetime(time), price))
-        self.enter_price_hist.append((pd.to_datetime(time), self.open_price))
-        self.volume_hist.append((pd.to_datetime(self.open_date), self.volume))
+        self.enter_points_hist.append((to_datetime(time), price))
+        self.enter_price_hist.append((to_datetime(time), self.open_price))
+        self.volume_hist.append((to_datetime(self.open_date), self.volume))
         logger.debug(f"Added {additional_volume} to position {self.id} at price {price}")
 
     def trim_position(self, 
@@ -202,9 +202,9 @@ class Position:
         self._update_profit_abs(price, trim_volume)
         self._update_fees(price, trim_volume)
         self.volume -= trim_volume
-        self.enter_points_hist.append((pd.to_datetime(time), price))
-        self.enter_price_hist.append((pd.to_datetime(time), self.open_price))
-        self.volume_hist.append((pd.to_datetime(time), self.volume))
+        self.enter_points_hist.append((to_datetime(time), price))
+        self.enter_price_hist.append((to_datetime(time), self.open_price))
+        self.volume_hist.append((to_datetime(time), self.volume))
         logger.debug(f"Remove {trim_volume} from position {self.id} at price {price}")
         
     def get_drawitem(self):
