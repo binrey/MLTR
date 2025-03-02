@@ -1,22 +1,22 @@
 from common.type import Symbols, TimePeriod, Vis
 from common.utils import FeeRate, update_config
-from experts.hvol import VVolPlus
 from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
+from experts.vvol import VVol
 
 
 config = dict(
     wallet=100,
     leverage=1,
-    date_start="2018-01-01T00:00:00",
+    date_start="2024-01-01T00:00:00",
     date_end="2025-01-01T00:00:00",
     no_trading_days=set(),
     decision_maker=dict(
-        type=VVolPlus,
-        nbins=30,
-        sharpness=4,
+        type=VVol,
+        nbins=20,
+        sharpness=2,
         long_bin=0,
         short_bin=0,
-        strategy=VVolPlus.TriggerStrategy.MANUAL_LEVELS
+        strategy=VVol.TriggerStrategy.MANUAL_LEVELS
     ),
     sl_processor=dict(
         type=SLDynamic,
@@ -34,10 +34,10 @@ config = dict(
         trailing_stop_rate=0.01,
     ),
     close_only_by_stops=False,
-    hist_buffer_size=128,
+    hist_buffer_size=64,
     tstart=0,
     tend=None,
-    period=TimePeriod.M60,
+    period=TimePeriod.M15,
     symbol=Symbols.BTCUSDT,
     equaty_step=0.001,
     data_type="bybit",
