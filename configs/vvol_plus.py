@@ -1,27 +1,26 @@
 from common.type import Symbols, TimePeriod, Vis
 from common.utils import FeeRate, update_config
-from experts.hvol import VVolPlus
 from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
-
+from experts.vvol_plus import VVolPlus
 
 config = dict(
     wallet=100,
     leverage=1,
-    date_start="2018-01-01T00:00:00",
+    date_start="2024-01-01T00:00:00",
     date_end="2025-01-01T00:00:00",
     no_trading_days=set(),
     decision_maker=dict(
         type=VVolPlus,
-        nbins=30,
-        sharpness=4,
-        long_bin=0,
-        short_bin=0,
-        strategy=VVolPlus.TriggerStrategy.MANUAL_LEVELS
+        nbins=10,
+        sharpness=3,
+        long_bin=1,
+        short_bin=2,
+        strategy=VVolPlus.TriggerStrategy.AUTO_LEVELS
     ),
     sl_processor=dict(
-        type=SLDynamic,
+        type=SLFixed,
         active=False,
-        percent_value=2
+        percent_value=5
     ),
     tp_processor=dict(
         type=TPFromSL,
@@ -31,13 +30,13 @@ config = dict(
     trailing_stop=dict(
         type=TrailingStop,
         strategy=TrailingStop.FIX_RATE,
-        trailing_stop_rate=0.01,
+        trailing_stop_rate=0.001,
     ),
     close_only_by_stops=False,
-    hist_buffer_size=128,
+    hist_buffer_size=64,
     tstart=0,
     tend=None,
-    period=TimePeriod.M60,
+    period=TimePeriod.M15,
     symbol=Symbols.BTCUSDT,
     equaty_step=0.001,
     data_type="bybit",
@@ -56,10 +55,10 @@ optimization = update_config(
     config,
     min_deals_per_month=1,
     symbol=[Symbols.BTCUSDT],
-    hist_buffer_size=[32, 64, 128], 
+    hist_buffer_size=[32, 64],
     decision_maker={
-        "nbins": [10, 20, 30],
-        "sharpness": [3, 4, 5],
+        "nbins": [20],
+        "sharpness": [3],
         "long_bin": [1, 2, 3],
         "short_bin": [1, 2, 3]
         }

@@ -36,6 +36,10 @@ class Side(Enum):
         return Side.BUY if side == Side.SELL else Side.SELL
 
 
+# Type aliases for stop-loss and take-profit price definitions
+SLDefiner = dict[Side, float | None]
+TPDefiner = dict[Side, float | None]
+
 class Vis(Enum):
     ON_STEP = 0
     ON_DEAL = 1

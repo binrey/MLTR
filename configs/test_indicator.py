@@ -1,6 +1,6 @@
 from common.type import Symbols, TimePeriod, Vis
 from common.utils import FeeRate, update_config
-from experts.hvol import HVOL
+from experts.hvol import VVolPlus
 from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
 
 config = dict(
@@ -11,7 +11,7 @@ config = dict(
     no_trading_days=set(),
     trailing_stop_rate=0.004,
     decision_maker=dict(
-        type=HVOL,
+        type=VVolPlus,
         ncross=3
     ),
     close_only_by_stops=False,

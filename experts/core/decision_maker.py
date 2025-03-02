@@ -4,7 +4,7 @@ from typing import List, Optional
 
 import pandas as pd
 
-from common.type import Line, Side, TimeVolumeProfile
+from common.type import Line, Side, SLDefiner, TPDefiner
 
 
 class DecisionMaker(ABC):
@@ -21,8 +21,8 @@ class DecisionMaker(ABC):
 
     def __init__(self, cfg):
         self.cfg = cfg
-        self.sl_definer = {Side.BUY: None, Side.SELL: None}
-        self.tp_definer = {Side.BUY: None, Side.SELL: None}
+        self.sl_definer: SLDefiner = {Side.BUY: None, Side.SELL: None}
+        self.tp_definer: TPDefiner = {Side.BUY: None, Side.SELL: None}
         self.lprice, self.sprice, self.cprice = None, None, None
         self.vis_items = []
         self.indicators = self.setup_indicators(cfg)
@@ -49,7 +49,7 @@ class DecisionMaker(ABC):
         pass
     
     @abstractmethod
-    def update_inner_state(self, h):
+    def update_inner_state(self, h) -> None:
         pass
 
     def _reset_state(self):
@@ -57,7 +57,5 @@ class DecisionMaker(ABC):
         self.lprice = None
         self.sprice = None
         self.cprice = None
-        self.sl_definer = {Side.BUY: None, Side.SELL: None}
-        self.tp_definer = {Side.BUY: None, Side.SELL: None}    
-
-
+        self.sl_definer.update({Side.BUY: None, Side.SELL: None})
+        self.tp_definer.update({Side.BUY: None, Side.SELL: None})

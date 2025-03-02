@@ -37,6 +37,7 @@ class VolDistribution:
         self.vol_hist = self.histogram(x, bins=self.price_bins, weights=y)
         bars = [(x, y) for x, y in zip(self.price_bins, self.vol_hist)]
         self.vol_profile = TimeVolumeProfile(time=h["Date"][1], hist=bars)
+        return self.vol_profile
         
     @property
     def vis_objects(self):
