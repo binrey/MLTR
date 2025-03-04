@@ -40,8 +40,8 @@ class DecisionMaker(ABC):
         if self.sprice is not None and time:
             self.draw_items.append(Line([(to_datetime(time), self.sprice), (None, self.sprice)], color="red"))
             
-        for indicator in self.indicators:
-            self.draw_items += indicator.vis_objects
+        # for indicator in self.indicators:
+        #     self.draw_items += indicator.vis_objects
     
     @abstractmethod
     def look_around(self, h) -> "DecisionMaker.Response":
@@ -56,5 +56,5 @@ class DecisionMaker(ABC):
         self.lprice = None
         self.sprice = None
         self.cprice = None
-        self.sl_definer.update({Side.BUY: None, Side.SELL: None})
-        self.tp_definer.update({Side.BUY: None, Side.SELL: None})
+        # self.sl_definer.update({Side.BUY: None, Side.SELL: None})
+        # self.tp_definer.update({Side.BUY: None, Side.SELL: None})

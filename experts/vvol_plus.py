@@ -6,13 +6,13 @@ from loguru import logger
 from common.type import Side
 from experts.core.expert import DecisionMaker
 from indicators.vol_distribution import VolDistribution
+from indicators.zigzag import ZigZag
 
 
 class VVolPlus(DecisionMaker):
     type = "vvol_plus"
 
     class TriggerStrategy(str, Enum):
-        """Strategy type for HVOL price level detection"""
         MANUAL_LEVELS = "manual_levels"  # Uses predefined volume distribution bins
         AUTO_LEVELS = "auto_levels"  # Uses shadow intersection analysis
 
@@ -25,7 +25,8 @@ class VVolPlus(DecisionMaker):
 
     def setup_indicators(self, cfg):
         self.indicator = VolDistribution(nbins=cfg["nbins"])
-        return [self.indicator]
+        self.zigzag = ZigZag(cfg["zigzag_period"])
+        return [self.indicator, self.zigzag]
 
     def _find_prices_manual_levels(self, h, max_vol_id):
         """Manual levels strategy: Uses volume distribution bins directly"""
@@ -36,8 +37,8 @@ class VVolPlus(DecisionMaker):
                                                self.long_bin] + bin_width/2
             sprice = self.indicator.price_bins[max_vol_id -
                                                self.short_bin] + bin_width/2
-            if sprice < h["Open"][-1] < lprice:
-                return lprice, sprice
+            # if sprice < h["Open"][-1] < lprice:
+            return lprice, sprice
         return None, None
 
     def _find_prices_auto_levels(self, h):
@@ -70,6 +71,7 @@ class VVolPlus(DecisionMaker):
     def look_around(self, h) -> DecisionMaker.Response:
         order_side, target_volume_fraction = None, 1
         self.indicator.update(h)
+        self.zigzag.update(h)
         max_vol_id = self.indicator.vol_hist.argmax()
 
         if self.indicator.vol_hist[max_vol_id] / self.indicator.vol_hist.mean() > self.sharpness:
@@ -84,15 +86,22 @@ class VVolPlus(DecisionMaker):
                 self.sl_definer[Side.BUY] = h["Low"].min()
                 self.sl_definer[Side.SELL] = h["High"].max()
                 self.set_vis_objects(h["Date"][-2])
+                self.draw_items += self.indicator.vis_objects
 
         if self.lprice:
-            if h["Close"][-3] < self.lprice and h["Close"][-2] > self.lprice:
+            zz_values, zz_types = self.zigzag.values, self.zigzag.types
+            if zz_values[-2] > self.lprice and zz_types[-2] < 0 and h["Close"][-2] > self.lprice:
                 order_side = Side.BUY
+                self.draw_items += self.zigzag.vis_objects
+                self._reset_state()
 
         if self.sprice:
-            if h["Close"][-3] > self.sprice and h["Close"][-2] < self.sprice:
+            zz_values, zz_types = self.zigzag.values, self.zigzag.types
+            if zz_values[-2] < self.sprice and zz_types[-2] > 0 and h["Close"][-2] < self.sprice:
                 order_side = Side.SELL
-
+                self.draw_items += self.zigzag.vis_objects
+                self._reset_state()
+                
         if self.lprice or self.sprice:
             logger.debug(
                 f"found enter points: long: {self.lprice}, short: {self.sprice}")

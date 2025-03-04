@@ -12,10 +12,10 @@ config = dict(
     no_trading_days=set(),
     decision_maker=dict(
         type=VVol,
-        nbins=20,
+        nbins=10,
         sharpness=2,
-        long_bin=0,
-        short_bin=0,
+        long_bin=1,
+        short_bin=2,
         strategy=VVol.TriggerStrategy.MANUAL_LEVELS
     ),
     sl_processor=dict(
@@ -56,11 +56,11 @@ optimization = update_config(
     config,
     min_deals_per_month=1,
     symbol=[Symbols.BTCUSDT],
-    hist_buffer_size=[32, 64, 128], 
+    hist_buffer_size=[64],
     decision_maker={
-        "nbins": [10, 20, 30],
-        "sharpness": [3, 4, 5],
-        "long_bin": [1, 2, 3],
-        "short_bin": [1, 2, 3]
+        "nbins": [10],
+        "sharpness": [4, 5, 9],
+        "long_bin": [1],
+        "short_bin": [2]
         }
     )

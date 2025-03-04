@@ -41,7 +41,7 @@ class Broker:
     def fees_abs(self):
         return [p.fees_abs for p in self.positions]
 
-    @profile_function
+    # @profile_function
     def trade_stream(self, callback):
         for self.hist_window, dt in tqdm(self.mw(), desc="Backtest", total=self.mw.timesteps_count, disable=False):
             self.time = self.hist_window["Date"][-1]

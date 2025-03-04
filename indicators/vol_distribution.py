@@ -1,5 +1,9 @@
 """Module for analyzing volume distribution across different price levels."""
 
+import os
+import pickle
+from pathlib import Path
+
 import numpy as np
 
 from backtesting.profiling import line_profile_function, profile_function
@@ -12,6 +16,29 @@ class VolDistribution:
         self.nbins = nbins
         self.vol_hist, self.price_bins = None, None
         self.vol_profile = None
+        self.cache = {}
+        self.cache_dir = Path(os.getenv("CACHE_DIR")) / "vol_distribution"
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self._load_cache()
+
+    def __del__(self):
+        self._save_cache()
+
+    def _get_cache_path(self):
+        return self.cache_dir / f"nbins={self.nbins}.pkl"
+
+    def _load_cache(self):
+        cache_file = self._get_cache_path()
+        if cache_file.exists():
+                with open(cache_file, "rb") as f:
+                        self.cache = pickle.load(f)
+
+    def _save_cache(self):
+        if not self.cache:
+            return
+        cache_file = self._get_cache_path()
+        with open(cache_file, 'wb') as f:
+            pickle.dump(self.cache, f)
 
     @staticmethod
     def histogram(data, bins, weights):
@@ -23,8 +50,49 @@ class VolDistribution:
         hist = np.bincount(inds[valid], weights=weights[valid], minlength=len(bins) - 1)
         return hist
 
-    # @line_profile_function
+    def _get_cache_key(self, h):
+        """Generate a unique cache key based on input data and parameters"""
+        # Use the date and nbins as the cache key
+        return f"{str(h['Date'][1])}_{self.nbins}"
+
+    def _load_from_cache(self, cache_key):
+        """Load histogram data from cache if available"""
+        if cache_key in self.cache:
+            cached_data = self.cache[cache_key]
+            self.vol_hist = cached_data['vol_hist']
+            self.price_bins = cached_data['price_bins']
+            return True
+        return False
+
+    def _save_to_cache(self, cache_key):
+        """Save histogram data to cache"""
+        self.cache[cache_key] = {
+            'vol_hist': self.vol_hist,
+            'price_bins': self.price_bins
+        }
+        # Periodically save to disk (every 10 updates)
+        # if len(self.cache) % 1000 == 0:
+        #     self._save_cache()
+
     def update(self, h: np.ndarray) -> TimeVolumeProfile:
+        cache_key = self._get_cache_key(h)
+        
+        # Try to load from cache first
+        if self._load_from_cache(cache_key):
+            bars = [(x, y) for x, y in zip(self.price_bins, self.vol_hist)]
+            self.vol_profile = TimeVolumeProfile(time=h["Date"][1], hist=bars)
+            return self.vol_profile
+
+        # If not in cache, calculate and cache the results
+        self._update_without_cache(h)
+        
+        # Save to cache
+        self._save_to_cache(cache_key)
+        
+        return self.vol_profile
+
+    def _update_without_cache(self, h: np.ndarray) -> TimeVolumeProfile:
+        """Update method without caching logic"""
         upper_price = h["High"][:-1].max()
         lower_price = h["Low"][:-1].min()
         self.price_bins = np.linspace(lower_price, upper_price, self.nbins)

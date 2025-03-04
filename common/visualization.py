@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 import finplot as fplt
 import matplotlib
 import mplfinance as mpf
+import numpy as np
 import pandas as pd
 from loguru import logger
 from matplotlib import pyplot as plt
@@ -122,10 +123,18 @@ class Visualizer:
                                   width=2,
                                   style="-")
                 else:
-                    fplt.plot(drawitem.to_dataframe(),
-                              color=drawitem.color,
-                              width=drawitem.width,
-                              style="-")
+                    # fplt.plot(drawitem.to_dataframe(),
+                    #           color=drawitem.color,
+                    #           width=drawitem.width,
+                    #           style="-")
+                    
+                    for point1, point2 in zip(drawitem.points[:-1],
+                                              drawitem.points[1:]):
+                        if np.isnan(point1[0]) or np.isnan(point2[0]):
+                            continue
+                        fplt.add_line(p0=(to_datetime(point1[0]), point1[1]),
+                                      p1=(to_datetime(point2[0]), point2[1]),
+                                      color="#000", width=2, style="-")
 
             if isinstance(drawitem, TimeVolumeProfile):
                 drawitem.to_datetime()

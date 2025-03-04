@@ -23,7 +23,7 @@ from trade.backtest import launch as backtest_launch
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
-pd.set_option('display.max_colwidth', 256)
+pd.set_option('display.max_colwidth', 512)
 
 
 def plot_daily_balances_with_av(btests: List[BackTestResults], test_ids: List[int], profit_av: np.ndarray, metrics_av: List[Tuple[str, float]]):
@@ -98,8 +98,6 @@ class Optimizer:
         locnum = 0
         while True:
             btest = backtest_launch(cfg)
-            if btest.ndeals_per_month < cfg["min_deals_per_month"]:
-                break
             # cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
             locnum += 1
             pickle.dump((cfg, btest), 
@@ -119,7 +117,7 @@ class Optimizer:
 
         cfgs = [(i, cfg) for i, cfg in enumerate(cfgs)]
         p = Pool(ncpu)
-        p.map(self.backtest_process, cfgs)
+        return p.map(self.backtest_process, cfgs,)
         # for cfg in cfgs:
         #     self.backtest_process(cfg)
     
@@ -138,8 +136,6 @@ class Optimizer:
             cfgs.append(cfg)
             btests.append(btest)
             print(p)
-        
-        assert len(btests), "Нет прогонов"
         
         start_dates = set([btest.date_start for btest in btests])
         assert len(start_dates) == 1, f"""Даты прогонов разные, скорее всего нужно сдвинуть 

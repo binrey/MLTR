@@ -6,21 +6,22 @@ from experts.vvol_plus import VVolPlus
 config = dict(
     wallet=100,
     leverage=1,
-    date_start="2024-01-01T00:00:00",
+    date_start="2018-01-01T00:00:00",
     date_end="2025-01-01T00:00:00",
     no_trading_days=set(),
     decision_maker=dict(
         type=VVolPlus,
-        nbins=10,
-        sharpness=3,
-        long_bin=1,
-        short_bin=2,
-        strategy=VVolPlus.TriggerStrategy.AUTO_LEVELS
+        nbins=20,
+        sharpness=4,
+        long_bin=0,
+        short_bin=0,
+        strategy=VVolPlus.TriggerStrategy.MANUAL_LEVELS,
+        zigzag_period=4
     ),
     sl_processor=dict(
-        type=SLFixed,
-        active=False,
-        percent_value=5
+        type=SLDynamic,
+        active=True,
+        percent_value=0
     ),
     tp_processor=dict(
         type=TPFromSL,
@@ -36,9 +37,8 @@ config = dict(
     hist_buffer_size=64,
     tstart=0,
     tend=None,
-    period=TimePeriod.M15,
+    period=TimePeriod.M60,
     symbol=Symbols.BTCUSDT,
-    equaty_step=0.001,
     data_type="bybit",
     fee_rate=FeeRate(0.1, 0.00016),
     save_backup=False,
@@ -55,11 +55,10 @@ optimization = update_config(
     config,
     min_deals_per_month=1,
     symbol=[Symbols.BTCUSDT],
-    hist_buffer_size=[32, 64],
+    hist_buffer_size=[128],
     decision_maker={
         "nbins": [20],
-        "sharpness": [3],
-        "long_bin": [1, 2, 3],
-        "short_bin": [1, 2, 3]
+        "sharpness": [3, 4, 5, 7],
+        "zigzag_period": [3, 5, 8],
         }
     )

@@ -30,6 +30,8 @@ class BackTestResults:
         self.tickers = None
         self.wallet = None
         self.ndeals = None
+        self.fees = None
+        self.num_years_on_trade = None
 
     def process_backtest(self, bktest_broker: Broker):
         t0 = perf_counter()
@@ -37,11 +39,10 @@ class BackTestResults:
         self.num_years_on_trade = self.compute_n_years(bktest_broker.positions)
         self.wallet = bktest_broker.cfg["wallet"]
         self.tickers = "+".join({pos.ticker for pos in bktest_broker.positions})
-        if self.ndeals:
-            self.process_profit_hist(bktest_broker.profit_hist)
-            self.process_profits(dates=[to_datetime(pos.close_date) for pos in bktest_broker.positions],
-                                profits=bktest_broker.profits_abs,
-                                fees=bktest_broker.fees_abs)
+        self.process_profit_hist(bktest_broker.profit_hist)
+        self.process_profits(dates=[to_datetime(pos.close_date) for pos in bktest_broker.positions],
+                             profits=bktest_broker.profits_abs,
+                             fees=bktest_broker.fees_abs)
         return perf_counter() - t0
 
     def process_profit_hist(self, profit_hist: pd.DataFrame):

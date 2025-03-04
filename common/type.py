@@ -79,7 +79,7 @@ if __name__ == "__main__":
     print(tp.to_timedelta())
 
 
-Point = Tuple[pd.Timestamp, float]
+Point = Tuple[np.datetime64, float]
 Bar = Tuple[float, float]
 
 @dataclass
@@ -92,11 +92,14 @@ class Line:
     """
     points: List[Point] = field(default_factory=list)
     color: str = "black"
-    width: int = 1
+    width: int = 4
 
-    def to_dataframe(cls):
-        df = pd.DataFrame(cls.points, columns=["Date", "Close"])
+    def to_dataframe(self):
+        df = pd.DataFrame(self.points, columns=["Date", "Close"])
+        df = df.dropna()
+        
         df["Date"] = to_datetime(df["Date"])
+        df.set_index("Date", inplace=True)
         return df
 
 
