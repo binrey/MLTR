@@ -22,6 +22,7 @@ class VVol(DecisionMaker):
         self.short_bin = cfg.get("short_bin", 1)
         self.sharpness = cfg["sharpness"]
         self.strategy = cfg["strategy"]
+        self.strike = cfg["strike"]
 
     def setup_indicators(self, cfg):
         self.indicator = VolDistribution(nbins=cfg["nbins"])
@@ -30,12 +31,10 @@ class VVol(DecisionMaker):
     def _find_prices_manual_levels(self, h, max_vol_id):
         """Manual levels strategy: Uses volume distribution bins directly"""
         if self.short_bin <= max_vol_id < len(self.indicator.vol_hist) - self.long_bin:
-            bin_width = self.indicator.price_bins[1] - \
-                self.indicator.price_bins[0]
-            lprice = self.indicator.price_bins[max_vol_id +
-                                               self.long_bin] + bin_width/2
-            sprice = self.indicator.price_bins[max_vol_id -
-                                               self.short_bin] + bin_width/2
+            lprice = self.indicator.price_bins[max_vol_id + self.long_bin]
+            lprice += self.indicator.bin_size/2
+            sprice = self.indicator.price_bins[max_vol_id - self.short_bin]
+            sprice += self.indicator.bin_size/2
             return lprice, sprice
         return None, None
 
@@ -76,17 +75,20 @@ class VVol(DecisionMaker):
                 self.lprice, self.sprice = self._find_prices_auto_levels(h)
                 
             if self.lprice is not None and self.sprice is not None:
-                self.sl_definer[Side.BUY] = h["Low"].min()
-                self.sl_definer[Side.SELL] = h["High"].max()
+                self.sl_definer[Side.BUY] = self.sprice
+                self.sl_definer[Side.SELL] = self.lprice
                 self.set_vis_objects(h["Date"][-2])
-                    
-        if self.lprice:
-            if h["Close"][-3] <= self.lprice and h["Close"][-2] > self.lprice:
-                order_side = Side.BUY
-            
-        if self.sprice:
-            if h["Close"][-3] >= self.sprice and h["Close"][-2] < self.sprice:
-                order_side = Side.SELL
+                self.draw_items += self.indicator.vis_objects
+
+        strike = h["Close"][-2] - h["Open"][-2]
+        if abs(strike) > self.indicator.bin_size * self.strike:
+            if self.lprice:
+                if strike > 0 and h["Close"][-2] > self.sprice:
+                    order_side = Side.BUY
+
+            if self.sprice:
+                if strike < 0 and h["Close"][-2] < self.lprice:
+                    order_side = Side.SELL
 
         if self.lprice or self.sprice:
             logger.debug(f"found enter points: long: {self.lprice}, short: {self.sprice}")

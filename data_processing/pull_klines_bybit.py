@@ -6,14 +6,12 @@ import numpy as np
 import pandas as pd
 from pybit.unified_trading import HTTP
 
-from common.type import to_datetime
-
 
 class BybitDownloader:
     def __init__(self, symbol, period, start_date=None, init_data=None):
         self.symbol = symbol
         self.period = period
-        self.start_date = start_date if type(start_date) is pd.Timestamp else to_datetime(start_date)
+        self.start_date = start_date if type(start_date) is pd.Timestamp else pd.to_datetime(start_date)
         self.init_data = Path(init_data)
         
         if not self.init_data.exists():
@@ -41,7 +39,7 @@ class BybitDownloader:
     def _get_data_from_message(mresult):
         data = {}
         input = np.array(mresult["list"], dtype=np.float64)[::-1]
-        data["Date"] = to_datetime(input[:, 0].astype(np.int64)*1000000)
+        data["Date"] = pd.to_datetime(input[:, 0].astype(np.int64)*1000000)
         data["Open"] = input[:, 1]
         data["High"] = input[:, 2]
         data["Low"]  = input[:, 3]
@@ -55,7 +53,7 @@ class BybitDownloader:
     def read_from_file(self, filename):
         # filename - csv file name
         data = pd.read_csv(filename)
-        data.Date = to_datetime(data.Date, format="mixed")
+        data.Date = pd.to_datetime(data.Date, format="mixed")
         data.set_index(data.Date, drop=True, inplace=True)
         data.drop("Date", axis=1, inplace=True)
         return data
@@ -78,8 +76,8 @@ class BybitDownloader:
 
 
 if __name__ == "__main__":
-    symbol = "SOLUSDT"
-    period = 15
+    symbol = "BTCUSDT"
+    period = 60
     init_data = f"/Users/andrybin/Yandex.Disk.localized/fin_data/bybit/M{period}/{symbol}.csv"
     bb_loader = BybitDownloader(symbol=symbol, 
                                 period=period, 

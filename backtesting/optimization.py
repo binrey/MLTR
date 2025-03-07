@@ -23,7 +23,10 @@ from trade.backtest import launch as backtest_launch
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
-pd.set_option('display.max_colwidth', 512)
+pd.set_option('display.max_colwidth', 1028)
+pd.set_option('display.width', 1000)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.expand_frame_repr', False)
 
 
 def plot_daily_balances_with_av(btests: List[BackTestResults], test_ids: List[int], profit_av: np.ndarray, metrics_av: List[Tuple[str, float]]):
@@ -31,7 +34,8 @@ def plot_daily_balances_with_av(btests: List[BackTestResults], test_ids: List[in
     for test_id in test_ids:
         btest = btests[test_id]
         plt.plot(btest.daily_hist.index, btest.daily_hist["profit_csum"])
-        legend.append(f"{btest.tickers} profit={btest.final_profit:.0f} ({btest.ndeals}) APR={btest.APR:.2f} mwait={btest.metrics['maxwait']:.0f}")
+        legend.append(
+            f"{btest.tickers} profit={btest.final_profit:.0f} ({btest.ndeals}) APR={btest.APR:.2f} mwait={btest.metrics['maxwait']:.0f}")
     plt.plot(btests[0].daily_hist.index, profit_av, linewidth=3, color="black")
     legend_item = f"AV profit={profit_av[-1]:.0f},"
     for (name, val) in metrics_av:
@@ -49,7 +53,7 @@ def collect_config_combinations(config):
         - A single value
         - A list of values
         - A nested dictionary following the same pattern
-    
+
     Returns:
         A list of fully expanded configuration dictionaries (the Cartesian 
         product of all possible paths through nested lists/dictionaries).
@@ -100,10 +104,9 @@ class Optimizer:
             btest = backtest_launch(cfg)
             # cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
             locnum += 1
-            pickle.dump((cfg, btest), 
+            pickle.dump((cfg, btest),
                         open(str(self.data_path / f"btest.{num + locnum/100:05.2f}.{cfg['symbol'].ticker}.pickle"), "wb"))
             break
-
 
     def pool_handler(self, optim_cfg):
         if self.data_path.exists():
@@ -120,28 +123,29 @@ class Optimizer:
         return p.map(self.backtest_process, cfgs,)
         # for cfg in cfgs:
         #     self.backtest_process(cfg)
-    
-    
+
     def optimize(self, optim_cfg, run_backtests=True):
-        self.data_path = Path("optimization") / f"data_{optim_cfg['period'][0].value}"
+        self.data_path = Path("optimization") / \
+            f"data_{optim_cfg['period'][0].value}"
         t0 = time()
         if run_backtests:
             self.pool_handler(optim_cfg)
-        logger.add("optimization/opt_report.txt", level="INFO", rotation="30 seconds") 
+        logger.add("optimization/opt_report.txt",
+                   level="INFO", rotation="30 seconds")
         logger.info(f"optimization time: {time() - t0:.1f} sec\n")
-            
+
         cfgs, btests = [], []
         for p in sorted(self.data_path.glob("*.pickle")):
             cfg, btest = pickle.load(open(p, "rb"))
             cfgs.append(cfg)
             btests.append(btest)
             print(p)
-        
+
         start_dates = set([btest.date_start for btest in btests])
         assert len(start_dates) == 1, f"""Даты прогонов разные, скорее всего нужно сдвинуть 
                             вправо дату начала тестов в конф. 
                             файле оптимизации минимум до {date2str(max(start_dates))}"""
-            
+
         opt_summary = defaultdict(list)
         cfg_keys = list(cfgs[0].keys())
         cfg_keys.remove("no_trading_days")
@@ -155,20 +159,20 @@ class Optimizer:
                             description.append(f"{vv.__name__}")
                         else:
                             description.append(f"{kk}:{vv}")
-                        
+
                     opt_summary[k].append("|".join(description))
                 else:
                     if isinstance(v, Symbol):
                         v = v.ticker
                     opt_summary[k].append(v)
-                
-        # Remove lines with attributes consists of one elment (except symbol field)            
+
+        # Remove lines with attributes consists of one elment (except symbol field)
         for k in list(opt_summary.keys()):
             if k == "symbol":
                 continue
             if len(set(map(str, opt_summary[k]))) == 1:
                 opt_summary.pop(k)
-                        
+
         for btest in btests:
             opt_summary["APR"].append(btest.APR)
             opt_summary["final_profit"].append(btest.final_profit)
@@ -176,35 +180,41 @@ class Optimizer:
             opt_summary["loss_max_rel"].append(btest.metrics["loss_max_rel"])
             opt_summary["recovery"].append(btest.metrics["recovery"])
             opt_summary["maxwait"].append(btest.metrics["maxwait"])
-        
+
         opt_summary = pd.DataFrame(opt_summary)
         opt_summary.sort_values(by=["APR"], ascending=False, inplace=True)
-        
+
         # Individual tests results
         top_runs_ids = []
         sum_daily_profit = 0
         for symbol in set(opt_summary["symbol"]):
             opt_summary_for_ticker = opt_summary[opt_summary["symbol"] == symbol]
             top_runs_ids.append(opt_summary_for_ticker.index[0])
-            sum_daily_profit += btests[top_runs_ids[-1]].daily_hist["profit_csum"]
+            sum_daily_profit += btests[top_runs_ids[-1]
+                                       ].daily_hist["profit_csum"]
             logger.info(f"\n{opt_summary_for_ticker.head(10)}\n")
-            pd.DataFrame(btests[top_runs_ids[-1]].daily_hist.profit_csum).to_csv(f"optimization/{symbol}.{optim_cfg['period'][0].value}.top_{self.sortby}_sorted.csv", index=False)
-            
+            pd.DataFrame(btests[top_runs_ids[-1]].daily_hist.profit_csum).to_csv(
+                f"optimization/{symbol}.{optim_cfg['period'][0].value}.top_{self.sortby}_sorted.csv", index=False)
+
         profit_av = (sum_daily_profit / len(top_runs_ids)).values
-        APR_av, maxwait_av = btests[top_runs_ids[-1]].metrics_from_profit(profit_av)
+        APR_av, maxwait_av = btests[top_runs_ids[-1]
+                                    ].metrics_from_profit(profit_av)
         # bstair_av, metrics = BackTestResults._calc_metrics(profit_av.values)
-        logger.info(f"\nAverage of top runs ({', '.join([f'{i}' for i in top_runs_ids])}): APR={APR_av:.2f}, maxwait={maxwait_av:.0f}\n")
+        logger.info(
+            f"\nAverage of top runs ({', '.join([f'{i}' for i in top_runs_ids])}): APR={APR_av:.2f}, maxwait={maxwait_av:.0f}\n")
         plot_daily_balances_with_av(
             btests=btests,
-            test_ids=top_runs_ids, 
-            profit_av=profit_av, 
+            test_ids=top_runs_ids,
+            profit_av=profit_av,
             metrics_av=[("APR", APR_av), ("mwait", maxwait_av)]
-            )
-        plt.savefig(f"optimization/{optim_cfg['period'][0].value}.av_{self.sortby}_sorted_runs.png")
+        )
+        plt.savefig(
+            f"optimization/{optim_cfg['period'][0].value}.av_{self.sortby}_sorted_runs.png")
         plt.clf()
-        
+
         # Mix results
-        opt_res = {"param_set":[], "symbol":[], "final_balance":[], "ndeals":[], "test_ids":[]}
+        opt_res = {"param_set": [], "symbol": [],
+                   "final_balance": [], "ndeals": [], "test_ids": []}
         for i in range(opt_summary.shape[0]):
             exphash, test_ids = "", ""
             for col in opt_summary.columns:
@@ -226,7 +236,8 @@ class Optimizer:
             for test_id in test_ids:
                 sum_daily_profit += btests[test_id].daily_hist["profit_csum"]
             profit_av = sum_daily_profit/len(test_ids)
-            bstair_av, metrics = BackTestResults._calc_metrics(profit_av.values)
+            bstair_av, metrics = BackTestResults._calc_metrics(
+                profit_av.values)
             recovery.append(metrics["recovery"])
             maxwait.append(metrics["maxwait"])
             opt_res["final_balance"].iloc[i] = profit_av.values[-1]
@@ -234,30 +245,33 @@ class Optimizer:
         opt_res["recovery"] = recovery
         opt_res["maxwait"] = maxwait
         opt_res["ndeals"] = np.int64(opt_res["ndeals"].values/len(test_ids))
-        
+
         # opt_res = opt_res[opt_res.ndeals<2500]
-        
+
         opt_res.sort_values(by=[self.sortby], ascending=False, inplace=True)
         logger.info(f"\n{opt_res}\n\n")
 
         legend = []
         for test_id in range(min(opt_res.shape[0], 5)):
-            plt.plot(btests[0].daily_hist.index, balances_av[opt_res.index[test_id]], linewidth=2 if test_id==0 else 1)
+            plt.plot(btests[0].daily_hist.index, balances_av[opt_res.index[test_id]],
+                     linewidth=2 if test_id == 0 else 1)
             row = opt_res.iloc[test_id]
-            legend.append(f"{opt_res.index[test_id]}: b={row.final_balance:.0f} ({row.ndeals}) recv={row.recovery:.2f} mwait={row.maxwait:.0f}")
-        plt.legend(legend) 
-        plt.grid("on")  
+            legend.append(
+                f"{opt_res.index[test_id]}: b={row.final_balance:.0f} ({row.ndeals}) recv={row.recovery:.2f} mwait={row.maxwait:.0f}")
+        plt.legend(legend)
+        plt.grid("on")
         plt.tight_layout()
-        plt.savefig(f"optimization/{optim_cfg['period'][0].value}.av_{self.sortby}_sorted_runs_with_same_paramset.top5.png")
+        plt.savefig(
+            f"optimization/{optim_cfg['period'][0].value}.av_{self.sortby}_sorted_runs_with_same_paramset.top5.png")
         plt.clf()
         # plt.subplot(2, 1, 2)
         i = 0
         test_ids = list(map(int, opt_res.test_ids.iloc[i].split(".")[1:]))
-        plot_daily_balances_with_av(btests, 
-                            test_ids, 
-                            balances_av[opt_res.index[i]].values, 
-                            metrics_av=[("recovery", opt_res.iloc[i].recovery)])
+        plot_daily_balances_with_av(btests,
+                                    test_ids,
+                                    balances_av[opt_res.index[i]].values,
+                                    metrics_av=[("recovery", opt_res.iloc[i].recovery)])
         plt.tight_layout()
-        plt.savefig(f"optimization/{optim_cfg['period'][0].value}.av_{self.sortby}_sorted_runs_with_same_paramset.top1.png")
+        plt.savefig(
+            f"optimization/{optim_cfg['period'][0].value}.av_{self.sortby}_sorted_runs_with_same_paramset.top1.png")
         plt.clf()
-

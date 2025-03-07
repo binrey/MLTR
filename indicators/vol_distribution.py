@@ -4,6 +4,7 @@ import os
 import pickle
 from pathlib import Path
 
+from loguru import logger
 import numpy as np
 
 from backtesting.profiling import line_profile_function, profile_function
@@ -30,8 +31,13 @@ class VolDistribution:
     def _load_cache(self):
         cache_file = self._get_cache_path()
         if cache_file.exists():
+            try:
                 with open(cache_file, "rb") as f:
-                        self.cache = pickle.load(f)
+                    self.cache = pickle.load(f)
+            except (pickle.UnpicklingError, EOFError, IOError):
+                # cache_file.unlink()
+                # self.cache = {}
+                logger.warning(f"Corrupted cache file {cache_file}")
 
     def _save_cache(self):
         if not self.cache:
@@ -110,6 +116,10 @@ class VolDistribution:
     @property
     def vis_objects(self):
         return [self.vol_profile]
+    
+    @property
+    def bin_size(self):
+        return abs(self.price_bins[0] - self.price_bins[1]) if len(self.price_bins) else 0
 
 
 def test_vol_distribution():

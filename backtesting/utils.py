@@ -213,7 +213,7 @@ class BackTestResults:
 
     @property
     def ndeals_per_month(self):
-        return int(self.ndeals / max(1, self.num_years_on_trade) / 12)
+        return self.ndeals / max(1, self.num_years_on_trade) / 12
 
     def compute_n_years(self, positions):
         if len(positions) == 0:

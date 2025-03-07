@@ -86,7 +86,7 @@ def launch(cfg):
         + f" ({bt_res.fees/bt_res.final_profit*100:.1f}% fees)"
     )
     logger.info(
-        sformat(2).format("DEALS/MONTH", bt_res.ndeals_per_month)
+        sformat(1).format("DEALS/MONTH", bt_res.ndeals_per_month)
         + f"   ({bt_res.ndeals} total)"
     )
     logger.info(sformat(0).format(
