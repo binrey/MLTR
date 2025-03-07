@@ -188,7 +188,6 @@ class BackTestResults:
 
         plt.tight_layout()
         plt.savefig("backtest.png")
-        plt.show()
 
     @property
     def final_profit(self):

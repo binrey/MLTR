@@ -26,7 +26,10 @@ def run_optimization(config_path, run_backtests):
     cfg["save_backup"] = False
     cfg["save_plots"] = False
     opt = Optimizer()
-    opt.optimize(cfg, run_backtests=run_backtests)
+    if run_backtests:
+        opt.run_backtests(cfg)
+    results = opt.optimize(cfg, run_backtests=run_backtests)
+    return results
 
 
 def run_bybit(config_path):
