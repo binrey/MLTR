@@ -12,7 +12,7 @@ config = dict(
     decision_maker=dict(
         type=VVol,
         nbins=9,
-        sharpness=5,
+        sharpness=2,
         strike=4,
         strategy=VVol.TriggerStrategy.MANUAL_LEVELS
     ),

@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional
-from common.type import to_datetime
+from pathlib import PosixPath
+from typing import Any, List, Optional
 
-from common.type import Line, Side, SLDefiner, TPDefiner
+from pandas import Period
+
+from common.type import Line, Side, SLDefiner, Symbol, TPDefiner, to_datetime
+from common.utils import set_indicator_cache_dir
 
 
 class DecisionMaker(ABC):
@@ -18,22 +21,21 @@ class DecisionMaker(ABC):
         def is_active(self):
             return self.side is not None
 
-    def __init__(self, cfg):
-        self.cfg = cfg
+    def __init__(self, hist_buffer_size: int, period: Period, symbol: Symbol):
         self.sl_definer: SLDefiner = {Side.BUY: None, Side.SELL: None}
         self.tp_definer: TPDefiner = {Side.BUY: None, Side.SELL: None}
         self.lprice, self.sprice, self.cprice = None, None, None
-        self.vis_items = []
-        self.indicators = self.setup_indicators(cfg)
-             
+        self.draw_items = []
+        self.cache_dir = set_indicator_cache_dir(symbol, period, hist_buffer_size)
+            
     def __str__(self):
         return self.type + ": " + "|".join([f"{k}:{v}" for k, v in self.cfg.items()])
     
     @abstractmethod
-    def setup_indicators(self, cfg):  # TODO
+    def setup_indicators(self, cfg, indicator_cache_dir: PosixPath):
         pass
     
-    def set_vis_objects(self, time=None):
+    def set_draw_objects(self, time=None):
         self.draw_items = []
         if self.lprice is not None and time:
             self.draw_items.append(Line([(to_datetime(time), self.lprice), (None, self.lprice)], color="green"))

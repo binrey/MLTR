@@ -3,24 +3,25 @@
 import os
 import pickle
 from pathlib import Path
+from typing import Optional
 
 from loguru import logger
 import numpy as np
 
-from backtesting.profiling import line_profile_function, profile_function
 from common.type import TimeVolumeProfile
 
 
 class VolDistribution:
     """Calculates volume distribution across price levels using histogram binning."""
-    def __init__(self, nbins=20):
+    def __init__(self, nbins: int = 20, cache_dir: Optional[str] = None):
         self.nbins = nbins
         self.vol_hist, self.price_bins = None, None
         self.vol_profile = None
         self.cache = {}
-        self.cache_dir = Path(os.getenv("CACHE_DIR")) / "vol_distribution"
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self._load_cache()
+        self.cache_dir = Path(cache_dir) / "vol_distribution" if cache_dir else None
+        if self.cache_dir:  
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            self._load_cache()
 
     def __del__(self):
         self._save_cache()

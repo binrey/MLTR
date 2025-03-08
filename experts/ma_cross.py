@@ -64,7 +64,7 @@ class ClsMACross(DecisionMaker):
         if order_side:
             self.sl_definer[Side.BUY] = h["Low"].min()
             self.sl_definer[Side.SELL] = h["High"].max()
-            self.set_vis_objects(h["Date"][-2])
+            self.set_draw_objects(h["Date"][-2])
 
         return DecisionMaker.Response(side=order_side, 
                                       target_volume_fraction=volume_fraction,

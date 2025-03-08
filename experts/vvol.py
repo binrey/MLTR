@@ -1,4 +1,6 @@
 from enum import Enum
+from pathlib import PosixPath
+from typing import Any
 
 import numpy as np
 from loguru import logger
@@ -17,15 +19,21 @@ class VVol(DecisionMaker):
         AUTO_LEVELS = "auto_levels"  # Uses shadow intersection analysis
     
     def __init__(self, cfg):
-        super().__init__(cfg)
+        super().__init__(cfg["hist_buffer_size"], cfg["period"], cfg["symbol"])
+        cfg.pop("hist_buffer_size")
+        cfg.pop("period")
+        cfg.pop("symbol")
+        self.cfg = cfg
+        self.indicators = self.setup_indicators(cfg)
+        
         self.long_bin = cfg.get("long_bin", 1)
         self.short_bin = cfg.get("short_bin", 1)
         self.sharpness = cfg["sharpness"]
         self.strategy = cfg["strategy"]
         self.strike = cfg["strike"]
 
-    def setup_indicators(self, cfg):
-        self.indicator = VolDistribution(nbins=cfg["nbins"])
+    def setup_indicators(self, cfg: dict[str, Any]):
+        self.indicator = VolDistribution(nbins=cfg["nbins"], cache_dir=self.cache_dir)
         return [self.indicator]
 
     def _find_prices_manual_levels(self, h, max_vol_id):
@@ -77,7 +85,7 @@ class VVol(DecisionMaker):
             if self.lprice is not None and self.sprice is not None:
                 self.sl_definer[Side.BUY] = self.sprice
                 self.sl_definer[Side.SELL] = self.lprice
-                self.set_vis_objects(h["Date"][-2])
+                self.set_draw_objects(h["Date"][-2])
                 self.draw_items += self.indicator.vis_objects
 
         strike = h["Close"][-2] - h["Open"][-2]

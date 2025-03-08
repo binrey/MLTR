@@ -2,7 +2,7 @@ import importlib.util
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Optional
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import mplfinance as mpf
@@ -15,7 +15,7 @@ from easydict import EasyDict
 from loguru import logger
 from PIL import Image
 
-from common.type import Side
+from common.type import Symbol
 
 # cache = Cache(".tmp")
 
@@ -35,6 +35,14 @@ def cache_result(func):
         return result
     
     return wrapper
+
+
+def set_indicator_cache_dir(symbol, period, window):
+    cache_dir = Path('.cache/indicators')
+    expert_cache_dir = cache_dir / symbol.ticker / period.value / f"win{window}"
+    expert_cache_dir.mkdir(parents=True, exist_ok=True)
+    return expert_cache_dir
+
 
 class PyConfig():
     def __init__(self, config_file) -> None:
@@ -64,11 +72,11 @@ class PyConfig():
             # If it's already a list of possible values...
             if isinstance(vlist, list):
                 for v in vlist:
-                    # If it’s something that has "func" and "params" (like your custom expansions)...
+                    # If it's something that has "func" and "params" (like your custom expansions)...
                     if isinstance(v, EasyDict) and "func" in v:
                         # Expand the params
                         params_list = self.unroll_params(v.params)
-                        # For each params combination, make a *copy* so we don’t lose anything
+                        # For each params combination, make a *copy* so we don't lose anything
                         for params in params_list:
                             new_v = deepcopy(v)
                             new_v.params = params

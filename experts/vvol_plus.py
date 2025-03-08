@@ -85,7 +85,7 @@ class VVolPlus(DecisionMaker):
             if self.lprice is not None and self.sprice is not None:
                 self.sl_definer[Side.BUY] = h["Low"].min()
                 self.sl_definer[Side.SELL] = h["High"].max()
-                self.set_vis_objects(h["Date"][-2])
+                self.set_draw_objects(h["Date"][-2])
                 self.draw_items += self.indicator.vis_objects
 
         if self.lprice:
