@@ -9,7 +9,7 @@ from multiprocessing import Pool
 from pathlib import Path
 from shutil import rmtree
 from time import time
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -112,9 +112,32 @@ class Optimizer:
         best_config: Dict  # Configuration that produced the best results
         
         
-    def __init__(self):
-        self.data_path = None
-        self.sortby = "recovery"
+    def __init__(self, optim_cfg: Dict[str, Any], results_dir = "results/optimization"):
+        self.results_dir = Path(results_dir)
+        self.results_dir.mkdir(exist_ok=True, parents=True)
+        self.cache_dir = Path(".cache/backtests")
+        self.sortby = "APR"
+        self.cfg = optim_cfg
+        self.cfgs = []
+        self.btests = []
+
+    def _get_cache_subdir(self, cfg):
+        """Get the appropriate cache subdirectory for a configuration."""
+        if isinstance(cfg['decision_maker'], list):
+            if len(cfg['decision_maker']) == 1:
+                decision_maker_type = cfg['decision_maker'][0]['type'].__name__
+            else:
+                raise ValueError("Multiple decision makers are not supported yet")
+        else:
+            decision_maker_type = cfg['decision_maker']['type'].__name__
+        if isinstance(cfg['symbol'], list):
+            if len(cfg['symbol']) == 1:
+                symbol_ticker = cfg['symbol'][0].ticker
+            else:
+                raise ValueError("Multiple symbols are not supported yet")
+        else:
+            symbol_ticker = cfg['symbol'].ticker
+        return self.cache_dir / decision_maker_type / symbol_ticker
 
     def backtest_process(self, args):
         num, cfg = args
@@ -122,16 +145,26 @@ class Optimizer:
         locnum = 0
         while True:
             btest = backtest_launch(cfg)
-            # cfg.no_trading_days.update(set(pos.open_date for pos in btest.positions))
             locnum += 1
-            pickle.dump((cfg, btest),
-                        open(str(self.data_path / f"btest.{num + locnum/100:05.2f}.{cfg['symbol'].ticker}.pickle"), "wb"))
+            
+            # Create cache subdirectory
+            cache_subdir = self._get_cache_subdir(cfg)
+            cache_subdir.mkdir(exist_ok=True, parents=True)
+            
+            # Save backtest results
+            cache_file = cache_subdir / f"btest.{num + locnum/100:05.2f}.pickle"
+            with open(cache_file, "wb") as f:
+                pickle.dump((cfg, btest), f)
             break
 
     def pool_handler(self, optim_cfg):
-        if self.data_path.exists():
-            rmtree(self.data_path)
-        self.data_path.mkdir(exist_ok=True, parents=True)
+        # Only remove results directory, not cache
+        if self.results_dir.exists():
+            rmtree(self.results_dir)
+            
+        # Create cache dir if it doesn't exist
+        self.cache_dir.mkdir(exist_ok=True, parents=True)
+            
         ncpu = multiprocessing.cpu_count()
         logger.info(f"Number of cpu : {ncpu}")
 
@@ -141,10 +174,8 @@ class Optimizer:
         cfgs = [(i, cfg) for i, cfg in enumerate(cfgs)]
         p = Pool(ncpu)
         return p.map(self.backtest_process, cfgs,)
-        # for cfg in cfgs:
-        #     self.backtest_process(cfg)
 
-    def optimize(self, optim_cfg: Dict) -> Dict[str, OptimizationResults]:
+    def optimize(self) -> Dict[str, OptimizationResults]:
         """
         Optimize the trading strategy for multiple symbols.
         
@@ -158,40 +189,28 @@ class Optimizer:
         Raises:
             ValueError: If no symbols are specified in the configuration
         """
-        if not optim_cfg.get("symbol"):
+        if not self.cfg.get("symbol"):
             raise ValueError("No symbols specified in optimization configuration")
         
-        symbols = optim_cfg["symbol"]
-        period = optim_cfg["period"][0]
-        
-        # Create base optimization directory
-        base_path = Path("optimization")
-        base_path.mkdir(exist_ok=True)
-        
+        symbols = self.cfg["symbol"]
         results = {}
         for symbol in symbols:
-            logger.info(f"Optimizing strategy for {symbol.ticker}")
+            logger.debug(f"Optimizing strategy for {symbol.ticker}...")
             
             # Create symbol-specific config
-            symbol_cfg = deepcopy(optim_cfg)
+            symbol_cfg = deepcopy(self.cfg)
             symbol_cfg["symbol"] = [symbol]
             
-            # Run optimization for this symbol
             try:
-                result = self._optimize_single_symbol(symbol_cfg, period)
+                result = self._optimize_single_symbol(symbol_cfg)
                 results[symbol.ticker] = result
-                
-                # Log optimization results
-                logger.info(f"\nOptimization results for {symbol.ticker}:")
-                logger.info(f"Best score ({self.sortby}): {result.best_score:.2f}")
-                
             except Exception as e:
                 logger.error(f"Failed to optimize for {symbol.ticker}: {str(e)}")
                 continue
         
         return results
 
-    def _optimize_single_symbol(self, optim_cfg: Dict, period) -> OptimizationResults:
+    def _optimize_single_symbol(self, optim_cfg) -> OptimizationResults:
         """
         Optimize the trading strategy for a specific symbol.
         
@@ -206,37 +225,40 @@ class Optimizer:
         Raises:
             ValueError: If configuration is invalid
         """
+        assert "symbol" in optim_cfg and len(optim_cfg["symbol"]) == 1, "symbol must be a single symbol"
         symbol = optim_cfg["symbol"][0]
-        self.data_path = Path("optimization") / f"data_{period.value}"
-        
-        # Set up logging for this optimization run
-        log_file = f"optimization/opt_report_{symbol.ticker}.txt"
-        logger.add(log_file, level="INFO", rotation="30 seconds")
+        # results_dir = self.results_dir / f"{symbol.value}"
         
         # Load and validate results
-        cfgs, btests = self._load_backtest_results()
-        if not cfgs:
+        self.cfgs, self.btests = self._load_backtest_results(optim_cfg)
+        if not self.cfgs:
             raise ValueError(f"No backtest results found for {symbol.ticker}")
         
         # Validate dates
-        self._validate_backtest_dates(btests)
+        self._validate_backtest_dates()
         
         # Generate optimization summary
-        opt_summary = self._generate_optimization_summary(cfgs, btests)
+        opt_summary = self._generate_optimization_summary()
         
         # Get best results
         top_run_id = opt_summary.index[0]
         best_score = opt_summary[self.sortby].iloc[0]
         
         # Save and plot results
-        self._plot_optimization_results(opt_summary, btests, symbol, period)
+        # self._plot_optimization_results(opt_summary, symbol, period)
         
-        return self.OptimizationResults(
+        results = self.OptimizationResults(
             opt_summary=opt_summary,
             best_score=best_score,
-            best_config=cfgs[top_run_id])
+            best_config=self.cfgs[top_run_id])
+        
+        # Log optimization results
+        logger.info(f"Optimization results for {symbol.ticker}:")
+        logger.info(f"Best score ({self.sortby}): {results.best_score:.2f}\n")  
 
-    def run_backtests(self, optim_cfg: Dict) -> None:
+        return results
+
+    def run_backtests(self) -> None:
         """
         Run backtests for the given optimization configuration.
         
@@ -244,37 +266,48 @@ class Optimizer:
             optim_cfg: Configuration dictionary for optimization
         """
         t0 = time()
-        self.pool_handler(optim_cfg)
-        symbol = optim_cfg["symbol"][0]
-        logger.info(f"Optimization time for {symbol.ticker}: {time() - t0:.1f} sec\n")
+        self.pool_handler(self.cfg)
+        logger.info(f"Optimization time: {time() - t0:.1f} sec\n")
 
-    def _load_backtest_results(self) -> Tuple[List[Dict], List[BackTestResults]]:
+    def _load_backtest_results(self, cfg):
         """Load backtest results from pickle files."""
         cfgs, btests = [], []
-        for p in sorted(self.data_path.glob("*.pickle")):
-            cfg, btest = pickle.load(open(p, "rb"))
-            cfgs.append(cfg)
-            btests.append(btest)
+        cache_dir = self._get_cache_subdir(cfg)
+        # Get all subdirectories in cache
+        if not cache_dir.exists():
+            return cfgs, btests
+            
+        # Recursively find all pickle files
+        for p in sorted(cache_dir.rglob("*.pickle")):
+            try:
+                with open(p, "rb") as f:
+                    cfg, btest = pickle.load(f)
+                cfgs.append(cfg)
+                btests.append(btest)
+            except (pickle.UnpicklingError, EOFError, IOError) as e:
+                logger.warning(f"Failed to load cache file {p}: {e}")
+                continue
+                
         return cfgs, btests
 
-    def _validate_backtest_dates(self, btests: List[BackTestResults]) -> None:
+    def _validate_backtest_dates(self) -> None:
         """Validate that all backtests have the same start date."""
-        start_dates = set([btest.date_start for btest in btests])
+        start_dates = set([btest.date_start for btest in self.btests])
         if len(start_dates) != 1:
             raise ValueError(
                 f"Inconsistent backtest start dates. Please adjust configuration to start from {date2str(max(start_dates))}"
             )
 
-    def _generate_optimization_summary(self, cfgs: List[Dict], btests: List[BackTestResults]) -> pd.DataFrame:
+    def _generate_optimization_summary(self) -> pd.DataFrame:
         """Generate summary DataFrame of optimization results."""
         opt_summary = defaultdict(list)
         
         # Extract configuration parameters
-        cfg_keys = list(cfgs[0].keys())
+        cfg_keys = list(self.cfgs[0].keys())
         cfg_keys.remove("no_trading_days")
         
         for k in cfg_keys:
-            for cfg in cfgs:
+            for cfg in self.cfgs:
                 v = cfg[k]
                 if isinstance(v, dict):
                     description = []
@@ -290,7 +323,7 @@ class Optimizer:
                     opt_summary[k].append(v)
         
         # Add metrics
-        for btest in btests:
+        for btest in self.btests:
             opt_summary["APR"].append(btest.APR)
             opt_summary["final_profit"].append(btest.final_profit)
             opt_summary["ndeals"].append(btest.ndeals)
@@ -309,27 +342,24 @@ class Optimizer:
         opt_summary.sort_values(by=["APR"], ascending=False, inplace=True)
         return opt_summary
 
-    def _plot_optimization_results(self, opt_summary: pd.DataFrame, btests: List[BackTestResults], symbol: Symbol, period) -> None:
+    def _plot_optimization_results(self, opt_summary: pd.DataFrame, symbol: Symbol, period) -> None:
         # Individual tests results
         top_runs_ids = []
         sum_daily_profit = 0
         for symbol in set(opt_summary["symbol"]):
             opt_summary_for_ticker = opt_summary[opt_summary["symbol"] == symbol]
             top_runs_ids.append(opt_summary_for_ticker.index[0])
-            sum_daily_profit += btests[top_runs_ids[-1]
-                                       ].daily_hist["profit_csum"]
+            sum_daily_profit += self.btests[top_runs_ids[-1]].daily_hist["profit_csum"]
             logger.info(f"\n{opt_summary_for_ticker.head(10)}\n")
-            pd.DataFrame(btests[top_runs_ids[-1]].daily_hist.profit_csum).to_csv(
+            pd.DataFrame(self.btests[top_runs_ids[-1]].daily_hist.profit_csum).to_csv(
                 f"optimization/{symbol}.{period.value}.top_{self.sortby}_sorted.csv", index=False)
 
         profit_av = (sum_daily_profit / len(top_runs_ids)).values
-        APR_av, maxwait_av = btests[top_runs_ids[-1]
-                                    ].metrics_from_profit(profit_av)
-        # bstair_av, metrics = BackTestResults._calc_metrics(profit_av.values)
+        APR_av, maxwait_av = self.btests[top_runs_ids[-1]].metrics_from_profit(profit_av)
         logger.info(
             f"\nAverage of top runs ({', '.join([f'{i}' for i in top_runs_ids])}): APR={APR_av:.2f}, maxwait={maxwait_av:.0f}\n")
         plot_daily_balances_with_av(
-            btests=btests,
+            btests=self.btests,
             test_ids=top_runs_ids,
             profit_av=profit_av,
             metrics_av=[("APR", APR_av), ("mwait", maxwait_av)]
@@ -360,7 +390,7 @@ class Optimizer:
             sum_daily_profit = 0
             test_ids = list(map(int, opt_res.test_ids.iloc[i].split(".")[1:]))
             for test_id in test_ids:
-                sum_daily_profit += btests[test_id].daily_hist["profit_csum"]
+                sum_daily_profit += self.btests[test_id].daily_hist["profit_csum"]
             profit_av = sum_daily_profit/len(test_ids)
             bstair_av, metrics = BackTestResults._calc_metrics(
                 profit_av.values)
@@ -372,14 +402,12 @@ class Optimizer:
         opt_res["maxwait"] = maxwait
         opt_res["ndeals"] = np.int64(opt_res["ndeals"].values/len(test_ids))
 
-        # opt_res = opt_res[opt_res.ndeals<2500]
-
         opt_res.sort_values(by=[self.sortby], ascending=False, inplace=True)
         logger.info(f"\n{opt_res}\n\n")
 
         legend = []
         for test_id in range(min(opt_res.shape[0], 5)):
-            plt.plot(btests[0].daily_hist.index, balances_av[opt_res.index[test_id]],
+            plt.plot(self.btests[0].daily_hist.index, balances_av[opt_res.index[test_id]],
                      linewidth=2 if test_id == 0 else 1)
             row = opt_res.iloc[test_id]
             legend.append(
@@ -393,7 +421,7 @@ class Optimizer:
         # plt.subplot(2, 1, 2)
         i = 0
         test_ids = list(map(int, opt_res.test_ids.iloc[i].split(".")[1:]))
-        plot_daily_balances_with_av(btests,
+        plot_daily_balances_with_av(self.btests,
                                     test_ids,
                                     balances_av[opt_res.index[i]].values,
                                     metrics_av=[("recovery", opt_res.iloc[i].recovery)])

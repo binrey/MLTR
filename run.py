@@ -25,10 +25,10 @@ def run_optimization(config_path, run_backtests):
     cfg["visualize"] = False
     cfg["save_backup"] = False
     cfg["save_plots"] = False
-    opt = Optimizer()
+    opt = Optimizer(cfg)
     if run_backtests:
-        opt.run_backtests(cfg)
-    results = opt.optimize(cfg, run_backtests=run_backtests)
+        opt.run_backtests()
+    results = opt.optimize()
     return results
 
 
@@ -78,7 +78,9 @@ if __name__ == "__main__":
 
     if run_type == RunType.BYBIT:
         run_bybit(args.config_path)
-    if run_type == RunType.OPTIMIZE:
+    elif run_type == RunType.OPTIMIZE:
         run_optimization(args.config_path, args.run_backtests)
     elif run_type == RunType.BACKTEST:
         run_backtest(args.config_path)
+    else:
+        raise ValueError(f"Invalid run type: {run_type}")
