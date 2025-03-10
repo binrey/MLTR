@@ -1,3 +1,5 @@
+import numpy as np
+
 from common.type import Symbols, TimePeriod, Vis
 from common.utils import FeeRate, update_config
 from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
@@ -6,8 +8,8 @@ from experts.vvol import VVol
 config = dict(
     wallet=100,
     leverage=4,
-    date_start="2024-01-01T00:00:00",
-    date_end="2025-03-01T00:00:00",
+    date_start=np.datetime64("2018-01-01T00:00:00"),
+    date_end=np.datetime64("2025-03-01T00:00:00"),
     no_trading_days=set(),
     decision_maker=dict(
         type=VVol,
@@ -52,14 +54,13 @@ config = dict(
 optimization = update_config(
     config,
     min_deals_per_month=1,
-    symbol=[Symbols.BTCUSDT, Symbols.ETHUSDT],
-    hist_buffer_size=[64, 128, 256],
+    hist_buffer_size=[32, 64, 128],
     trailing_stop={
-        "trailing_stop_rate": [0.04]
+        "trailing_stop_rate": [0.04, 0.02, 0.01]
         },
     decision_maker={
-        "nbins": [9],
-        "sharpness": [3],
-        "strike": [2]
+        "nbins": [9, 11, 15],
+        "sharpness": [2, 3, 4],
+        "strike": [2, 3, 4]
         }
     )

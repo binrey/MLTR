@@ -23,7 +23,6 @@ from trade.backtest import launch as backtest_launch
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
-# Configure logger to filter out messages from this module
 logger = logger.bind(module="data_processing.dataloading")
 logger.disable("data_processing.dataloading")
 
@@ -108,10 +107,31 @@ class Optimizer:
         Results of the optimization process.
         """
         opt_summary: pd.DataFrame  # Optimization summary DataFrame
-        best_score: float  # Best score achieved during optimization
-        best_config: Dict  # Configuration that produced the best results
+        configs: Dict  # Configuration that produced the best results
+        score_name: str = "APR"
         
+        def __post_init__(self):
+            self.sort_by(self.score_name)
         
+        def sort_by(self, score_name: str = "APR"):
+            self.opt_summary = self.opt_summary.sort_values(by=[score_name], ascending=False)
+        
+        def apply_filters(self, max_ndeals_per_month: int = 4):
+            self.opt_summary = self.opt_summary[self.opt_summary["ndeals_per_month"] > max_ndeals_per_month]
+        
+        @property
+        def top_run_id(self) -> int:
+            return self.opt_summary.index[0]
+        
+        @property
+        def best_config(self) -> Dict[str, Any]:
+            return self.configs[self.top_run_id]
+        
+        @property
+        def best_score(self) -> float:
+            return self.opt_summary.iloc[0][self.score_name]
+        
+
     def __init__(self, optim_cfg: Dict[str, Any], results_dir = "results/optimization"):
         self.results_dir = Path(results_dir)
         self.results_dir.mkdir(exist_ok=True, parents=True)
@@ -119,7 +139,7 @@ class Optimizer:
         self.sortby = "APR"
         self.cfg = optim_cfg
         self.cfgs = []
-        self.btests = []
+        self.btests: List[BackTestResults] = []
 
     def _get_cache_subdir(self, cfg):
         """Get the appropriate cache subdirectory for a configuration."""
@@ -138,6 +158,10 @@ class Optimizer:
         else:
             symbol_ticker = cfg['symbol'].ticker
         return self.cache_dir / decision_maker_type / symbol_ticker
+
+    def clear_cache(self):
+        if self.cache_dir.exists():
+            rmtree(self.cache_dir)
 
     def backtest_process(self, args):
         num, cfg = args
@@ -175,42 +199,7 @@ class Optimizer:
         p = Pool(ncpu)
         return p.map(self.backtest_process, cfgs,)
 
-    def optimize(self) -> Dict[str, OptimizationResults]:
-        """
-        Optimize the trading strategy for multiple symbols.
-        
-        Args:
-            optim_cfg: Dictionary containing optimization configuration
-            run_backtests: Whether to run backtests or use existing results
-        
-        Returns:
-            Dictionary mapping symbol tickers to their OptimizationResults
-        
-        Raises:
-            ValueError: If no symbols are specified in the configuration
-        """
-        if not self.cfg.get("symbol"):
-            raise ValueError("No symbols specified in optimization configuration")
-        
-        symbols = self.cfg["symbol"]
-        results = {}
-        for symbol in symbols:
-            logger.debug(f"Optimizing strategy for {symbol.ticker}...")
-            
-            # Create symbol-specific config
-            symbol_cfg = deepcopy(self.cfg)
-            symbol_cfg["symbol"] = [symbol]
-            
-            try:
-                result = self._optimize_single_symbol(symbol_cfg)
-                results[symbol.ticker] = result
-            except Exception as e:
-                logger.error(f"Failed to optimize for {symbol.ticker}: {str(e)}")
-                continue
-        
-        return results
-
-    def _optimize_single_symbol(self, optim_cfg) -> OptimizationResults:
+    def optimize(self, optim_cfg) -> OptimizationResults:
         """
         Optimize the trading strategy for a specific symbol.
         
@@ -225,8 +214,7 @@ class Optimizer:
         Raises:
             ValueError: If configuration is invalid
         """
-        assert "symbol" in optim_cfg and len(optim_cfg["symbol"]) == 1, "symbol must be a single symbol"
-        symbol = optim_cfg["symbol"][0]
+        symbol = optim_cfg["symbol"]
         # results_dir = self.results_dir / f"{symbol.value}"
         
         # Load and validate results
@@ -240,23 +228,11 @@ class Optimizer:
         # Generate optimization summary
         opt_summary = self._generate_optimization_summary()
         
-        # Get best results
-        top_run_id = opt_summary.index[0]
-        best_score = opt_summary[self.sortby].iloc[0]
-        
         # Save and plot results
         # self._plot_optimization_results(opt_summary, symbol, period)
         
-        results = self.OptimizationResults(
-            opt_summary=opt_summary,
-            best_score=best_score,
-            best_config=self.cfgs[top_run_id])
-        
-        # Log optimization results
-        logger.info(f"Optimization results for {symbol.ticker}:")
-        logger.info(f"Best score ({self.sortby}): {results.best_score:.2f}\n")  
+        return self.OptimizationResults(score_name=self.sortby, opt_summary=opt_summary, configs=self.cfgs)
 
-        return results
 
     def run_backtests(self) -> None:
         """
@@ -326,7 +302,7 @@ class Optimizer:
         for btest in self.btests:
             opt_summary["APR"].append(btest.APR)
             opt_summary["final_profit"].append(btest.final_profit)
-            opt_summary["ndeals"].append(btest.ndeals)
+            opt_summary["ndeals_per_month"].append(btest.ndeals_per_month)
             opt_summary["loss_max_rel"].append(btest.metrics["loss_max_rel"])
             opt_summary["recovery"].append(btest.metrics["recovery"])
             opt_summary["maxwait"].append(btest.metrics["maxwait"])

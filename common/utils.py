@@ -89,7 +89,7 @@ class PyConfig():
                 cfg[k] = vlist_new
             else:
                 # If not a list, wrap it in one so we have a single "variant"
-                cfg[k] = [vlist]
+                cfg[k] = vlist
         return cfg
     
     @staticmethod

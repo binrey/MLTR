@@ -1,119 +1,182 @@
 """Cross-validation utilities for backtesting."""
+import pickle
+import sys
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
 from loguru import logger
+from tabulate import tabulate
 
 from backtesting.optimization import Optimizer
 from backtesting.utils import BackTestResults
-from common.type import Symbol
+from common.type import Symbol, to_datetime
+from trade.backtest import launch as backtest_launch
+
+logger.remove()
+logger.add(sys.stderr, level="INFO")
+logger = logger.bind(module="data_processing.dataloading")
+logger.disable("data_processing.dataloading")
+logger = logger.bind(module="backtesting.optimization")
+logger.disable("backtesting.optimization")
 
 
 class CrossValidation:
-    def __init__(self, 
-                 data: pd.DataFrame,
-                 n_splits: int = 5,
-                 test_size: Optional[timedelta] = None,
-                 gap: Optional[timedelta] = None):
+    @dataclass
+    class CrossValidationResults:
+        """
+        Results of the cross-validation process.
+        """
+        train_scores: Optional[List[float]] = field(default_factory=list)
+        test_scores: Optional[List[float]] = field(default_factory=list)
+
+        def add_train_test_scores(self, train_score: float, test_score: float):
+            self.train_scores.append(train_score)
+            self.test_scores.append(test_score)
+            
+        def as_averall_table(self):
+            """Print a formatted table of cross-validation results."""
+            data = []
+            for fold, (train_score, test_score) in enumerate(zip(self.train_scores, self.test_scores), 1):
+                data.append([f"Fold {fold}", f"{train_score:.4f}", f"{test_score:.4f}"])
+            
+            return tabulate(data, 
+                            headers=["Fold", "Train Score", "Test Score"], 
+                            tablefmt="grid")
+        
+        def as_summary_table(self):
+            # Print summary statistics
+            avg_train = np.mean(self.train_scores)
+            avg_test = np.mean(self.test_scores)
+            std_train = np.std(self.train_scores)
+            std_test = np.std(self.test_scores)
+            
+            summary_data = [
+                ["Average", f"{avg_train:.4f}", f"{avg_test:.4f}"],
+                ["Std Dev", f"{std_train:.4f}", f"{std_test:.4f}"]
+            ]
+            
+            return tabulate(summary_data, 
+                            headers=["Fold", "Train Score", "Test Score"], 
+                            tablefmt="grid")
+        
+    class Strategy(Enum):
+        EQUAL_TEST_CUMULATIVE_TRAIN = "equal_test_cumulative_train"
+        EQUAL_TEST_EQUAL_TRAIN = "equal_test_equal_train"
+        
+        
+    def __init__(self, optim_cfg: Dict[str, Any], n_splits: int = 5, 
+                 strategy: Strategy = Strategy.EQUAL_TEST_CUMULATIVE_TRAIN):
         """
         Initialize cross-validation for backtesting.
         
         Args:
-            data: Historical price data
+            optim_cfg: Configuration dictionary for optimization
             n_splits: Number of splits for cross-validation
-            test_size: Size of each test period. If None, will be calculated as data_size / n_splits
-            gap: Gap between train and test periods. If None, no gap will be used
+            test_size: Size of each test period. If None, will be calculated based on data range
         """
-        self.data = data
+        self.optim_cfg = optim_cfg
         self.n_splits = n_splits
-        self.test_size = test_size or (data.index[-1] - data.index[0]) / n_splits
-        self.gap = gap or timedelta(0)
-        self.optimizer = Optimizer()
-        
-    def _get_split_bounds(self) -> List[tuple]:
-        """Calculate bounds for each split."""
-        splits = []
-        data_start = self.data.index[0]
-        data_end = self.data.index[-1]
-        
-        for i in range(self.n_splits):
-            test_start = data_start + i * (self.test_size + self.gap)
-            test_end = test_start + self.test_size
+        self.strategy = strategy
+        self.cache_dir = Path(".cache/cross_validation")
+        self.cache_dir.mkdir(exist_ok=True, parents=True)
+     
+        # Get data range from configuration
+        assert "date_start" in optim_cfg and "date_end" in optim_cfg, "date_start and date_end must be provided in optim_cfg"
+        self.date_start: np.datetime64 = np.datetime64(optim_cfg["date_start"])
+        self.date_end: np.datetime64 = np.datetime64(optim_cfg["date_end"])
             
-            if test_end > data_end:
-                break
-                
-            splits.append((test_start, test_end))
+        # Set test_size based on data range if not provided
+        # Calculate total period in days
+        total_days = (self.date_end - self.date_start).astype('timedelta64[D]').astype(int)
+        # Convert numpy.int64 to Python int
+        days_per_split = int(total_days // self.n_splits)
+        self.test_size = timedelta(days=days_per_split)
+        
+    def _get_cumulative_split_bounds(self) -> List[tuple]:
+        """
+        Iterate over the data range and calculate split bounds for cumulative splits.
+        """
+            
+        splits = []
+        test_size_days = np.timedelta64(self.test_size.days, 'D')
+        
+        # Calculate splits from the end of the data range
+        for i in range(self.n_splits - 1):
+            # Calculate test period for this split
+            test_end = self.date_end - (self.n_splits - i - 2) * test_size_days
+            test_start = test_end - test_size_days
+            train_start = self.date_start
+            splits.append((train_start, test_start, test_start, test_end))
             
         return splits
     
+    def _get_equal_split_bounds(self) -> List[tuple]:
+        raise NotImplementedError("Equal split bounds not implemented")
+    
+    def _get_split_bounds(self) -> List[tuple]:
+        if self.strategy == self.Strategy.EQUAL_TEST_CUMULATIVE_TRAIN:
+            return self._get_cumulative_split_bounds()
+        elif self.strategy == self.Strategy.EQUAL_TEST_EQUAL_TRAIN:
+            return self._get_equal_split_bounds()
+        else:
+            raise ValueError(f"Invalid strategy: {self.strategy}")
+        
     def cross_validate(self, 
                       config: Dict,
-                      metric: str = "APR",
-                      n_jobs: int = -1) -> Dict:
+                      metric: str = "APR") -> Dict:
         """
         Perform cross-validation using the Optimizer.
         
         Args:
             config: Configuration dictionary for backtesting
             metric: Metric to optimize (default: "APR")
-            n_jobs: Number of jobs for parallel processing (-1 for all available)
-            
-        Returns:
-            Dictionary containing:
-            - best_params: Best parameters found across all splits
-            - split_results: Results for each split
-            - mean_score: Mean score across all splits
-            - std_score: Standard deviation of scores
         """
-        splits = self._get_split_bounds()
-        split_results = []
+        cvall_results = self.CrossValidationResults()
         
-        for i, (test_start, test_end) in enumerate(splits):
-            logger.info(f"Processing split {i+1}/{len(splits)}")
+        for i, (train_start, train_end, test_start, test_end) in enumerate(self._get_split_bounds()):
+            logger.info(f"Processing test split {i + 1}/{self.n_splits - 1}")
+            logger.info(f"Train period: {train_start} to {train_end}")
+            logger.info(f"Test period: {test_start} to {test_end}")
             
-            # Create split-specific config
-            split_config = config.copy()
-            split_config["date_start"] = test_start
-            split_config["date_end"] = test_end
+            # Create train config for optimization
+            train_config = config.copy()
+            train_config["date_start"] = train_start
+            train_config["date_end"] = train_end
             
-            # Run optimization for this split
-            self.optimizer.optimize(split_config)
+            # Run optimization on training data
+            optimizer = Optimizer(train_config)
+            optimizer.clear_cache()
+            optimizer.run_backtests()
+            optimization_results: Optimizer.OptimizationResults = optimizer.optimize(train_config)
             
-            # Get best results for this split
-            best_result = self._get_best_result(metric)
-            split_results.append({
-                "split": i,
-                "test_period": (test_start, test_end),
-                "best_params": best_result["params"],
-                "score": best_result["score"]
-            })
+            # Extract best result from training
+            optimization_results.sort_by(score_name=metric)
+            optimization_results.apply_filters()
+            best_params = optimization_results.best_config
+            train_score = optimization_results.best_score
+            
+            # Create test config with optimized parameters
+            test_config = config.copy()
+            test_config.update(best_params)
+            test_config["date_start"] = test_start
+            test_config["date_end"] = test_end
+            
+            # Run backtest on test data with optimized parameters
+            test_results = backtest_launch(test_config)
+            test_score = test_results.APR
+            
+            # Save results to cache
+            cache_file = self.cache_dir / f"split_{i}.pickle"
+            with open(cache_file, "wb") as f:
+                pickle.dump((train_config, test_config, best_params, test_score), f)
+            
+            cvall_results.add_train_test_scores(train_score, test_score)
         
-        # Calculate aggregate metrics
-        scores = [r["score"] for r in split_results]
-        mean_score = np.mean(scores)
-        std_score = np.std(scores)
-        
-        # Find best parameters across all splits
-        best_split = max(split_results, key=lambda x: x["score"])
-        
-        return {
-            "best_params": best_split["best_params"],
-            "split_results": split_results,
-            "mean_score": mean_score,
-            "std_score": std_score
-        }
-    
-    def _get_best_result(self, metric: str) -> Dict:
-        """Get best result from the optimizer based on specified metric."""
-        # This is a placeholder - actual implementation would depend on how
-        # the Optimizer class stores and exposes its results
-        # You would need to modify this based on the actual Optimizer implementation
-        results = self.optimizer.get_results()  # This method would need to be added to Optimizer
-        best_result = max(results, key=lambda x: x[metric])
-        return {
-            "params": best_result["params"],
-            "score": best_result[metric]
-        }
+        logger.info(f"Cross-validation results:\n {cvall_results.as_averall_table()}")
+        logger.info(f"Cross-validation summary:\n {cvall_results.as_summary_table()}")
+        return cvall_results

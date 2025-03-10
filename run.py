@@ -5,8 +5,10 @@ import os
 import sys
 from datetime import datetime
 
+import pandas as pd
 from loguru import logger
 
+from backtesting.cross_validation import CrossValidation
 from backtesting.optimization import Optimizer
 from common.type import RunType
 from common.utils import PyConfig
@@ -27,6 +29,7 @@ def run_optimization(config_path, run_backtests):
     cfg["save_plots"] = False
     opt = Optimizer(cfg)
     if run_backtests:
+        opt.clear_cache()
         opt.run_backtests()
     results = opt.optimize()
     return results
@@ -40,6 +43,20 @@ def run_bybit(config_path):
     bybit_launch(cfg)
 
 
+def run_cross_validation(config_path):
+    cfg = PyConfig(config_path).get_optimization()
+    cfg["visualize"] = False
+    cfg["save_backup"] = False
+    cfg["save_plots"] = False
+    
+    # Assuming data is loaded here for cross-validation
+    cross_validator = CrossValidation(cfg)
+    results = cross_validator.cross_validate(cfg)
+    
+    logger.info("Cross-validation results:")
+    logger.info(results)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run backtest with specified configuration."
@@ -47,15 +64,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "run_type",
         type=str,
-        choices=["backtest", "optimize", "bybit"],
-        help="Type of run: backtest or bybit"
+        choices=["backtest", "optimize", "bybit", "cross_validation"],
+        help="Type of run to execute."
     )
-    parser.add_argument("config_path", type=str,
-                        help="Path to the configuration file")
+    parser.add_argument(
+        "config_path",
+        type=str,
+        help="Path to the configuration file."
+    )
     parser.add_argument("--debug", action="store_true",
                         help="Enable debug logging")
     parser.add_argument("--run_backtests", action="store_true",
-                        help="run backtests or use previous, default true")
+                        help="Whether to run backtests during optimization.")
     args = parser.parse_args()
 
     run_type = RunType.from_str(args.run_type)
@@ -82,5 +102,7 @@ if __name__ == "__main__":
         run_optimization(args.config_path, args.run_backtests)
     elif run_type == RunType.BACKTEST:
         run_backtest(args.config_path)
+    elif run_type == RunType.CROSS_VALIDATION:
+        run_cross_validation(args.config_path)
     else:
         raise ValueError(f"Invalid run type: {run_type}")

@@ -42,7 +42,7 @@ class BackTest(BaseTradeClass):
         return self.cfg["equaty_step"]
 
 
-def launch(cfg):
+def launch(cfg) -> BackTestResults:
     if cfg["save_plots"]:
         save_path = Path("backtests") / f"{cfg['symbol'].ticker}"
         if save_path.exists():
