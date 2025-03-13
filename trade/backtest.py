@@ -1,15 +1,15 @@
-from trade.base import BaseTradeClass, log_get_hist
-from experts.experts import BacktestExpert
-from backtesting.backtest_broker import Broker
-import stackprinter
-import numpy as np
 from pathlib import Path
 from shutil import rmtree
 
+import numpy as np
 import pandas as pd
+import stackprinter
 from loguru import logger
 
+from backtesting.backtest_broker import Broker
 from backtesting.utils import BackTestResults
+from experts.experts import BacktestExpert
+from trade.base import BaseTradeClass, log_get_hist
 from trade.utils import Position
 
 pd.options.mode.chained_assignment = None
@@ -75,7 +75,7 @@ def launch(cfg) -> BackTestResults:
     def sformat(nd): return "{:>30}: {:>5.@f}".replace("@", str(nd))
 
     logger.info(
-        f"{cfg['symbol'].ticker}-{cfg['period']}: {backtest_trading.exp}"
+        f"{cfg['symbol'].ticker}-{cfg['period']}-{cfg['hist_buffer_size']}: {backtest_trading.exp}"
     )
 
     logger.info("-" * 40)

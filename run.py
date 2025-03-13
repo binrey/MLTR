@@ -31,8 +31,8 @@ def run_optimization(config_path, run_backtests):
     if run_backtests:
         opt.clear_cache()
         opt.run_backtests()
-    results = opt.optimize()
-    return results
+    results = opt.optimize(cfg)
+    logger.info(f"\n{str(results)}")
 
 
 def run_bybit(config_path):
@@ -51,7 +51,7 @@ def run_cross_validation(config_path):
     
     # Assuming data is loaded here for cross-validation
     cross_validator = CrossValidation(cfg)
-    results = cross_validator.cross_validate(cfg)
+    results = cross_validator.cross_validate(cfg, metric="recovery")
     
     logger.info("Cross-validation results:")
     logger.info(results)
@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
     log_file_path = os.path.join(LOG_DIR, f"{datetime.now()}.log")
     logger.add(log_file_path, level=LOG_LEVEL,
-               format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}")
+               format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}", rotation="10 MB")
 
     if run_type == RunType.BYBIT:
         run_bybit(args.config_path)

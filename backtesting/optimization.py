@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 from matplotlib import pyplot as plt
+from tabulate import tabulate
 
 from backtesting.utils import BackTestResults
 from common.type import Symbol
@@ -116,8 +117,11 @@ class Optimizer:
         def sort_by(self, score_name: str = "APR"):
             self.opt_summary = self.opt_summary.sort_values(by=[score_name], ascending=False)
         
-        def apply_filters(self, max_ndeals_per_month: int = 4):
-            self.opt_summary = self.opt_summary[self.opt_summary["ndeals_per_month"] > max_ndeals_per_month]
+        def apply_filters(self, max_ndeals_per_month: int = 4, min_ndeals_per_month: int = 1):
+            self.opt_summary = self.opt_summary[
+                (self.opt_summary["ndeals_per_month"] < max_ndeals_per_month) & 
+                (self.opt_summary["ndeals_per_month"] > min_ndeals_per_month)
+            ]
         
         @property
         def top_run_id(self) -> int:
@@ -131,12 +135,17 @@ class Optimizer:
         def best_score(self) -> float:
             return self.opt_summary.iloc[0][self.score_name]
         
+        def __str__(self) -> str:
+            return tabulate(self.opt_summary, headers='keys', tablefmt='psql', showindex=True, floatfmt='.2f')
+            
+        def __repr__(self) -> str:
+            return self.__str__()
 
-    def __init__(self, optim_cfg: Dict[str, Any], results_dir = "results/optimization"):
+    def __init__(self, optim_cfg: Dict[str, Any], results_dir = "results/optimization", sortby: str = "APR"):
         self.results_dir = Path(results_dir)
         self.results_dir.mkdir(exist_ok=True, parents=True)
         self.cache_dir = Path(".cache/backtests")
-        self.sortby = "APR"
+        self.sortby = sortby
         self.cfg = optim_cfg
         self.cfgs = []
         self.btests: List[BackTestResults] = []
@@ -233,7 +242,6 @@ class Optimizer:
         
         return self.OptimizationResults(score_name=self.sortby, opt_summary=opt_summary, configs=self.cfgs)
 
-
     def run_backtests(self) -> None:
         """
         Run backtests for the given optimization configuration.
@@ -318,12 +326,15 @@ class Optimizer:
         opt_summary.sort_values(by=["APR"], ascending=False, inplace=True)
         return opt_summary
 
-    def _plot_optimization_results(self, opt_summary: pd.DataFrame, symbol: Symbol, period) -> None:
+    def _plot_optimization_results(self, symbol: Symbol, period) -> None:
+        if self.opt_summary is None:
+            self.opt_summary = self._generate_optimization_summary()
+            
         # Individual tests results
         top_runs_ids = []
         sum_daily_profit = 0
-        for symbol in set(opt_summary["symbol"]):
-            opt_summary_for_ticker = opt_summary[opt_summary["symbol"] == symbol]
+        for symbol in set(self.opt_summary["symbol"]):
+            opt_summary_for_ticker = self.opt_summary[self.opt_summary["symbol"] == symbol]
             top_runs_ids.append(opt_summary_for_ticker.index[0])
             sum_daily_profit += self.btests[top_runs_ids[-1]].daily_hist["profit_csum"]
             logger.info(f"\n{opt_summary_for_ticker.head(10)}\n")
@@ -347,16 +358,16 @@ class Optimizer:
         # Mix results
         opt_res = {"param_set": [], "symbol": [],
                    "final_balance": [], "ndeals": [], "test_ids": []}
-        for i in range(opt_summary.shape[0]):
+        for i in range(self.opt_summary.shape[0]):
             exphash, test_ids = "", ""
-            for col in opt_summary.columns:
+            for col in self.opt_summary.columns:
                 if col not in ["symbol", "APR", "ndeals", "recovery", "maxwait", "final_profit", "loss_max_rel"]:
-                    exphash += str(opt_summary[col].iloc[i]) + " "
-            opt_res["test_ids"].append(f".{opt_summary.index[i]}")
+                    exphash += str(self.opt_summary[col].iloc[i]) + " "
+            opt_res["test_ids"].append(f".{self.opt_summary.index[i]}")
             opt_res["param_set"].append(exphash)
-            opt_res["symbol"].append(f".{opt_summary['symbol'].iloc[i]}")
-            opt_res["ndeals"].append(opt_summary.ndeals.iloc[i])
-            opt_res["final_balance"].append(opt_summary.APR.iloc[i])
+            opt_res["symbol"].append(f".{self.opt_summary['symbol'].iloc[i]}")
+            opt_res["ndeals"].append(self.opt_summary.ndeals.iloc[i])
+            opt_res["final_balance"].append(self.opt_summary.APR.iloc[i])
 
         opt_res = pd.DataFrame(opt_res)
         opt_res = opt_res.groupby(by="param_set").sum()
