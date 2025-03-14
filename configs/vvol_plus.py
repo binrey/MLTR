@@ -31,7 +31,7 @@ config = dict(
     trailing_stop=dict(
         type=TrailingStop,
         strategy=TrailingStop.FIX_RATE,
-        trailing_stop_rate=0.001,
+        rate=0.001,
     ),
     close_only_by_stops=False,
     hist_buffer_size=64,

@@ -1,6 +1,5 @@
 from configs.library import *
 
-
 classifier = body_classifiers.bb
 
 stops_processor = stops_processors.stops_dynamic
@@ -12,7 +11,7 @@ config = EasyDict(
     date_start=Param("2019-08-01", ["2017-08-01"]),
     date_end=Param("2024-03-01", ["2024-03-01"]),
     no_trading_days=Param(set(), [set()]),
-    trailing_stop_rate=Param(0., [0.002, 0.003, 0.004, 0.005, 0.006, 0.007]),
+    rate=Param(0., [0.002, 0.003, 0.004, 0.005, 0.006, 0.007]),
     trailing_stop_type=Param(1, [1]),
     body_classifier=Param(classifier, [classifier]),
     stops_processor=Param(stops_processor, [stops_processor]),

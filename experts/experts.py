@@ -74,7 +74,7 @@ class ExpertFormation(ExpertBase):
         #     x = build_features(h, 
         #                        self.order_dir, 
         #                        self.stops_processor.cfg.sl,
-        #                        self.cfg.trailing_stop_rate
+        #                        self.cfg.rate
         #                        )
         #     x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.cfg.run_model_device)
         #     y = [0.5, 1, 2, 4, 8][self.model.predict(x).item()]

@@ -2,21 +2,21 @@ import numpy as np
 
 from common.type import Symbols, TimePeriod, Vis
 from common.utils import FeeRate, update_config
-from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
+from experts.position_control import FixRate, SLDynamic, SLFixed, TPFromSL, TrailingStop
 from experts.vvol import VVol
 
 config = dict(
     wallet=100,
     leverage=4,
-    date_start=np.datetime64("2018-01-01T00:00:00"),
+    date_start=np.datetime64("2023-01-01T00:00:00"),
     date_end=np.datetime64("2025-03-01T00:00:00"),
     no_trading_days=set(),
     decision_maker=dict(
         type=VVol,
         nbins=9,
-        sharpness=2,
-        strike=4,
-        strategy=VVol.TriggerStrategy.MANUAL_LEVELS
+        sharpness=4,
+        strike=0,
+        strategy=VVol.Levels.MANUAL
     ),
     sl_processor=dict(
         type=SLDynamic,
@@ -26,12 +26,11 @@ config = dict(
     tp_processor=dict(
         type=TPFromSL,
         active=False,
-        scale=2
+        scale=0
     ),
     trailing_stop=dict(
-        type=TrailingStop,
-        strategy=TrailingStop.FIX_RATE,
-        trailing_stop_rate=0.04,
+        type=FixRate,
+        rate=0.01,
     ),
     close_only_by_stops=True,
     hist_buffer_size=64,
@@ -54,13 +53,12 @@ config = dict(
 optimization = update_config(
     config,
     min_deals_per_month=1,
-    hist_buffer_size=[32, 64, 128],
+    hist_buffer_size=[32, 64],
     trailing_stop={
-        "trailing_stop_rate": [0.04, 0.02, 0.01]
+        "rate": [0.04, 0.02, 0.01]
         },
     decision_maker={
-        "nbins": [9, 11, 15],
-        "sharpness": [2, 3, 4],
-        "strike": [2, 3, 4]
+        "nbins": [7, 9],
+        "sharpness": [2,],
         }
     )

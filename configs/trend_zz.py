@@ -1,6 +1,5 @@
 from configs.library import *
 
-
 classifier = body_classifiers.trend
 classifier.params.npairs = Param(2, [2])
 classifier.params.period = Param(4, [4, 8, 16])
@@ -14,7 +13,7 @@ config = EasyDict(
     date_start=Param("2017-09-01T00:00:00", ["2017-09-01"]),
     date_end=Param("2024-08-01", ["2025-01-01"]),
     no_trading_days=Param(set(), [set()]),
-    trailing_stop_rate=Param(0.004, [0.002, 0.004, 0.008]),
+    rate=Param(0.004, [0.002, 0.004, 0.008]),
     trailing_stop_type=Param(1, [1]),
     body_classifier=Param(classifier, [classifier]),
     stops_processor=Param(stops_processor, [stops_processor]),

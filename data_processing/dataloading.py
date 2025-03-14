@@ -20,7 +20,7 @@ DTYPE = [('Date', np.dtype('<M8[m]')),
          ('Volume', np.dtype('float64')),
          ('Id', np.dtype('int64'))]
         
-def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=None):
+def build_features(f, dir, sl, rate, open_date=None, timeframe=None):
     fo = f.Open/f.Open[-1]
     fc = f.Close/f.Open[-1]
     fh = f.High/f.Open[-1]
@@ -35,7 +35,7 @@ def build_features(f, dir, sl, trailing_stop_rate, open_date=None, timeframe=Non
     x = x*127
     # x = np.vstack([x, fv])
     # x = np.vstack([x, np.ones(x.shape[1])*sl*10])
-    # x = np.vstack([x, np.ones(x.shape[1])*trailing_stop_rate*1000])
+    # x = np.vstack([x, np.ones(x.shape[1])*rate*1000])
     if open_date is not None:
         odate = to_datetime(open_date)
         odate = odate.year*10000 + odate.month*100 + odate.day
@@ -179,7 +179,7 @@ def collect_train_data(dir, fsize=64, glob="*.pickle"):
             x = build_features(f,
                                pos.dir,
                                btest.cfg.stops_processor.func.cfg.sl,
-                               btest.cfg.trailing_stop_rate,
+                               btest.cfg.rate,
                                pos.open_date,
                                tfdict[btest.cfg.period.value])
             X.append([x])
@@ -224,7 +224,7 @@ def collect_train_data2(dir, fsize=64, nparams=4):
             x = build_features(f,
                                pos["dir"][0],
                                0,
-                               btest.cfg.trailing_stop_rate,
+                               btest.cfg.rate,
                                open_date,
                                tfdict[btest.cfg.period.value])
             X.append([x])
