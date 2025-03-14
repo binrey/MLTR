@@ -6,6 +6,7 @@ import sys
 from datetime import datetime
 
 import pandas as pd
+from dotenv import load_dotenv
 from loguru import logger
 
 from backtesting.cross_validation import CrossValidation
@@ -17,6 +18,8 @@ from trade.bybit import launch as bybit_launch
 
 
 def run_backtest(config_path):
+    # Load environment variables from .env file
+    load_dotenv()    
     cfg = PyConfig(config_path).get_inference()
     cfg["save_backup"] = False
     backtest_launch(cfg)
