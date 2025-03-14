@@ -5,6 +5,7 @@ import sys
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
+from enum import Enum
 from multiprocessing import Pool
 from pathlib import Path
 from shutil import rmtree
@@ -298,6 +299,8 @@ class Optimizer:
                     for kk, vv in v.items():
                         if kk == "type":
                             description.append(f"{vv.__name__}")
+                        elif isinstance(vv, Enum):
+                            description.append(f"{kk}:{vv.value}")
                         else:
                             description.append(f"{kk}:{vv}")
                     opt_summary[k].append("|".join(description))

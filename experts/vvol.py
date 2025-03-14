@@ -13,10 +13,10 @@ from indicators.vol_distribution import VolDistribution
 class VVol(DecisionMaker):
     type = "vvol"
     
-    class TriggerStrategy(str, Enum):
+    class Levels(str, Enum):
         """Strategy type for HVOL price level detection"""
-        MANUAL_LEVELS = "manual_levels"  # Uses predefined volume distribution bins
-        AUTO_LEVELS = "auto_levels"  # Uses shadow intersection analysis
+        MANUAL = "manual"  # Uses predefined volume distribution bins
+        AUTO = "auto"  # Uses shadow intersection analysis
     
     def __init__(self, cfg):
         super().__init__(cfg["hist_buffer_size"], cfg["period"], cfg["symbol"])
@@ -78,7 +78,7 @@ class VVol(DecisionMaker):
         max_vol_id = self.indicator.vol_hist.argmax()
         
         if self.indicator.vol_hist[max_vol_id] / self.indicator.vol_hist.mean() > self.sharpness:
-            if self.strategy == self.TriggerStrategy.MANUAL_LEVELS:
+            if self.strategy == self.Levels.MANUAL:
                 self.lprice, self.sprice = self._find_prices_manual_levels(h, max_vol_id)
             else:  # AUTO_LEVELS
                 self.lprice, self.sprice = self._find_prices_auto_levels(h)
