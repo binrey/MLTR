@@ -25,7 +25,7 @@ config = EasyDict(
     close_only_by_stops=Param(True, [False]),
     stops_processor=Param(stops_processor, [stops_processor]),
     wait_entry_point=Param(999, [999]),
-    hist_buffer_size=Param(128, [128]),
+    hist_size=Param(128, [128]),
     tstart=Param(0, [0]),
     tend=Param(None, [None]),
 

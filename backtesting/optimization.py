@@ -114,7 +114,13 @@ class Optimizer:
         
         def __post_init__(self):
             self.sort_by(self.score_name)
-        
+
+        def __str__(self) -> str:
+            return tabulate(self.opt_summary, headers='keys', tablefmt='psql', showindex=True, floatfmt='.2f')
+            
+        def __repr__(self) -> str:
+            return self.__str__()
+                
         def sort_by(self, score_name: str = "APR"):
             self.opt_summary = self.opt_summary.sort_values(by=[score_name], ascending=False)
         
@@ -123,6 +129,16 @@ class Optimizer:
                 (self.opt_summary["ndeals_per_month"] < max_ndeals_per_month) & 
                 (self.opt_summary["ndeals_per_month"] > min_ndeals_per_month)
             ]
+        
+        @property
+        def top_configuration_id(self):
+            return " ".join(map(str, [
+                self.opt_summary.loc[self.top_run_id]["symbol"],
+                f"{'hist_size'}:{self.opt_summary.loc[self.top_run_id]['hist_size']}",
+                f"{'decision_maker'}:{self.opt_summary.loc[self.top_run_id]['decision_maker']}",
+                f"{'trailing_stop'}:{self.opt_summary.loc[self.top_run_id]['trailing_stop']}"
+            ]))
+            
         
         @property
         def top_run_id(self) -> int:
@@ -135,12 +151,7 @@ class Optimizer:
         @property
         def best_score(self) -> float:
             return self.opt_summary.iloc[0][self.score_name]
-        
-        def __str__(self) -> str:
-            return tabulate(self.opt_summary, headers='keys', tablefmt='psql', showindex=True, floatfmt='.2f')
-            
-        def __repr__(self) -> str:
-            return self.__str__()
+
 
     def __init__(self, optim_cfg: Dict[str, Any], results_dir = "results/optimization", sortby: str = "APR"):
         self.results_dir = Path(results_dir)

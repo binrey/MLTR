@@ -8,7 +8,7 @@ updates = {
     "wallet": 100,
     "leverage": 1,
     "rate": 0.005,
-    "hist_buffer_size": 64,
+    "hist_size": 64,
     "period": TimePeriod.M60,
     "decision_maker": {
         "ncross": 4

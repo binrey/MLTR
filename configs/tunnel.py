@@ -30,7 +30,7 @@ config = dict(
         strategy=TrailingStop.FIX_RATE,
         rate=0.002,
     ),
-    hist_buffer_size=32,
+    hist_size=32,
     tstart=0,
     tend=None,
     period=TimePeriod.M60,
@@ -51,7 +51,7 @@ config = dict(
 optimization = update_config(
     config,
     trailing_stop={"rate": [0.002, 0.004]},
-    hist_buffer_size=[32, 64],
+    hist_size=[32, 64],
     decision_maker={"ncross": [4, 5, 7]},
     symbol=[Symbols.BTCUSDT, Symbols.ETHUSDT]
 )

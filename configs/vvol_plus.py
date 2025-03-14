@@ -34,7 +34,7 @@ config = dict(
         rate=0.001,
     ),
     close_only_by_stops=False,
-    hist_buffer_size=64,
+    hist_size=64,
     tstart=0,
     tend=None,
     period=TimePeriod.M60,
@@ -53,9 +53,8 @@ config = dict(
 
 optimization = update_config(
     config,
-    min_deals_per_month=1,
     symbol=[Symbols.BTCUSDT],
-    hist_buffer_size=[128],
+    hist_size=[128],
     decision_maker={
         "nbins": [20],
         "sharpness": [3, 4, 5, 7],

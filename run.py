@@ -53,7 +53,7 @@ def run_cross_validation(config_path):
     cfg["save_plots"] = False
     
     # Assuming data is loaded here for cross-validation
-    cross_validator = CrossValidation(cfg)
+    cross_validator = CrossValidation(cfg, n_splits=6)
     results = cross_validator.cross_validate(cfg, metric="recovery")
     
     logger.info("Cross-validation results:")

@@ -36,7 +36,7 @@ config = dict(
         rate=0.0,
     ),
     close_only_by_stops=False,
-    hist_buffer_size=1028,
+    hist_size=1028,
     tstart=0,
     tend=None,
     period=TimePeriod.M60,

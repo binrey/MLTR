@@ -241,7 +241,7 @@ class MovingWindow():
         self.hist = DataParser(cfg).load()
         self.date_start = np.datetime64(cfg["date_start"])
         self.date_end = np.datetime64(cfg["date_end"])
-        self.size = cfg["hist_buffer_size"]
+        self.size = cfg["hist_size"]
         self.ticker = cfg["symbol"].ticker
 
         self.id2start = self.find_nearest_date_indx(

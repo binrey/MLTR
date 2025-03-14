@@ -83,7 +83,10 @@ class CrossValidation:
         """
         self.optim_cfg = optim_cfg
         self.n_splits = n_splits
+        self.max_ndeals_per_month = 10
+        self.min_ndeals_per_month = 1
         self.strategy = strategy
+        
         self.cache_dir = Path(".cache/cross_validation")
         self.cache_dir.mkdir(exist_ok=True, parents=True)
 
@@ -160,12 +163,13 @@ class CrossValidation:
 
             # Extract best result from training
             optimization_results.sort_by(score_name=metric)
-            optimization_results.apply_filters()
+            optimization_results.apply_filters(max_ndeals_per_month=self.max_ndeals_per_month,
+                                               min_ndeals_per_month=self.min_ndeals_per_month)
             assert len(
                 optimization_results.opt_summary) > 0, "No valid results found"
             best_params = optimization_results.best_config
             train_score = optimization_results.opt_summary.loc[optimization_results.top_run_id]["APR"]
-            train_id = optimization_results.opt_summary.loc[optimization_results.top_run_id]["decision_maker"]
+            train_id = optimization_results.top_configuration_id
 
             # Create test config with optimized parameters
             test_config = config.copy()
@@ -186,7 +190,7 @@ class CrossValidation:
             cval_results.add_train_test_scores(train_id, train_score, test_score)
 
         logger.info(
-            f"Cross-validation results:\n {cval_results.as_averall_table()}")
+            f"Cross-validation results:\n{cval_results.as_averall_table()}")
         logger.info(
-            f"Cross-validation summary:\n {cval_results.as_summary_table()}")
+            f"Cross-validation summary:\n{cval_results.as_summary_table()}")
         return cval_results

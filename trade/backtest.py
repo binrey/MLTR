@@ -75,7 +75,7 @@ def launch(cfg) -> BackTestResults:
     def sformat(nd): return "{:>30}: {:>5.@f}".replace("@", str(nd))
 
     logger.info(
-        f"{cfg['symbol'].ticker}-{cfg['period']}-{cfg['hist_buffer_size']}: {backtest_trading.exp}"
+        f"{cfg['symbol'].ticker}-{cfg['period']}-{cfg['hist_size']}: {backtest_trading.exp}"
     )
 
     logger.info("-" * 40)

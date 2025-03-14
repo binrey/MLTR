@@ -19,7 +19,7 @@ config = dict(
         type=SLDynamic,
         active=True
     ),
-    hist_buffer_size=64,
+    hist_size=64,
     tstart=0,
     tend=None,
     period=TimePeriod.M60,
@@ -38,5 +38,5 @@ config = dict(
 
 optimization = config.copy()
 optimization.update(dict(
-    hist_buffer_size=[32, 64]
+    hist_size=[32, 64]
 ))

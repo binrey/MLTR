@@ -7,14 +7,14 @@ from experts.vvol import VVol
 
 config = dict(
     wallet=100,
-    leverage=4,
-    date_start=np.datetime64("2023-01-01T00:00:00"),
+    leverage=1,
+    date_start=np.datetime64("2018-01-01T00:00:00"),
     date_end=np.datetime64("2025-03-01T00:00:00"),
     no_trading_days=set(),
     decision_maker=dict(
         type=VVol,
-        nbins=9,
-        sharpness=4,
+        nbins=17,
+        sharpness=3,
         strike=0,
         strategy=VVol.Levels.MANUAL
     ),
@@ -33,7 +33,7 @@ config = dict(
         rate=0.01,
     ),
     close_only_by_stops=True,
-    hist_buffer_size=64,
+    hist_size=64,
     tstart=0,
     tend=None,
     period=TimePeriod.M60,
@@ -44,7 +44,7 @@ config = dict(
     save_plots=False,
     vis_events=Vis.ON_DEAL,
     vis_hist_length=512,
-    visualize=False,
+    visualize=True,
     eval_buyhold=True,
     run_model_device=None,
 )
@@ -52,13 +52,12 @@ config = dict(
 
 optimization = update_config(
     config,
-    min_deals_per_month=1,
-    hist_buffer_size=[32, 64],
+    hist_size=[16, 32, 64],
     trailing_stop={
-        "rate": [0.04, 0.02, 0.01]
+        "rate": [0.03, 0.02, 0.01]
         },
     decision_maker={
-        "nbins": [7, 9],
-        "sharpness": [2,],
+        "nbins": [9, 15, 19],
+        "sharpness": [2, 3, 4, 5],
         }
     )

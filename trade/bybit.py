@@ -105,9 +105,9 @@ class BybitTrading(BaseTradeClass):
                 interval=str(self.cfg.period.minutes),
                 start=0,
                 end=t.astype("datetime64[ms]").astype(int),
-                limit=self.cfg.hist_buffer_size
+                limit=self.cfg.hist_size
             )
-            data = get_bybit_hist(message["result"], self.cfg.hist_buffer_size)
+            data = get_bybit_hist(message["result"], self.cfg.hist_size)
         return data
     
 

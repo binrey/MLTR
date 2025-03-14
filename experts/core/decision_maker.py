@@ -21,12 +21,12 @@ class DecisionMaker(ABC):
         def is_active(self):
             return self.side is not None
 
-    def __init__(self, hist_buffer_size: int, period: Period, symbol: Symbol):
+    def __init__(self, hist_size: int, period: Period, symbol: Symbol):
         self.sl_definer: SLDefiner = {Side.BUY: None, Side.SELL: None}
         self.tp_definer: TPDefiner = {Side.BUY: None, Side.SELL: None}
         self.lprice, self.sprice, self.cprice = None, None, None
         self.draw_items = []
-        self.cache_dir = set_indicator_cache_dir(symbol, period, hist_buffer_size)
+        self.cache_dir = set_indicator_cache_dir(symbol, period, hist_size)
         self.description = None
             
     @staticmethod

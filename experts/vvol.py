@@ -19,8 +19,8 @@ class VVol(DecisionMaker):
         AUTO = "auto"  # Uses shadow intersection analysis
     
     def __init__(self, cfg):
-        super().__init__(cfg["hist_buffer_size"], cfg["period"], cfg["symbol"])
-        cfg.pop("hist_buffer_size")
+        super().__init__(cfg["hist_size"], cfg["period"], cfg["symbol"])
+        cfg.pop("hist_size")
         cfg.pop("period")
         cfg.pop("symbol")
         self.indicators = self.setup_indicators(cfg)
