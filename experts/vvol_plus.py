@@ -13,8 +13,8 @@ class VVolPlus(DecisionMaker):
     type = "vvol_plus"
 
     class TriggerStrategy(str, Enum):
-        MANUAL_LEVELS = "manual_levels"  # Uses predefined volume distribution bins
-        AUTO_LEVELS = "auto_levels"  # Uses shadow intersection analysis
+        MANUAL_LEVELS = "manual"  # Uses predefined volume distribution bins
+        AUTO_LEVELS = "auto"  # Uses shadow intersection analysis
 
     def __init__(self, cfg):
         super().__init__(cfg)
