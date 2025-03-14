@@ -14,8 +14,7 @@ def init_target_from_cfg(cfg):
 
 class ExpertBase(ABC):
     def __init__(self, cfg):
-        self.cfg = cfg
-        decision_maker_cfg = cfg["decision_maker"]
+        decision_maker_cfg = cfg["decision_maker"].copy()
         decision_maker_cfg.update({k:cfg[k] for k in ["hist_buffer_size", "period", "symbol"]})
         self.decision_maker: DecisionMaker = init_target_from_cfg(decision_maker_cfg)
         assert "sl_processor" in cfg, "sl_processor must be defined in cfg"

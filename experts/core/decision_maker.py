@@ -27,9 +27,14 @@ class DecisionMaker(ABC):
         self.lprice, self.sprice, self.cprice = None, None, None
         self.draw_items = []
         self.cache_dir = set_indicator_cache_dir(symbol, period, hist_buffer_size)
+        self.description = None
             
+    @staticmethod
+    def make_description(ds_type, cfg):
+        return ds_type + ": " + "|".join([f"{k}:{v}" for k, v in cfg.items()])
+    
     def __str__(self):
-        return self.type + ": " + "|".join([f"{k}:{v}" for k, v in self.cfg.items()])
+        return self.description
     
     @abstractmethod
     def setup_indicators(self, cfg, indicator_cache_dir: PosixPath):

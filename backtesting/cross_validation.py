@@ -165,6 +165,7 @@ class CrossValidation:
                 optimization_results.opt_summary) > 0, "No valid results found"
             best_params = optimization_results.best_config
             train_score = optimization_results.opt_summary.loc[optimization_results.top_run_id]["APR"]
+            train_id = optimization_results.opt_summary.loc[optimization_results.top_run_id]["decision_maker"]
 
             # Create test config with optimized parameters
             test_config = config.copy()
@@ -182,7 +183,7 @@ class CrossValidation:
                 pickle.dump((train_config, test_config,
                             best_params, test_score), f)
 
-            cval_results.add_train_test_scores(train_score, test_score)
+            cval_results.add_train_test_scores(train_id, train_score, test_score)
 
         logger.info(
             f"Cross-validation results:\n {cval_results.as_averall_table()}")

@@ -23,7 +23,6 @@ class VVol(DecisionMaker):
         cfg.pop("hist_buffer_size")
         cfg.pop("period")
         cfg.pop("symbol")
-        self.cfg = cfg
         self.indicators = self.setup_indicators(cfg)
         
         self.long_bin = cfg.get("long_bin", 1)
@@ -31,6 +30,8 @@ class VVol(DecisionMaker):
         self.sharpness = cfg["sharpness"]
         self.strategy = cfg["strategy"]
         self.strike = cfg["strike"]
+        
+        self.description = DecisionMaker.make_description(self.type, cfg)
 
     def setup_indicators(self, cfg: dict[str, Any]):
         self.indicator = VolDistribution(nbins=cfg["nbins"], cache_dir=self.cache_dir)
@@ -89,7 +90,8 @@ class VVol(DecisionMaker):
                 self.draw_items += self.indicator.vis_objects
 
         strike = h["Close"][-2] - h["Open"][-2]
-        if abs(strike) > self.indicator.bin_size * self.strike:
+        max_body = max(np.maximum(h["Open"][:-2], h["Close"][:-2]) - np.minimum(h["Open"][:-2], h["Close"][:-2]))
+        if abs(strike) > max_body:
             if self.lprice:
                 if strike > 0 and h["Close"][-2] > self.sprice:
                     order_side = Side.BUY
