@@ -12,6 +12,7 @@ def init_target_from_cfg(cfg):
     Target = cfg.pop("type")
     return Target(cfg)
 
+
 class ExpertBase(ABC):
     def __init__(self, cfg):
         decision_maker_cfg = cfg["decision_maker"].copy()

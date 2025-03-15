@@ -5,16 +5,15 @@ import pickle
 from pathlib import Path
 from typing import Optional
 
-from loguru import logger
 import numpy as np
+from loguru import logger
 
 from common.type import TimeVolumeProfile
 
 
 class VolDistribution:
     """Calculates volume distribution across price levels using histogram binning."""
-    def __init__(self, nbins: int = 20, cache_dir: Optional[str] = None):
-        self.nbins = nbins
+    def __init__(self, cache_dir: Optional[str] = None):
         self.vol_hist, self.price_bins = None, None
         self.vol_profile = None
         self.cache = {}
@@ -27,7 +26,7 @@ class VolDistribution:
         self._save_cache()
 
     def _get_cache_path(self):
-        return self.cache_dir / f"nbins={self.nbins}.pkl"
+        return self.cache_dir / "cache.pkl"
 
     def _load_cache(self):
         cache_file = self._get_cache_path()
@@ -60,7 +59,7 @@ class VolDistribution:
     def _get_cache_key(self, h):
         """Generate a unique cache key based on input data and parameters"""
         # Use the date and nbins as the cache key
-        return f"{str(h['Date'][1])}_{self.nbins}"
+        return f"{str(h['Date'][-1])}"
 
     def _load_from_cache(self, cache_key):
         """Load histogram data from cache if available"""
@@ -102,10 +101,14 @@ class VolDistribution:
         """Update method without caching logic"""
         upper_price = h["High"][:-1].max()
         lower_price = h["Low"][:-1].min()
-        self.price_bins = np.linspace(lower_price, upper_price, self.nbins)
+        max_open_cls = np.vstack([h["Close"][:-1], h["Open"][:-1]]).max(0)
+        min_open_cls = np.vstack([h["Close"][:-1], h["Open"][:-1]]).min(0)
+        nbins = int((upper_price - lower_price)/(max_open_cls - min_open_cls).mean())
+        self.price_bins = np.linspace(lower_price, upper_price, nbins)
 
-        upper = h["High"][:-1] - np.vstack([h["Close"][:-1], h["Open"][:-1]]).max(0)
-        lower = np.vstack([h["Close"][:-1], h["Open"][:-1]]).min(0) - h["Low"][:-1]        
+
+        upper = h["High"][:-1] - max_open_cls
+        lower = min_open_cls - h["Low"][:-1]
         x = (h["High"][:-1]*upper + h["Low"][:-1]*lower)/(upper + lower + 0.001)
         y = h["Volume"][:-1]
 

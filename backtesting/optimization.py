@@ -3,7 +3,6 @@ import multiprocessing
 import pickle
 import sys
 from collections import defaultdict
-from copy import deepcopy
 from dataclasses import dataclass
 from enum import Enum
 from multiprocessing import Pool

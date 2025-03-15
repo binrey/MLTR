@@ -25,16 +25,15 @@ class VVol(DecisionMaker):
         cfg.pop("symbol")
         self.indicators = self.setup_indicators(cfg)
         
-        self.long_bin = cfg.get("long_bin", 1)
-        self.short_bin = cfg.get("short_bin", 1)
+        self.long_bin = 1
+        self.short_bin = 1
         self.sharpness = cfg["sharpness"]
         self.strategy = cfg["strategy"]
-        self.strike = cfg["strike"]
         
         self.description = DecisionMaker.make_description(self.type, cfg)
 
     def setup_indicators(self, cfg: dict[str, Any]):
-        self.indicator = VolDistribution(nbins=cfg["nbins"], cache_dir=self.cache_dir)
+        self.indicator = VolDistribution(cache_dir=self.cache_dir)
         return [self.indicator]
 
     def _find_prices_manual_levels(self, h, max_vol_id):

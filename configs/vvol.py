@@ -13,9 +13,7 @@ config = dict(
     no_trading_days=set(),
     decision_maker=dict(
         type=VVol,
-        nbins=17,
-        sharpness=3,
-        strike=0,
+        sharpness=4,
         strategy=VVol.Levels.MANUAL
     ),
     sl_processor=dict(
@@ -30,7 +28,7 @@ config = dict(
     ),
     trailing_stop=dict(
         type=FixRate,
-        rate=0.01,
+        rate=0.02,
     ),
     close_only_by_stops=True,
     hist_size=64,
@@ -44,7 +42,7 @@ config = dict(
     save_plots=False,
     vis_events=Vis.ON_DEAL,
     vis_hist_length=512,
-    visualize=True,
+    visualize=False,
     eval_buyhold=True,
     run_model_device=None,
 )
@@ -52,12 +50,11 @@ config = dict(
 
 optimization = update_config(
     config,
-    hist_size=[16, 32, 64],
+    hist_size=[16, 32, 64, 128],
     trailing_stop={
         "rate": [0.03, 0.02, 0.01]
         },
     decision_maker={
-        "nbins": [9, 15, 19],
         "sharpness": [2, 3, 4, 5],
         }
     )
