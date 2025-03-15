@@ -21,6 +21,7 @@ from backtesting.utils import BackTestResults
 from common.type import Symbol
 from common.utils import date2str
 from trade.backtest import launch as backtest_launch
+from trade.utils import Position
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
@@ -108,7 +109,8 @@ class Optimizer:
         Results of the optimization process.
         """
         opt_summary: pd.DataFrame  # Optimization summary DataFrame
-        configs: Dict  # Configuration that produced the best results
+        configs_by_run: Dict  # Configurations
+        positions_by_run: List[Position]
         score_name: str = "APR"
 
         def __post_init__(self):
@@ -145,7 +147,7 @@ class Optimizer:
 
         @property
         def best_config(self) -> Dict[str, Any]:
-            return self.configs[self.top_run_id]
+            return self.configs_by_run[self.top_run_id]
 
         @property
         def best_score(self) -> float:
@@ -221,20 +223,6 @@ class Optimizer:
         return p.map(self.backtest_process, cfgs,)
 
     def optimize(self, optim_cfg) -> OptimizationResults:
-        """
-        Optimize the trading strategy for a specific symbol.
-
-        Args:
-            optim_cfg: Configuration dictionary for this symbol
-            period: Trading period
-            run_backtests: Whether to run backtests or use existing results
-
-        Returns:
-            OptimizationResults containing optimization summary and metrics
-
-        Raises:
-            ValueError: If configuration is invalid
-        """
         symbol = optim_cfg["symbol"]
         # results_dir = self.results_dir / f"{symbol.value}"
 
@@ -252,7 +240,10 @@ class Optimizer:
         # Save and plot results
         # self._plot_optimization_results(opt_summary, symbol, period)
 
-        return self.OptimizationResults(score_name=self.sortby, opt_summary=opt_summary, configs=self.cfgs)
+        return self.OptimizationResults(score_name=self.sortby, 
+                                        opt_summary=opt_summary, 
+                                        configs_by_run=self.cfgs,
+                                        positions_by_run=self.btests)
 
     def run_backtests(self) -> None:
         """
@@ -325,6 +316,7 @@ class Optimizer:
             opt_summary["APR"].append(btest.APR)
             opt_summary["final_profit"].append(btest.final_profit)
             opt_summary["ndeals_per_month"].append(btest.ndeals_per_month)
+            opt_summary["profits_entropy"].append(btest.normalized_profits_entropy)
             opt_summary["loss_max_rel"].append(btest.metrics["loss_max_rel"])
             opt_summary["recovery"].append(btest.metrics["recovery"])
             opt_summary["maxwait"].append(btest.metrics["maxwait"])

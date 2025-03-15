@@ -158,8 +158,7 @@ class CrossValidation:
             optimizer = Optimizer(train_config, sortby=metric)
             optimizer.clear_cache()
             optimizer.run_backtests()
-            optimization_results: Optimizer.OptimizationResults = optimizer.optimize(
-                train_config)
+            optimization_results = optimizer.optimize(train_config)
 
             # Extract best result from training
             optimization_results.sort_by(score_name=metric)

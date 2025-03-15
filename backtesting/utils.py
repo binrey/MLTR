@@ -5,6 +5,7 @@
 
 
 from datetime import timedelta
+from functools import cached_property
 from time import perf_counter
 from typing import Iterable, List
 
@@ -257,3 +258,44 @@ class BackTestResults:
         deposit = self.wallet + loss_max
         final_profit_rel = profit_curve[-1] / deposit * 100
         return final_profit_rel / self.num_years_on_trade, wait_max
+    
+    @cached_property
+    def profits_histogram(self):
+        npos_by_bins, bin_edges = np.histogram(self.deals_hist["profits"])
+        finres_by_bins = (bin_edges[:-1] + bin_edges[1:]) / 2
+        return npos_by_bins, finres_by_bins
+    
+    @property
+    def normalized_profits_entropy(self):
+        """
+        Вычисляет нормированную энтропию распределения прибылей.
+        
+        Аргументы:
+            profits (list или np.array): массив значений прибылей по сделкам.
+            
+        Возвращает:
+            Нормированная энтропия в диапазоне [0, 1], 
+            где 1 соответствует равномерному распределению, 0 — концентрации прибыли в одном элементе.
+        """
+        profits = self.deals_hist["profits"][self.deals_hist["profits"] > 0].values
+        
+        # Если суммарная прибыль равна 0, энтропия неопределена
+        total_profit = np.sum(profits)
+        if total_profit == 0:
+            raise ValueError("Суммарная прибыль равна 0, энтропия не может быть вычислена.")
+        
+        # Вычисляем доли (веса) каждой сделки
+        weights = profits / total_profit
+        
+        # Для вычисления логарифма учитываем только ненулевые веса, чтобы избежать ошибки log(0)
+        nonzero_weights = weights[weights > 0]
+        
+        # Вычисляем энтропию: H = -sum(w_i * ln(w_i))
+        H = -np.sum(nonzero_weights * np.log(nonzero_weights))
+        
+        # Нормируем энтропию относительно максимума ln(N), где N - число сделок
+        N = len(profits)
+        H_max = np.log(N)
+        normalized_H = H / H_max if H_max > 0 else 1.0
+        
+        return normalized_H
