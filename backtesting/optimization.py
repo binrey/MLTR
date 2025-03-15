@@ -110,25 +110,26 @@ class Optimizer:
         opt_summary: pd.DataFrame  # Optimization summary DataFrame
         configs: Dict  # Configuration that produced the best results
         score_name: str = "APR"
-        
+
         def __post_init__(self):
             self.sort_by(self.score_name)
 
         def __str__(self) -> str:
             return tabulate(self.opt_summary, headers='keys', tablefmt='psql', showindex=True, floatfmt='.2f')
-            
+
         def __repr__(self) -> str:
             return self.__str__()
-                
+
         def sort_by(self, score_name: str = "APR"):
-            self.opt_summary = self.opt_summary.sort_values(by=[score_name], ascending=False)
-        
+            self.opt_summary = self.opt_summary.sort_values(
+                by=[score_name], ascending=False)
+
         def apply_filters(self, max_ndeals_per_month: int = 4, min_ndeals_per_month: int = 1):
             self.opt_summary = self.opt_summary[
-                (self.opt_summary["ndeals_per_month"] < max_ndeals_per_month) & 
+                (self.opt_summary["ndeals_per_month"] < max_ndeals_per_month) &
                 (self.opt_summary["ndeals_per_month"] > min_ndeals_per_month)
             ]
-        
+
         @property
         def top_configuration_id(self):
             return " ".join(map(str, [
@@ -137,22 +138,20 @@ class Optimizer:
                 f"{'decision_maker'}:{self.opt_summary.loc[self.top_run_id]['decision_maker']}",
                 f"{'trailing_stop'}:{self.opt_summary.loc[self.top_run_id]['trailing_stop']}"
             ]))
-            
-        
+
         @property
         def top_run_id(self) -> int:
             return self.opt_summary.index[0]
-        
+
         @property
         def best_config(self) -> Dict[str, Any]:
             return self.configs[self.top_run_id]
-        
+
         @property
         def best_score(self) -> float:
             return self.opt_summary.iloc[0][self.score_name]
 
-
-    def __init__(self, optim_cfg: Dict[str, Any], results_dir = "results/optimization", sortby: str = "APR"):
+    def __init__(self, optim_cfg: Dict[str, Any], results_dir="results/optimization", sortby: str = "APR"):
         self.results_dir = Path(results_dir)
         self.results_dir.mkdir(exist_ok=True, parents=True)
         self.cache_dir = Path(".cache/backtests")
@@ -167,7 +166,8 @@ class Optimizer:
             if len(cfg['decision_maker']) == 1:
                 decision_maker_type = cfg['decision_maker'][0]['type'].__name__
             else:
-                raise ValueError("Multiple decision makers are not supported yet")
+                raise ValueError(
+                    "Multiple decision makers are not supported yet")
         else:
             decision_maker_type = cfg['decision_maker']['type'].__name__
         if isinstance(cfg['symbol'], list):
@@ -190,13 +190,14 @@ class Optimizer:
         while True:
             btest = backtest_launch(cfg)
             locnum += 1
-            
+
             # Create cache subdirectory
             cache_subdir = self._get_cache_subdir(cfg)
             cache_subdir.mkdir(exist_ok=True, parents=True)
-            
+
             # Save backtest results
-            cache_file = cache_subdir / f"btest.{num + locnum/100:05.2f}.pickle"
+            cache_file = cache_subdir / \
+                f"btest.{num + locnum/100:05.2f}.pickle"
             with open(cache_file, "wb") as f:
                 pickle.dump((cfg, btest), f)
             break
@@ -205,10 +206,10 @@ class Optimizer:
         # Only remove results directory, not cache
         if self.results_dir.exists():
             rmtree(self.results_dir)
-            
+
         # Create cache dir if it doesn't exist
         self.cache_dir.mkdir(exist_ok=True, parents=True)
-            
+
         ncpu = multiprocessing.cpu_count()
         logger.info(f"Number of cpu : {ncpu}")
 
@@ -222,41 +223,41 @@ class Optimizer:
     def optimize(self, optim_cfg) -> OptimizationResults:
         """
         Optimize the trading strategy for a specific symbol.
-        
+
         Args:
             optim_cfg: Configuration dictionary for this symbol
             period: Trading period
             run_backtests: Whether to run backtests or use existing results
-        
+
         Returns:
             OptimizationResults containing optimization summary and metrics
-        
+
         Raises:
             ValueError: If configuration is invalid
         """
         symbol = optim_cfg["symbol"]
         # results_dir = self.results_dir / f"{symbol.value}"
-        
+
         # Load and validate results
         self.cfgs, self.btests = self._load_backtest_results(optim_cfg)
         if not self.cfgs:
             raise ValueError(f"No backtest results found for {symbol.ticker}")
-        
+
         # Validate dates
         self._validate_backtest_dates()
-        
+
         # Generate optimization summary
         opt_summary = self._generate_optimization_summary()
-        
+
         # Save and plot results
         # self._plot_optimization_results(opt_summary, symbol, period)
-        
+
         return self.OptimizationResults(score_name=self.sortby, opt_summary=opt_summary, configs=self.cfgs)
 
     def run_backtests(self) -> None:
         """
         Run backtests for the given optimization configuration.
-        
+
         Args:
             optim_cfg: Configuration dictionary for optimization
         """
@@ -271,7 +272,7 @@ class Optimizer:
         # Get all subdirectories in cache
         if not cache_dir.exists():
             return cfgs, btests
-            
+
         # Recursively find all pickle files
         for p in sorted(cache_dir.rglob("*.pickle")):
             try:
@@ -282,7 +283,7 @@ class Optimizer:
             except (pickle.UnpicklingError, EOFError, IOError) as e:
                 logger.warning(f"Failed to load cache file {p}: {e}")
                 continue
-                
+
         return cfgs, btests
 
     def _validate_backtest_dates(self) -> None:
@@ -296,11 +297,11 @@ class Optimizer:
     def _generate_optimization_summary(self) -> pd.DataFrame:
         """Generate summary DataFrame of optimization results."""
         opt_summary = defaultdict(list)
-        
+
         # Extract configuration parameters
         cfg_keys = list(self.cfgs[0].keys())
         cfg_keys.remove("no_trading_days")
-        
+
         for k in cfg_keys:
             for cfg in self.cfgs:
                 v = cfg[k]
@@ -318,7 +319,7 @@ class Optimizer:
                     if isinstance(v, Symbol):
                         v = v.ticker
                     opt_summary[k].append(v)
-        
+
         # Add metrics
         for btest in self.btests:
             opt_summary["APR"].append(btest.APR)
@@ -327,35 +328,37 @@ class Optimizer:
             opt_summary["loss_max_rel"].append(btest.metrics["loss_max_rel"])
             opt_summary["recovery"].append(btest.metrics["recovery"])
             opt_summary["maxwait"].append(btest.metrics["maxwait"])
-        
+
         # Convert to DataFrame and clean up
         opt_summary = pd.DataFrame(opt_summary)
-        
+
         # Remove constant columns except symbol
         for k in list(opt_summary.columns):
             if k != "symbol" and len(set(map(str, opt_summary[k]))) == 1:
                 del opt_summary[k]
-        
+
         opt_summary.sort_values(by=["APR"], ascending=False, inplace=True)
         return opt_summary
 
     def _plot_optimization_results(self, symbol: Symbol, period) -> None:
         if self.opt_summary is None:
             self.opt_summary = self._generate_optimization_summary()
-            
+
         # Individual tests results
         top_runs_ids = []
         sum_daily_profit = 0
         for symbol in set(self.opt_summary["symbol"]):
             opt_summary_for_ticker = self.opt_summary[self.opt_summary["symbol"] == symbol]
             top_runs_ids.append(opt_summary_for_ticker.index[0])
-            sum_daily_profit += self.btests[top_runs_ids[-1]].daily_hist["profit_csum"]
+            sum_daily_profit += self.btests[top_runs_ids[-1]
+                                            ].daily_hist["profit_csum"]
             logger.info(f"\n{opt_summary_for_ticker.head(10)}\n")
             pd.DataFrame(self.btests[top_runs_ids[-1]].daily_hist.profit_csum).to_csv(
                 f"optimization/{symbol}.{period.value}.top_{self.sortby}_sorted.csv", index=False)
 
         profit_av = (sum_daily_profit / len(top_runs_ids)).values
-        APR_av, maxwait_av = self.btests[top_runs_ids[-1]].metrics_from_profit(profit_av)
+        APR_av, maxwait_av = self.btests[top_runs_ids[-1]
+                                         ].metrics_from_profit(profit_av)
         logger.info(
             f"\nAverage of top runs ({', '.join([f'{i}' for i in top_runs_ids])}): APR={APR_av:.2f}, maxwait={maxwait_av:.0f}\n")
         plot_daily_balances_with_av(
