@@ -67,10 +67,11 @@ class RunType(Enum):
     OPTIMIZE = "optimize"
     CROSS_VALIDATION = "cross_validation"
     BYBIT = "bybit"
+    MULTIRUN = "multirun"
 
     @staticmethod
     def from_str(label):
-        if label in ("backtest", "optimize", "bybit", "cross_validation"):
+        if label in ("backtest", "optimize", "bybit", "cross_validation", "multirun"):
             return RunType[label.upper()]
         else:
             raise ValueError(f"Unknown run type: {label}")

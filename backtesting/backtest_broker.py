@@ -19,7 +19,7 @@ class Broker:
         self.active_position: Position = None
         self.positions: List[Position] = []
         self.orders = []
-        self.profit_hist = {"dates": [], "profit_nofees": [], "fees_csum": []}
+        self.profit_hist = {"dates": [], "profit_csum_nofees": [], "fees_csum": []}
         
         self.time = None
         self.hist_id = None
@@ -90,7 +90,7 @@ class Broker:
 
         # Append current cumulative profit to the profit curve
         self.profit_hist["dates"].append(self.time)
-        self.profit_hist["profit_nofees"].append(self.cumulative_profit + active_profit)
+        self.profit_hist["profit_csum_nofees"].append(self.cumulative_profit + active_profit)
         self.profit_hist["fees_csum"].append(self.cumulative_fees)
 
     def close_orders(self, hist_id, i=None):

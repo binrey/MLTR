@@ -98,3 +98,21 @@ def launch(cfg) -> BackTestResults:
 
     bt_res.plot_results()
     return bt_res
+
+
+def launch_multirun(cfgs: list[dict]):
+    # run backtest for each config and create combined profit_hist
+    daily_hist = None
+    for cfg in cfgs:
+        bt_res = launch(cfg)
+        if daily_hist is None:
+            daily_hist = bt_res.daily_hist
+        else:
+            daily_hist += bt_res.daily_hist
+        
+    # create new backtest result with all positions from all results
+    bt_res_combined = BackTestResults(cfgs[0]["date_start"], cfgs[0]["date_end"])
+    bt_res_combined.wallet = bt_res.wallet
+    bt_res_combined.process_profit_hist(daily_hist)
+    bt_res_combined.plot_results()
+    return bt_res_combined

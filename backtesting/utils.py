@@ -18,7 +18,7 @@ from common.type import to_datetime
 
 
 class BackTestResults:
-    def __init__(self, date_start, date_end, wallet=None):
+    def __init__(self, date_start, date_end):
         self.date_start = date_start
         self.date_end = date_end
         # self.target_dates = [
@@ -31,7 +31,6 @@ class BackTestResults:
         self.tickers = None
         self.wallet = None
         self.ndeals = None
-        self.fees = None
         self.num_years_on_trade = None
 
     def process_backtest(self, bktest_broker: Broker):
@@ -41,54 +40,29 @@ class BackTestResults:
         self.wallet = bktest_broker.cfg["wallet"]
         self.tickers = "+".join({pos.ticker for pos in bktest_broker.positions})
         self.process_profit_hist(bktest_broker.profit_hist)
-        self.process_profits(dates=[to_datetime(pos.close_date) for pos in bktest_broker.positions],
-                             profits=bktest_broker.profits_abs,
-                             fees=bktest_broker.fees_abs)
         return perf_counter() - t0
 
     def process_profit_hist(self, profit_hist: pd.DataFrame):
-        profit_hist.set_index("dates", inplace=True)
+        if "dates" in profit_hist.columns:
+            profit_hist.set_index("dates", inplace=True)
         self.daily_hist = self.resample_hist(profit_hist, "D", func="last")
-        self.daily_hist["profit_csum"] = self.daily_hist["profit_nofees"] - self.daily_hist["fees_csum"]   
+        self.daily_hist["profit_csum"] = self.daily_hist["profit_csum_nofees"] - self.daily_hist["fees_csum"]   
+        self.daily_hist["finres"] = self.daily_hist["profit_csum"].diff().fillna(0)
+        self.monthly_hist = self.resample_hist(self.daily_hist, "M")
         self.process_daily_metrics()
-        # self.update_monthly_profit()
-        self.fees = profit_hist["fees_csum"].iloc[-1]
-
-    def process_profits(self, dates: Iterable, profits: List[float], fees: list[float]):
-        self.ndeals = len(profits)
-        if self.ndeals:
-            self.deals_hist = pd.DataFrame(
-                {"dates": dates, "profits": profits, "fees":fees}
-                )       
-            self.deals_hist.set_index("dates", inplace=True)
-            # self.daily_hist = self.resample_hist(self.deals_hist, "D")
-            
-            # # add column with cumulative sum of profits
-            # self.daily_hist["profit_nofees"] = self.daily_hist["profits"].cumsum()
-            # # add column with cumulative sum of fees
-            # self.daily_hist["fees_csum"] = self.daily_hist["fees"].cumsum()
-            # # add column with cumulative sum of profits without fees
-            # self.daily_hist["profit_csum"] = self.daily_hist["profit_nofees"] - self.daily_hist["fees_csum"]   
-            self.monthly_hist = self.resample_hist(self.deals_hist, "M")
-            # self.process_daily_metrics()
-            # self.update_monthly_profit()
-            # self.fees = sum(fees)
 
     def resample_hist(self, hist, period="D", func="sum"):
         target_dates = pd.date_range(start=to_datetime(self.date_start).date(), 
-                                     end=to_datetime(self.date_end).date(), 
-                                     freq=period) 
-               
-        hist = hist.resample(period)
-        if func == "sum":
-            hist = hist.sum() 
-            hist = hist.reindex(target_dates, fill_value=0)
-        elif func == "last":
-            hist = hist.last()
-            hist = hist.reindex(target_dates, method="ffill")
-        else:
-            raise ValueError("func must be 'sum' or 'last'")
-        return hist
+                                   end=to_datetime(self.date_end).date(), 
+                                   freq=period)
+        
+        agg_method = "sum" if func == "sum" else "last"
+        fill_method = {"sum": 0, "last": "ffill"}[func]
+        
+        return (hist.resample(period)
+                   .agg(agg_method)
+                   .reindex(target_dates, method=fill_method if func == "last" else None,
+                          fill_value=fill_method if func == "sum" else None))
 
     def compute_buy_and_hold(self, dates: np.ndarray, closes: np.ndarray):
         """
@@ -106,7 +80,7 @@ class BackTestResults:
         self.daily_hist["buy_and_hold"] = close_prices * self.wallet/closes[0]
         self.daily_hist["buy_and_hold"].iloc[-1] = self.daily_hist["buy_and_hold"].iloc[-2]
         
-        self.daily_hist["unrealized_profit"] = -self.daily_hist["buy_and_hold"].diff() * np.sign(self.daily_hist["profit_nofees"])
+        self.daily_hist["unrealized_profit"] = -self.daily_hist["buy_and_hold"].diff() * np.sign(self.daily_hist["profit_csum_nofees"])
         return perf_counter() - t0
 
     def process_daily_metrics(self):
@@ -136,7 +110,7 @@ class BackTestResults:
         # First subplot
         ax1.plot(
             self.daily_hist.index,
-            self.daily_hist.profit_csum,
+            self.daily_hist["profit_csum"],
             linewidth=3,
             color="b",
             alpha=0.6,
@@ -144,7 +118,7 @@ class BackTestResults:
 
         ax1.plot(
             self.daily_hist.index,
-            self.daily_hist.profit_nofees,
+            self.daily_hist["profit_csum_nofees"],
             linewidth=1,
             color="r",
             alpha=0.6,
@@ -172,20 +146,20 @@ class BackTestResults:
             linewidth=3,
             alpha=0.3,
         )
-        
 
-        # Third subplot
-        ax3.bar(
-            self.monthly_hist.index,
-            self.monthly_hist["profits"],
-            width=20,
-            color="g",
-            alpha=0.6,
-        )
+        ax1.legend(legend_ax1)
+        ax2.legend(["deposit"]) 
 
-        ax1.legend(legend_ax1)    
-        ax2.legend(["deposit"])    
-        ax3.legend(["monthly profit"])
+        if self.monthly_hist is not None:
+            # Third subplot
+            ax3.bar(
+                self.monthly_hist.index,
+                self.monthly_hist["finres"],
+                width=20,
+                color="g",
+                alpha=0.6,
+            )
+            ax3.legend(["monthly profit"])
 
         plt.tight_layout()
         plt.savefig("backtest.png")
@@ -299,3 +273,10 @@ class BackTestResults:
         normalized_H = H / H_max if H_max > 0 else 1.0
         
         return normalized_H
+
+    @property
+    def fees(self) -> float:
+        """Total accumulated fees from trading"""
+        if self.daily_hist is None:
+            return 0.0
+        return self.daily_hist["fees_csum"].iloc[-1]
