@@ -21,9 +21,17 @@ stackprinter.set_excepthook(style='color')
 
 
 class BackTest(BaseTradeClass):
-    def __init__(self, cfg, backtest_session: Broker) -> None:
-        self.session = backtest_session
-        super().__init__(cfg=cfg, expert=BacktestExpert(cfg=cfg, session=backtest_session))
+    def __init__(self, cfg) -> None:
+        self.session = Broker(cfg)
+        super().__init__(cfg=cfg, expert=BacktestExpert(cfg=cfg, session=self.session))
+        self.init_save_path()
+    
+    def init_save_path(self):
+        if self.cfg["save_plots"]:
+            save_path = Path("backtests") / f"{self.cfg['symbol'].ticker}"
+            if save_path.exists():
+                rmtree(save_path)
+            save_path.mkdir(parents=True)
 
     def get_server_time(self) -> np.datetime64:
         return self.session.time
@@ -42,49 +50,38 @@ class BackTest(BaseTradeClass):
         return self.cfg["equaty_step"]
 
     def postprocess(self) -> BackTestResults:
-        bt_res = BackTestResults(self.session.mw.date_start, self.session.mw.date_end)
-        bt_res.process_backtest(self.session)
+        bt_res = BackTestResults()
+        bt_res.add(self.session)
         if bt_res.ndeals == 0:
             logger.warning("No trades!")
             return bt_res
-
+        
+        bt_res.eval_daily_metrics()
+        dates = self.session.mw.hist["Date"][self.session.mw.id2start: self.session.mw.id2end]
+        closes = self.session.mw.hist["Close"][self.session.mw.id2start: self.session.mw.id2end]
         if self.cfg['eval_buyhold']:
-            bt_res.compute_buy_and_hold(
-                dates=self.session.mw.hist["Date"][self.session.mw.id2start: self.session.mw.id2end],
-                closes=self.session.mw.hist["Close"][self.session.mw.id2start: self.session.mw.id2end],
-            )
+            bt_res.compute_buy_and_hold(dates=dates, closes=closes)
         return bt_res
 
 def launch(cfg) -> BackTestResults:
-    if cfg["save_plots"]:
-        save_path = Path("backtests") / f"{cfg['symbol'].ticker}"
-        if save_path.exists():
-            rmtree(save_path)
-        save_path.mkdir(parents=True)
-
-    bt_session = Broker(cfg)
-    backtest_trading = BackTest(cfg=cfg, backtest_session=bt_session)
+    backtest_trading = BackTest(cfg)
     backtest_trading.test_connection()
-    print()
     backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
     bt_res = backtest_trading.postprocess()
 
     bt_res.print_results(cfg, backtest_trading.exp)
-    if cfg["save_plots"]:
-        bt_res.plot_results()
-    
+    bt_res.plot_results()
+
     return bt_res
 
 
 def launch_multirun(cfgs: list[dict]):
-    # run backtest for each config and create combined profit_hist
-    daily_hist = None
+    bt_sessions = []
     for cfg in cfgs:
-        bt_res = launch(cfg)
-        if daily_hist is None:
-            daily_hist = bt_res.daily_hist
-        else:
-            daily_hist += bt_res.daily_hist
+        backtest_trading = BackTest(cfg)
+        backtest_trading.test_connection()
+        backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
+        bt_sessions.append(backtest_trading.session)
         
     # create new backtest result with all positions from all results
     bt_res_combined = BackTestResults(cfgs[0]["date_start"], cfgs[0]["date_end"])

@@ -4,53 +4,59 @@
 
 from functools import cached_property
 from time import perf_counter
-from loguru import logger
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from loguru import logger
 
 from backtesting.backtest_broker import Broker
 from common.type import to_datetime
 
 
 class BackTestResults:
-    def __init__(self, date_start, date_end):
-        self.date_start = date_start
-        self.date_end = date_end
-        # self.target_dates = [
-        #     to_datetime(d).date()
-        #     for d in pd.date_range(start=date_start, end=date_end, freq="D")
-        # ]
-        self.daily_hist = None
-        self.monthly_hist = None
+    def __init__(self, date_start=None, date_end=None):
+        self.daily_hist = pd.DataFrame()
+        self.monthly_hist = pd.DataFrame()
         self.buy_and_hold = None
-        self.tickers = None
-        self.wallet = None
-        self.ndeals = None
-        self.num_years_on_trade = None
+        self.tickers = set()
+        self.wallet = 0
+        self.ndeals = 0
+        self.deals_hist = None
 
-    def process_backtest(self, bktest_broker: Broker):
-        t0 = perf_counter()
-        self.ndeals = len(bktest_broker.positions)
-        self.num_years_on_trade = self.compute_n_years(bktest_broker.positions)
-        self.wallet = bktest_broker.cfg["wallet"]
-        self.tickers = "+".join({pos.ticker for pos in bktest_broker.positions})
-        self.process_profit_hist(bktest_broker.profit_hist)
-        return perf_counter() - t0
+    def process(self):
+        self.eval_daily_metrics()
+
+    def add(self, bktest_broker: Broker):
+        self.ndeals += len(bktest_broker.positions)
+        self.wallet += bktest_broker.cfg["wallet"]
+        self.tickers.update([pos.ticker for pos in bktest_broker.positions])
+        daily_hist, monthly_hist = self.process_profit_hist(bktest_broker.profit_hist)
+        
+        # Handle empty DataFrames properly
+        if self.daily_hist.empty:
+            self.daily_hist = daily_hist
+        else:
+            self.daily_hist += daily_hist
+            
+        if self.monthly_hist.empty:
+            self.monthly_hist = monthly_hist
+        else:
+            self.monthly_hist += monthly_hist
 
     def process_profit_hist(self, profit_hist: pd.DataFrame):
-        if "dates" in profit_hist.columns:
-            profit_hist.set_index("dates", inplace=True)
-        self.daily_hist = self.resample_hist(profit_hist, "D", func="last")
-        self.daily_hist["profit_csum"] = self.daily_hist["profit_csum_nofees"] - self.daily_hist["fees_csum"]   
-        self.daily_hist["finres"] = self.daily_hist["profit_csum"].diff().fillna(0)
-        self.monthly_hist = self.resample_hist(self.daily_hist, "M")
-        self.process_daily_metrics()
+        assert "dates" in profit_hist.columns, "profit_hist must have 'dates' column"
+        profit_hist.set_index("dates", inplace=True)
+        daily_hist = self.resample_hist(profit_hist, "D", func="last")
+        daily_hist["profit_csum"] = daily_hist["profit_csum_nofees"] - daily_hist["fees_csum"]   
+        daily_hist["finres"] = daily_hist["profit_csum"].diff().fillna(0)
+        monthly_hist = self.resample_hist(daily_hist, "M")
+        return daily_hist, monthly_hist
 
     def resample_hist(self, hist, period="D", func="sum"):
-        target_dates = pd.date_range(start=to_datetime(self.date_start).date(), 
-                                   end=to_datetime(self.date_end).date(), 
-                                   freq=period)
+        target_dates = pd.date_range(start=to_datetime(hist.index.min()).date(),
+                                     end=to_datetime(hist.index.max()).date(),
+                                     freq=period)
         
         agg_method = "sum" if func == "sum" else "last"
         fill_method = {"sum": 0, "last": "ffill"}[func]
@@ -59,6 +65,18 @@ class BackTestResults:
                    .agg(agg_method)
                    .reindex(target_dates, method=fill_method if func == "last" else None,
                           fill_value=fill_method if func == "sum" else None))
+
+    @property
+    def date_start(self):
+        return self.daily_hist.index.min()
+    
+    @property
+    def date_end(self):
+        return self.daily_hist.index.max()
+    
+    @property
+    def num_years_on_trade(self):
+        return (self.date_end - self.date_start).days / 365
 
     def compute_buy_and_hold(self, dates: np.ndarray, closes: np.ndarray):
         """
@@ -79,7 +97,7 @@ class BackTestResults:
         self.daily_hist["unrealized_profit"] = -self.daily_hist["buy_and_hold"].diff() * np.sign(self.daily_hist["profit_csum_nofees"])
         return perf_counter() - t0
 
-    def process_daily_metrics(self):
+    def eval_daily_metrics(self):
         profit_stair, self.metrics = self._calc_metrics(
             self.daily_hist["profit_csum"].values
         )
@@ -158,7 +176,7 @@ class BackTestResults:
             ax3.legend(["monthly profit"])
 
         plt.tight_layout()
-        plt.savefig("backtest.png")
+        plt.savefig("_last_backtest.png")
 
     @property
     def final_profit(self):
@@ -184,13 +202,6 @@ class BackTestResults:
     @property
     def ndeals_per_month(self):
         return self.ndeals / max(1, self.num_years_on_trade) / 12
-
-    def compute_n_years(self, positions):
-        if len(positions) == 0:
-            return 0
-        d0 = max(np.datetime64(self.date_start), positions[0].open_date)
-        d1 = min(np.datetime64(self.date_end), positions[-1].close_date)
-        return (d1 - d0).astype("timedelta64[M]").item() / 12
 
     @staticmethod
     def _calc_metrics(ts):
@@ -282,6 +293,7 @@ class BackTestResults:
         
         def sformat(nd): return "{:>30}: {:>5.@f}".replace("@", str(nd))
 
+        print()
         logger.info(
             f"{cfg['symbol'].ticker}-{cfg['period']}-{cfg['hist_size']}: {expert_name}"
         )
@@ -303,3 +315,4 @@ class BackTestResults:
             "RECOVRY FACTOR", self.metrics["recovery"]))
         logger.info(sformat(0).format(
             "MAXWAIT", self.metrics["maxwait"]) + " days")
+

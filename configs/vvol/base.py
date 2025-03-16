@@ -7,8 +7,8 @@ from experts.vvol import VVol
 
 config = dict(
     wallet=100,
-    leverage=1,
-    date_start=np.datetime64("2020-01-01T00:00:00"),
+    leverage=5,
+    date_start=np.datetime64("2018-01-01T00:00:00"),
     date_end=np.datetime64("2025-03-01T00:00:00"),
     no_trading_days=set(),
     decision_maker=dict(
