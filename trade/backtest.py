@@ -21,9 +21,9 @@ stackprinter.set_excepthook(style='color')
 
 
 class BackTest(BaseTradeClass):
-    def __init__(self, cfg, expert, telebot, session: Broker) -> None:
-        super().__init__(cfg=cfg, expert=expert, telebot=telebot)
-        self.session = session
+    def __init__(self, cfg, backtest_session: Broker) -> None:
+        self.session = backtest_session
+        super().__init__(cfg=cfg, expert=BacktestExpert(cfg=cfg, session=backtest_session))
 
     def get_server_time(self) -> np.datetime64:
         return self.session.time
@@ -41,6 +41,19 @@ class BackTest(BaseTradeClass):
     def get_qty_step(self):
         return self.cfg["equaty_step"]
 
+    def postprocess(self) -> BackTestResults:
+        bt_res = BackTestResults(self.session.mw.date_start, self.session.mw.date_end)
+        bt_res.process_backtest(self.session)
+        if bt_res.ndeals == 0:
+            logger.warning("No trades!")
+            return bt_res
+
+        if self.cfg['eval_buyhold']:
+            bt_res.compute_buy_and_hold(
+                dates=self.session.mw.hist["Date"][self.session.mw.id2start: self.session.mw.id2end],
+                closes=self.session.mw.hist["Close"][self.session.mw.id2start: self.session.mw.id2end],
+            )
+        return bt_res
 
 def launch(cfg) -> BackTestResults:
     if cfg["save_plots"]:
@@ -50,53 +63,16 @@ def launch(cfg) -> BackTestResults:
         save_path.mkdir(parents=True)
 
     bt_session = Broker(cfg)
-    backtest_trading = BackTest(
-        cfg=cfg,
-        expert=BacktestExpert(cfg=cfg, session=bt_session),
-        telebot=None,
-        session=bt_session
-    )
+    backtest_trading = BackTest(cfg=cfg, backtest_session=bt_session)
     backtest_trading.test_connection()
     print()
-    bt_session.trade_stream(backtest_trading.handle_trade_message)
+    backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
+    bt_res = backtest_trading.postprocess()
 
-    bt_res = BackTestResults(bt_session.mw.date_start, bt_session.mw.date_end)
-    bt_res.process_backtest(bt_session)
-    if bt_res.ndeals == 0:
-        logger.warning("No trades!")
-        return bt_res
-
-    if cfg['eval_buyhold']:
-        bt_res.compute_buy_and_hold(
-            dates=bt_session.mw.hist["Date"][bt_session.mw.id2start: bt_session.mw.id2end],
-            closes=bt_session.mw.hist["Close"][bt_session.mw.id2start: bt_session.mw.id2end],
-        )
-
-    def sformat(nd): return "{:>30}: {:>5.@f}".replace("@", str(nd))
-
-    logger.info(
-        f"{cfg['symbol'].ticker}-{cfg['period']}-{cfg['hist_size']}: {backtest_trading.exp}"
-    )
-
-    logger.info("-" * 40)
-    logger.info(sformat(0).format("APR", bt_res.APR) + f" %")
-    logger.info(
-        sformat(0).format("FINAL PROFIT", bt_res.final_profit_rel)
-        + f" %"
-        + f" ({bt_res.fees/bt_res.final_profit*100:.1f}% fees)"
-    )
-    logger.info(
-        sformat(1).format("DEALS/MONTH", bt_res.ndeals_per_month)
-        + f"   ({bt_res.ndeals} total)"
-    )
-    logger.info(sformat(0).format(
-        "MAXLOSS", bt_res.metrics["loss_max_rel"]) + " %")
-    logger.info(sformat(0).format(
-        "RECOVRY FACTOR", bt_res.metrics["recovery"]))
-    logger.info(sformat(0).format(
-        "MAXWAIT", bt_res.metrics["maxwait"]) + " days")
-
-    bt_res.plot_results()
+    bt_res.print_results(cfg, backtest_trading.exp)
+    if cfg["save_plots"]:
+        bt_res.plot_results()
+    
     return bt_res
 
 

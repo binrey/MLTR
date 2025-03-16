@@ -15,7 +15,7 @@ from trade.utils import Position
 pd.options.mode.chained_assignment = None
 import pickle
 from copy import copy
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -60,7 +60,7 @@ class StepData:
 
 
 class BaseTradeClass(ABC):
-    def __init__(self, cfg, expert: ExpertBase, telebot: Telebot) -> None:
+    def __init__(self, cfg, expert: ExpertBase, telebot: Optional[Telebot] = None) -> None:
         self.cfg = cfg
         self.my_telebot = telebot
         self.exp = expert

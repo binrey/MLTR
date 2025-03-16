@@ -1,14 +1,10 @@
-# logger.remove()
-
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen
 
 
-from datetime import timedelta
 from functools import cached_property
 from time import perf_counter
-from typing import Iterable, List
-
+from loguru import logger
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -280,3 +276,30 @@ class BackTestResults:
         if self.daily_hist is None:
             return 0.0
         return self.daily_hist["fees_csum"].iloc[-1]
+        
+    def print_results(self, cfg: dict, expert_name: str) -> None:
+        """Print formatted backtest results to the log."""
+        
+        def sformat(nd): return "{:>30}: {:>5.@f}".replace("@", str(nd))
+
+        logger.info(
+            f"{cfg['symbol'].ticker}-{cfg['period']}-{cfg['hist_size']}: {expert_name}"
+        )
+
+        logger.info("-" * 40)
+        logger.info(sformat(0).format("APR", self.APR) + f" %")
+        logger.info(
+            sformat(0).format("FINAL PROFIT", self.final_profit_rel)
+            + f" %"
+            + f" ({self.fees/self.final_profit*100:.1f}% fees)"
+        )
+        logger.info(
+            sformat(1).format("DEALS/MONTH", self.ndeals_per_month)
+            + f"   ({self.ndeals} total)"
+        )
+        logger.info(sformat(0).format(
+            "MAXLOSS", self.metrics["loss_max_rel"]) + " %")
+        logger.info(sformat(0).format(
+            "RECOVRY FACTOR", self.metrics["recovery"]))
+        logger.info(sformat(0).format(
+            "MAXWAIT", self.metrics["maxwait"]) + " days")
