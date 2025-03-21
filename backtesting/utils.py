@@ -4,6 +4,7 @@
 
 from functools import cached_property
 from time import perf_counter
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +16,7 @@ from common.type import to_datetime
 
 
 class BackTestResults:
-    def __init__(self, date_start=None, date_end=None):
+    def __init__(self):
         self.daily_hist = pd.DataFrame()
         self.monthly_hist = pd.DataFrame()
         self.buy_and_hold = None
@@ -37,12 +38,36 @@ class BackTestResults:
         if self.daily_hist.empty:
             self.daily_hist = daily_hist
         else:
-            self.daily_hist += daily_hist
+            # Align the indices of both DataFrames
+            all_dates = self.daily_hist.index.union(daily_hist.index)
+            
+            # Reindex both DataFrames to include all dates
+            self_reindexed = self.daily_hist.reindex(all_dates)
+            daily_hist_reindexed = daily_hist.reindex(all_dates)
+            
+            # Fill NaNs with the last value for each DataFrame
+            self_reindexed.fillna(method='ffill', inplace=True)
+            daily_hist_reindexed.fillna(method='ffill', inplace=True)
+            
+            # Add the DataFrames
+            self.daily_hist = self_reindexed.add(daily_hist_reindexed, fill_value=0)
             
         if self.monthly_hist.empty:
             self.monthly_hist = monthly_hist
         else:
-            self.monthly_hist += monthly_hist
+            # Apply similar logic for monthly_hist
+            all_months = self.monthly_hist.index.union(monthly_hist.index)
+            
+            # Reindex both DataFrames to include all months
+            self_monthly_reindexed = self.monthly_hist.reindex(all_months)
+            monthly_hist_reindexed = monthly_hist.reindex(all_months)
+            
+            # Fill NaNs with zeros for monthly data
+            self_monthly_reindexed.fillna(0, inplace=True)
+            monthly_hist_reindexed.fillna(0, inplace=True)
+            
+            # Add the DataFrames
+            self.monthly_hist = self_monthly_reindexed.add(monthly_hist_reindexed, fill_value=0)
 
     def process_profit_hist(self, profit_hist: pd.DataFrame):
         assert "dates" in profit_hist.columns, "profit_hist must have 'dates' column"
@@ -240,14 +265,12 @@ class BackTestResults:
         final_profit_rel = profit_curve[-1] / deposit * 100
         return final_profit_rel / self.num_years_on_trade, wait_max
     
-    @cached_property
-    def profits_histogram(self):
-        npos_by_bins, bin_edges = np.histogram(self.deals_hist["profits"])
+    def profits_histogram(self, positions_finresults):
+        npos_by_bins, bin_edges = np.histogram(positions_finresults)
         finres_by_bins = (bin_edges[:-1] + bin_edges[1:]) / 2
         return npos_by_bins, finres_by_bins
     
-    @property
-    def normalized_profits_entropy(self):
+    def normalized_profits_entropy(self, positions_finresults):
         """
         Вычисляет нормированную энтропию распределения прибылей.
         
@@ -258,7 +281,7 @@ class BackTestResults:
             Нормированная энтропия в диапазоне [0, 1], 
             где 1 соответствует равномерному распределению, 0 — концентрации прибыли в одном элементе.
         """
-        profits = self.deals_hist["profits"][self.deals_hist["profits"] > 0].values
+        profits = positions_finresults[positions_finresults > 0].values
         
         # Если суммарная прибыль равна 0, энтропия неопределена
         total_profit = np.sum(profits)
@@ -288,15 +311,14 @@ class BackTestResults:
             return 0.0
         return self.daily_hist["fees_csum"].iloc[-1]
         
-    def print_results(self, cfg: dict, expert_name: str) -> None:
+    def print_results(self, cfg: Optional[dict] = None, expert_name: Optional[str] = None) -> None:
         """Print formatted backtest results to the log."""
         
         def sformat(nd): return "{:>30}: {:>5.@f}".replace("@", str(nd))
 
         print()
-        logger.info(
-            f"{cfg['symbol'].ticker}-{cfg['period']}-{cfg['hist_size']}: {expert_name}"
-        )
+        if cfg is not None and expert_name is not None:
+            logger.info(f"{cfg['symbol'].ticker}-{cfg['period']}-{cfg['hist_size']}: {expert_name}")
 
         logger.info("-" * 40)
         logger.info(sformat(0).format("APR", self.APR) + f" %")

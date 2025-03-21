@@ -1,3 +1,4 @@
+from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
 
@@ -57,9 +58,9 @@ class BackTest(BaseTradeClass):
             return bt_res
         
         bt_res.eval_daily_metrics()
-        dates = self.session.mw.hist["Date"][self.session.mw.id2start: self.session.mw.id2end]
-        closes = self.session.mw.hist["Close"][self.session.mw.id2start: self.session.mw.id2end]
         if self.cfg['eval_buyhold']:
+            dates = self.session.mw.hist["Date"][self.session.mw.id2start: self.session.mw.id2end]
+            closes = self.session.mw.hist["Close"][self.session.mw.id2start: self.session.mw.id2end]            
             bt_res.compute_buy_and_hold(dates=dates, closes=closes)
         return bt_res
 
@@ -76,16 +77,20 @@ def launch(cfg) -> BackTestResults:
 
 
 def launch_multirun(cfgs: list[dict]):
-    bt_sessions = []
+    bt_res_combined = BackTestResults()
     for cfg in cfgs:
         backtest_trading = BackTest(cfg)
         backtest_trading.test_connection()
         backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
-        bt_sessions.append(backtest_trading.session)
         
-    # create new backtest result with all positions from all results
-    bt_res_combined = BackTestResults(cfgs[0]["date_start"], cfgs[0]["date_end"])
-    bt_res_combined.wallet = bt_res.wallet
-    bt_res_combined.process_profit_hist(daily_hist)
+        bt_res = BackTestResults()
+        bt_res.add(deepcopy(backtest_trading.session))
+        bt_res.eval_daily_metrics()
+        bt_res.print_results()
+        
+        bt_res_combined.add(backtest_trading.session)
+        
+    bt_res_combined.eval_daily_metrics()
+    bt_res_combined.print_results()
     bt_res_combined.plot_results()
     return bt_res_combined
