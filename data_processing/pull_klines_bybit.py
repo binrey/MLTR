@@ -11,12 +11,16 @@ class BybitDownloader:
     def __init__(self, symbol, period, start_date=None, init_data=None):
         self.symbol = symbol
         self.period = period
+        self.init_data = init_data
         self.start_date = start_date if type(start_date) is pd.Timestamp else pd.to_datetime(start_date)
-        self.init_data = Path(init_data)
+        self.init_dirs()
         
-        if not self.init_data.exists():
-            self.init_data.parent.mkdir(parents=True, exist_ok=True)
-            self.init_data = None
+    def init_dirs(self):
+        if self.init_data is not None:
+            self.init_data = Path(self.init_data)
+            if not self.init_data.exists():
+                self.init_data.parent.mkdir(parents=True, exist_ok=True)
+                self.init_data = None
         
     def get_klines(self, start_date, size: int=1000, end: datetime=None): 
         if start_date is not None and isinstance(start_date, datetime):
@@ -77,12 +81,13 @@ class BybitDownloader:
 
 if __name__ == "__main__":
     symbol = "BTCUSDT"
-    period = 60
+    period = 1
     init_data = f"/Users/andrybin/Yandex.Disk.localized/fin_data/bybit/M{period}/{symbol}.csv"
     bb_loader = BybitDownloader(symbol=symbol, 
                                 period=period, 
-                                start_date="2020-01-01",
-                                init_data=init_data)
+                                start_date="2025-03-01",
+                                # init_data=init_data
+                                )
     
     h = bb_loader.get_history()
     h.to_csv(init_data)
