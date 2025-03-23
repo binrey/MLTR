@@ -68,7 +68,7 @@ class BackTest(BaseTradeClass):
 
 def launch(cfg) -> BackTestResults:
     backtest_trading = BackTest(cfg)
-    backtest_trading.test_connection()
+    backtest_trading.initialize()
     backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
     bt_res = backtest_trading.postprocess()
 
@@ -85,7 +85,7 @@ def launch_multirun(cfgs: list[dict]):
 
     for cfg in cfgs:
         backtest_trading = BackTest(cfg)
-        backtest_trading.test_connection()
+        backtest_trading.initialize()
         backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
         
         bt_res = BackTestResults()

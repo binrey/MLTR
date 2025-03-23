@@ -1,9 +1,10 @@
 from typing import Any, Callable, Optional
 
 from loguru import logger
+from pybit.unified_trading import HTTP
 
-# import torch
 from backtesting.backtest_broker import Broker, Order
+from common.type import Side
 from experts.core.expert import ExpertBase
 from indicators import *
 from trade.utils import ORDER_TYPE
@@ -16,10 +17,17 @@ def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
         return result
     return wrapper
 
+def log_modify_tp(func: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(self, tp: Optional[float]):
+        logger.debug(f"Modifying tp: {self.active_position.tp} -> {tp}")
+        result = func(self, tp)
+        return result
+    return wrapper
+
 class ExpertFormation(ExpertBase):
     def __init__(self, cfg):
         super(ExpertFormation, self).__init__(cfg)  
-        
+        self.traid_stops_min_size_multiplier = 3
         # if self.cfg["run_model_device"] is not None:
         #     from ml import Net, Net2
         #     self.model = Net2(4, 32)
@@ -43,10 +51,14 @@ class ExpertFormation(ExpertBase):
                 sl = self.sl_processor.create(hist=h,
                                               active_position=self.active_position,
                                               decision_maker=self.decision_maker)
-                self.modify_sl(sl)
             else:
-                sl_new = self.trailing_stop.get_stop_loss(self.active_position, hist=h)
-                self.modify_sl(sl_new)                
+                sl = self.trailing_stop.get_stop_loss(self.active_position, hist=h)
+            
+            if self.active_position.side == Side.BUY:
+                sl = min(sl, h["Open"][-1] - self.symbol.tick_size*self.traid_stops_min_size_multiplier)
+            else:
+                sl = max(sl, h["Open"][-1] + self.symbol.tick_size*self.traid_stops_min_size_multiplier)
+            self.modify_sl(sl)                
 
     def create_or_update_tp(self, h):
         if self.active_position is not None:
@@ -143,11 +155,12 @@ class BacktestExpert(ExpertFormation):
     def modify_sl(self, sl: Optional[float]):
         self.session.update_sl(sl)
 
+    @log_modify_tp
     def modify_tp(self, tp: Optional[float]):
         self.session.update_tp(tp)        
             
 class ByBitExpert(ExpertFormation):
-    def __init__(self, cfg, session):
+    def __init__(self, cfg, session: HTTP):
         self.cfg = cfg
         self.session = session
         super(ByBitExpert, self).__init__(cfg)
@@ -174,12 +187,23 @@ class ByBitExpert(ExpertFormation):
         if sl is None:
             return
         try:
-            resp = self.session.set_trading_stop(
+            self.session.set_trading_stop(
                 category="linear",
                 symbol=self.cfg["symbol"].ticker,
-                stopLoss=sl,
-                slTriggerB="IndexPrice",
-                positionIdx=0,
+                stopLoss=sl
+            )
+        except Exception as ex:
+            logger.error(ex)
+            
+    @log_modify_tp
+    def modify_tp(self, tp: Optional[float]):
+        if tp is None:
+            return
+        try:
+            self.session.set_trading_stop(
+                category="linear",
+                symbol=self.cfg["symbol"].ticker,
+                takeProfit=tp
             )
         except Exception as ex:
             logger.error(ex)

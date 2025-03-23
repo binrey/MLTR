@@ -2,7 +2,6 @@ from time import sleep
 
 import pandas as pd
 from loguru import logger
-from tqdm import tqdm
 
 from common.type import Side
 from common.utils import Telebot
@@ -16,7 +15,7 @@ import numpy as np
 import pandas as pd
 import stackprinter
 import yaml
-from pybit.unified_trading import HTTP, WebSocket
+from pybit.unified_trading import HTTP
 
 from experts.experts import ByBitExpert
 from trade.base import BaseTradeClass, log_get_hist
@@ -83,7 +82,7 @@ class BybitTrading(BaseTradeClass):
             side=Side.from_str(pos["side"]),
             ticker=pos["symbol"],
             volume=float(pos["closedSize"] if "closedSize" in pos else pos["size"]),
-            period=self.cfg.period,
+            period=self.period,
             sl=float(pos["stopLoss"]) if "stopLoss" in pos and len(pos["stopLoss"]) else None,
             )    
         if "avgExitPrice" in pos.keys():
@@ -98,41 +97,46 @@ class BybitTrading(BaseTradeClass):
         t = self.time.curr
         data = None
         while data is None or t != data["Date"][-1]:
-            logger.info(f"request history data for {t}...")
+            logger.debug(f"request history data for {t}...")
             message = self.session.get_kline(
                 category="linear",
                 symbol=self.ticker,
-                interval=str(self.cfg.period.minutes),
+                interval=str(self.period.minutes),
                 start=0,
                 end=t.astype("datetime64[ms]").astype(int),
-                limit=self.cfg.hist_size
+                limit=self.hist_size
             )
-            data = get_bybit_hist(message["result"], self.cfg.hist_size)
+            data = get_bybit_hist(message["result"], self.hist_size)
         return data
     
+    def wait_until_next_update(self, next_update_time):
+        remaining_seconds = (next_update_time - self.get_server_time()).astype(int)
+        while remaining_seconds > 0:
+            minutes, seconds = divmod(remaining_seconds, 60)
+            print(f"wait {minutes}m {seconds}s until next update...", end="\r")
+            sleep_time = min(10, remaining_seconds)
+            sleep(sleep_time)
+            remaining_seconds -= sleep_time
+
 
 def launch(cfg, demo=False):
     with open("./api.yaml", "r") as f:
-        creds = yaml.safe_load(f)
-    if demo:
-        creds["api_secret"] = creds["api_secret_demo"]
-        creds["api_key"] = creds["api_key_demo"]
+        api = yaml.safe_load(f)
+    bybit_creds = api["bybit_demo"] if demo else api["bybit"]
+    bot_token = api["bot_token"]
     
-    bybit_session = HTTP(testnet=False, api_key=creds["api_key"], api_secret=creds["api_secret"])
+    bybit_session = HTTP(testnet=False, api_key=bybit_creds["api_key"], 
+                         api_secret=bybit_creds["api_secret"],
+                         demo=demo)
     bybit_trading = BybitTrading(cfg=cfg,
-                                 telebot=Telebot(creds["bot_token"]), 
+                                 telebot=Telebot(bot_token), 
                                  bybit_session=bybit_session)
-    bybit_trading.test_connection()
+    bybit_trading.initialize()
     
     print()
     while True:
         bybit_trading.handle_trade_message(None)
         time_step_curr = bybit_trading.time.curr
-        time_step_next = time_step_curr + np.timedelta64(cfg.period.minutes, "m")
-        dtime = time_step_next - bybit_trading.get_server_time()
-        # for _ in tqdm(range(dtime.astype(int)), "wait"):
-        #     sleep(1)
-        print(f"wait {dtime} ...")
-        sleep(dtime.astype(int))
-        # print ("\033[A\033[A")
+        time_step_next = time_step_curr + np.timedelta64(bybit_trading.period.minutes, "m")
+        bybit_trading.wait_until_next_update(time_step_next)
     

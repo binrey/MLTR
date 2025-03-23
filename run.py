@@ -45,12 +45,12 @@ def run_optimization(config_path, run_backtests):
     logger.info(f"\n{str(results)}")
 
 
-def run_bybit(config_path):
+def run_bybit(config_path, demo=False):
     cfg = PyConfig(config_path).get_inference()
     cfg["save_backup"] = True
     cfg["save_plots"] = False
     cfg["visualize"] = False
-    bybit_launch(cfg)
+    bybit_launch(cfg, demo)
 
 
 def run_cross_validation(config_path):
@@ -108,7 +108,7 @@ if __name__ == "__main__":
                format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}", rotation="10 MB")
 
     if run_type == RunType.BYBIT:
-        run_bybit(args.config_paths[0])
+        run_bybit(args.config_paths[0], args.debug)
     elif run_type == RunType.OPTIMIZE:
         run_optimization(args.config_paths[0], args.run_backtests)
     elif run_type == RunType.MULTIRUN:

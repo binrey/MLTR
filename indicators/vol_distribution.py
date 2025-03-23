@@ -103,9 +103,11 @@ class VolDistribution:
         lower_price = h["Low"][:-1].min()
         max_open_cls = np.vstack([h["Close"][:-1], h["Open"][:-1]]).max(0)
         min_open_cls = np.vstack([h["Close"][:-1], h["Open"][:-1]]).min(0)
-        nbins = int((upper_price - lower_price)/(max_open_cls - min_open_cls).mean())
+        mean_body_size = (max_open_cls - min_open_cls).mean()
+        nbins = 2
+        if mean_body_size > 0:
+            nbins = int(np.ceil((upper_price - lower_price)/mean_body_size))
         self.price_bins = np.linspace(lower_price, upper_price, nbins)
-
 
         upper = h["High"][:-1] - max_open_cls
         lower = min_open_cls - h["Low"][:-1]
@@ -115,6 +117,7 @@ class VolDistribution:
         self.vol_hist = self.histogram(x, bins=self.price_bins, weights=y)
         bars = [(x, y) for x, y in zip(self.price_bins, self.vol_hist)]
         self.vol_profile = TimeVolumeProfile(time=h["Date"][1], hist=bars)
+        assert len(self.vol_hist) > 0
         return self.vol_profile
         
     @property
