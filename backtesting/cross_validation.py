@@ -2,19 +2,16 @@
 import pickle
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-import pandas as pd
 from loguru import logger
 from tabulate import tabulate
 
 from backtesting.optimization import Optimizer
-from backtesting.utils import BackTestResults
-from common.type import Symbol, to_datetime
 from trade.backtest import launch as backtest_launch
 
 logger.remove()

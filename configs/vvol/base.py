@@ -5,6 +5,7 @@ from common.utils import FeeRate, update_config
 from experts.position_control import FixRate, SLDynamic, SLFixed, TPFromSL, TrailingStop
 from experts.vvol import VVol
 
+
 config = dict(
     wallet=100,
     leverage=1,

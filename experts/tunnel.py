@@ -1,5 +1,7 @@
-from experts.core.expert import DecisionMaker
 from loguru import logger
+
+from common.type import Side
+from experts.core.expert import DecisionMaker
 
 
 class ClsTunnel(DecisionMaker):

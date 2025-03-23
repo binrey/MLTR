@@ -1,7 +1,9 @@
+import random
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
 
+import matplotlib.colors as mcolors
 import numpy as np
 import pandas as pd
 import stackprinter
@@ -72,12 +74,15 @@ def launch(cfg) -> BackTestResults:
 
     bt_res.print_results(cfg, backtest_trading.exp)
     bt_res.plot_results()
+    bt_res.save_fig()
 
     return bt_res
 
 
 def launch_multirun(cfgs: list[dict]):
     bt_res_combined = BackTestResults()
+    bt_res_composition = []
+
     for cfg in cfgs:
         backtest_trading = BackTest(cfg)
         backtest_trading.test_connection()
@@ -87,10 +92,35 @@ def launch_multirun(cfgs: list[dict]):
         bt_res.add(deepcopy(backtest_trading.session))
         bt_res.eval_daily_metrics()
         bt_res.print_results()
-        
+        bt_res_composition.append(bt_res)
         bt_res_combined.add(backtest_trading.session)
         
     bt_res_combined.eval_daily_metrics()
     bt_res_combined.print_results()
-    bt_res_combined.plot_results()
+    bt_res_combined.plot_results(plot_profit_without_fees=False)
+    
+    colors = get_distinct_colors(len(bt_res_composition))
+    for i, bt_res in enumerate(bt_res_composition):
+        bt_res_combined.add_from_other_results(btest_results=bt_res, color=colors[i % len(colors)])
+    bt_res_combined.save_fig()
     return bt_res_combined
+
+
+def get_distinct_colors(num_colors):
+    """
+    Generate a list of distinct colors for plotting multiple curves.
+    
+    Args:
+        num_colors: Number of distinct colors needed
+        
+    Returns:
+        List of color values
+    """
+    colors = list(mcolors.TABLEAU_COLORS.values())
+    # If we need more colors than available in TABLEAU_COLORS, add more from CSS4_COLORS
+    if num_colors > len(colors):
+        more_colors = list(mcolors.CSS4_COLORS.values())
+        random.shuffle(more_colors)
+        colors.extend(more_colors)
+    
+    return colors

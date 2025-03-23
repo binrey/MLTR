@@ -24,7 +24,24 @@ class BackTestResults:
         self.wallet = 0
         self.ndeals = 0
         self.deals_hist = None
-
+        self.fig = None
+        self.legend_ax1 = []
+        
+    @property
+    def date_start(self):
+        return self.daily_hist.index.min()
+    
+    @property
+    def date_end(self):
+        return self.daily_hist.index.max()
+    
+    @property
+    def num_years_on_trade(self):
+        return (self.date_end - self.date_start).days / 365
+    @property
+    def tickers_set(self) -> str:
+        return "+".join(self.tickers)
+    
     def process(self):
         self.eval_daily_metrics()
 
@@ -73,7 +90,7 @@ class BackTestResults:
         assert "dates" in profit_hist.columns, "profit_hist must have 'dates' column"
         profit_hist.set_index("dates", inplace=True)
         daily_hist = self.resample_hist(profit_hist, "D", func="last")
-        daily_hist["profit_csum"] = daily_hist["profit_csum_nofees"] - daily_hist["fees_csum"]   
+        daily_hist["profit_csum"] = daily_hist["profit_csum_nofees"] - daily_hist["fees_csum"]
         daily_hist["finres"] = daily_hist["profit_csum"].diff().fillna(0)
         monthly_hist = self.resample_hist(daily_hist, "M")
         return daily_hist, monthly_hist
@@ -91,17 +108,7 @@ class BackTestResults:
                    .reindex(target_dates, method=fill_method if func == "last" else None,
                           fill_value=fill_method if func == "sum" else None))
 
-    @property
-    def date_start(self):
-        return self.daily_hist.index.min()
-    
-    @property
-    def date_end(self):
-        return self.daily_hist.index.max()
-    
-    @property
-    def num_years_on_trade(self):
-        return (self.date_end - self.date_start).days / 365
+
 
     def compute_buy_and_hold(self, dates: np.ndarray, closes: np.ndarray):
         """
@@ -142,66 +149,67 @@ class BackTestResults:
         self.monthly_hist = temp_df['profit'].resample('M').sum()
         self.monthly_hist = self.monthly_hist.reset_index()
         self.monthly_hist.columns = ["days", "profit"]
-        
-    def plot_results(self):
-        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 8), gridspec_kw={'height_ratios': [3, 1, 1]})
-        
-        # First subplot
-        ax1.plot(
-            self.daily_hist.index,
-            self.daily_hist["profit_csum"],
-            linewidth=3,
-            color="b",
-            alpha=0.6,
-        )
 
-        ax1.plot(
-            self.daily_hist.index,
-            self.daily_hist["profit_csum_nofees"],
-            linewidth=1,
-            color="r",
-            alpha=0.6,
-        )
-        
-        legend_ax1 = ["profit", "profit without fees"]
+    def relative2wallet(self, data: pd.Series):
+        return data/self.wallet*100
 
-        # Create a secondary y-axis for buy_and_hold_reinvest
+    def add_profit_curve(self, days: pd.Index, values: pd.Series, name: str, color: str, linewidth: float, alpha: float):
+        self.fig.axes[0].plot(days, values, linewidth=linewidth, color=color, alpha=alpha)
+        self.legend_ax1.append(name)
+        
+    def add_from_other_results(self, btest_results: "BackTestResults", color: str, linewidth: float = 1, alpha: float = 0.5):
+        self.add_profit_curve(btest_results.daily_hist.index, btest_results.relative2wallet(btest_results.daily_hist["profit_csum"]), 
+                              btest_results.tickers_set, color, linewidth, alpha)
+
+    def plot_results(self, title: Optional[str] = None, plot_profit_without_fees: bool = True):
+        self.fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 8), gridspec_kw={'height_ratios': [3, 1, 1]})
+        
+        if title:
+            self.fig.suptitle(title, fontsize=16)
+            self.fig.subplots_adjust(top=0.9)
+        
+        self.add_profit_curve(self.daily_hist.index, self.relative2wallet(self.daily_hist["profit_csum"]), 
+                              self.tickers_set, color="b", linewidth=3, alpha=0.5)
+        if plot_profit_without_fees:
+            self.add_profit_curve(self.daily_hist.index, self.relative2wallet(self.daily_hist["profit_csum_nofees"]), 
+                                  f"{self.tickers_set } without fees", color="b", linewidth=1, alpha=0.5)
+
         if "buy_and_hold" in self.daily_hist.columns:
-            # ax1 = ax1.twinx()
             ax1.plot(
                 self.daily_hist.index,
-                self.daily_hist["buy_and_hold"],
+                (self.daily_hist["buy_and_hold"]/self.wallet - 1)*100,
                 linewidth=2,
                 color="g",
                 alpha=0.6,
             )
-            legend_ax1.append("buy & hold")
+            self.legend_ax1.append("buy & hold")
+            
+        ax1.set_ylabel("fin result, %")
 
-        # Second subplot
         ax2.plot(
             self.daily_hist.index,
-            self.daily_hist["deposit"],
+            self.daily_hist["deposit"]/self.wallet*100,
             "-",
             linewidth=3,
             alpha=0.3,
         )
+        ax2.set_ylabel("deposit, %")
 
-        ax1.legend(legend_ax1)
-        ax2.legend(["deposit"]) 
-
-        if self.monthly_hist is not None:
-            # Third subplot
-            ax3.bar(
-                self.monthly_hist.index,
-                self.monthly_hist["finres"],
-                width=20,
-                color="g",
-                alpha=0.6,
-            )
-            ax3.legend(["monthly profit"])
+        ax3.bar(
+            self.monthly_hist.index,
+            self.monthly_hist["finres"]/self.wallet*100,
+            width=20,
+            color="g",
+            alpha=0.6,
+        )
+        ax3.set_ylabel("monthly profit, %")
 
         plt.tight_layout()
-        plt.savefig("_last_backtest.png")
+        
+    def save_fig(self, save_path: Optional[str] = "_last_backtest.png"):
+        self.fig.axes[0].legend(self.legend_ax1)
+        if self.fig is not None:
+            self.fig.savefig(save_path)
 
     @property
     def final_profit(self):
