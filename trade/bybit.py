@@ -45,9 +45,13 @@ class BybitTrading(BaseTradeClass):
         super().__init__(cfg=cfg, expert=ByBitExpert(cfg, bybit_session), telebot=telebot)
 
     def get_server_time(self) -> np.datetime64:
-        serv_time = int(self.session.get_server_time()["result"]["timeSecond"])
-        serv_time = np.array(serv_time).astype("datetime64[s]")
-        return serv_time     
+        while True:
+            try:
+                serv_time = int(self.session.get_server_time()["result"]["timeSecond"])
+                return np.datetime64(serv_time, "[s]")
+            except Exception as e:
+                logger.error(f"Error getting server time: {e}")
+                sleep(1)
        
     def to_datetime(self, timestamp: Union[int, float]) -> np.datetime64:
         return np.datetime64(int(timestamp), "ms")
