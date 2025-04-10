@@ -51,7 +51,6 @@ class BackTestResults:
         self.tickers.update([pos.ticker for pos in bktest_broker.positions])
         daily_hist, monthly_hist = self.process_profit_hist(bktest_broker.profit_hist)
         
-        # Handle empty DataFrames properly
         if self.daily_hist.empty:
             self.daily_hist = daily_hist
         else:
@@ -123,7 +122,7 @@ class BackTestResults:
         # create datafreame from closes and dates as index
         df = pd.DataFrame({"price": closes}, index=dates)
         close_prices = df.resample("D").last()["price"]
-        self.daily_hist["buy_and_hold"] = close_prices * self.wallet/closes[0]
+        self.daily_hist["buy_and_hold"] = (close_prices - close_prices[0]) * self.wallet/close_prices[0]
         self.daily_hist["buy_and_hold"].iloc[-1] = self.daily_hist["buy_and_hold"].iloc[-2]
         
         self.daily_hist["unrealized_profit"] = -self.daily_hist["buy_and_hold"].diff() * np.sign(self.daily_hist["profit_csum_nofees"])
@@ -177,7 +176,7 @@ class BackTestResults:
         if "buy_and_hold" in self.daily_hist.columns:
             ax1.plot(
                 self.daily_hist.index,
-                (self.daily_hist["buy_and_hold"]/self.wallet - 1)*100,
+                self.daily_hist["buy_and_hold"]/self.wallet*100,
                 linewidth=2,
                 color="g",
                 alpha=0.6,

@@ -280,10 +280,9 @@ class Optimizer:
     def _validate_backtest_dates(self) -> None:
         """Validate that all backtests have the same start date."""
         start_dates = set([btest.date_start for btest in self.btests])
-        if len(start_dates) != 1:
-            raise ValueError(
-                f"Inconsistent backtest start dates. Please adjust configuration to start from {date2str(max(start_dates))}"
-            )
+        assert len(start_dates) == 1, f"Inconsistent backtest start dates. \
+            Please adjust configuration to start from {date2str(max(start_dates))}"
+
 
     def _generate_optimization_summary(self) -> pd.DataFrame:
         """Generate summary DataFrame of optimization results."""
@@ -316,7 +315,6 @@ class Optimizer:
             opt_summary["APR"].append(btest.APR)
             opt_summary["final_profit"].append(btest.final_profit)
             opt_summary["ndeals_per_month"].append(btest.ndeals_per_month)
-            opt_summary["profits_entropy"].append(btest.normalized_profits_entropy)
             opt_summary["loss_max_rel"].append(btest.metrics["loss_max_rel"])
             opt_summary["recovery"].append(btest.metrics["recovery"])
             opt_summary["maxwait"].append(btest.metrics["maxwait"])

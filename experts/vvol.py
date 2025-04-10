@@ -90,6 +90,7 @@ class VVol(DecisionMaker):
 
         strike = h["Close"][-2] - h["Open"][-2]
         max_body = max(np.maximum(h["Open"][:-2], h["Close"][:-2]) - np.minimum(h["Open"][:-2], h["Close"][:-2]))
+        logger.debug(f"check condition curr. body ({abs(strike):.2f}) > max. body ({max_body:.3f})")
         if abs(strike) > max_body:
             if self.lprice:
                 if strike > 0 and h["Close"][-2] > self.sprice:
