@@ -159,8 +159,13 @@ class FeeConst(FeeModel):
         return self.position_suply_rate * h8_count * volume
 
     
-def date2str(date: np.datetime64, step="s") -> str:
-    return np.datetime_as_string(date.astype(f"datetime64[{step}]")) if date is not None else "-/-"
+def date2str(date: np.datetime64 | pd.Timestamp, step="s") -> str:
+    if isinstance(date, pd.Timestamp):
+        return date.strftime("%Y-%m-%d %H:%M:%S")
+    elif isinstance(date, np.datetime64):   
+        return np.datetime_as_string(date.astype(f"datetime64[{step}]"))
+    else:
+        raise ValueError(f"Invalid date type: {type(date)}")
 
 
 class Telebot:
