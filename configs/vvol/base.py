@@ -8,8 +8,8 @@ from experts.vvol import VVol
 config = dict(
     wallet=100,
     leverage=1,
-    date_start=np.datetime64("2025-03-01T00:00:00"),
-    date_end=np.datetime64("2025-04-01T00:00:00"),
+    date_start=np.datetime64("2018-01-01T00:00:00"),
+    date_end=np.datetime64("2025-05-01T00:00:00"),
     no_trading_days=set(),
     decision_maker=dict(
         type=VVol,
@@ -42,7 +42,7 @@ config = dict(
     save_plots=False,
     vis_events=Vis.ON_DEAL,
     vis_hist_length=512,
-    visualize=True,
+    visualize=False,
     eval_buyhold=True,
     run_model_device=None,
 )

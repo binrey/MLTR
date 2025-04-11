@@ -9,8 +9,6 @@ from common.type import Side, to_datetime
 from data_processing.dataloading import MovingWindow
 from trade.utils import ORDER_TYPE, Order, Position
 
-from .profiling import line_profile_function, profile_function
-
 
 class Broker:
     def __init__(self, cfg: Optional[dict] = None):
