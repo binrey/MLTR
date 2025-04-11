@@ -1,6 +1,6 @@
 from common.type import Symbols, TimePeriod
 from common.utils import update_config
-from configs.vvol.base import config
+from configs.volprof.base import config
 
 updates = dict(
     symbol = Symbols.ETHUSDT,

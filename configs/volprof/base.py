@@ -3,7 +3,7 @@ import numpy as np
 from common.type import Symbols, TimePeriod, Vis
 from common.utils import FeeRate, update_config
 from experts.position_control import FixRate, SLDynamic, SLFixed, TPFromSL, TrailingStop
-from experts.vvol import VVol
+from experts.volprof import VolProf
 
 config = dict(
     wallet=100,
@@ -12,9 +12,9 @@ config = dict(
     date_end=np.datetime64("2025-05-01T00:00:00"),
     no_trading_days=set(),
     decision_maker=dict(
-        type=VVol,
+        type=VolProf,
         sharpness=0,
-        strategy=VVol.Levels.MANUAL
+        strategy=VolProf.Levels.MANUAL
     ),
     sl_processor=dict(
         type=SLDynamic,

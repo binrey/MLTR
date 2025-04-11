@@ -10,8 +10,8 @@ from experts.core.expert import DecisionMaker
 from indicators.vol_distribution import VolDistribution
 
 
-class VVol(DecisionMaker):
-    type = "vvol"
+class VolProf(DecisionMaker):
+    type = "volprof"
     
     class Levels(str, Enum):
         """Strategy type for HVOL price level detection"""

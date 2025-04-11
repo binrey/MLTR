@@ -1,7 +1,7 @@
 from common.type import Symbols, TimePeriod, Vis
 from common.utils import FeeRate, update_config
 from experts.position_control import SLDynamic, SLFixed, TPFromSL, TrailingStop
-from experts.vvol import VVolPlus
+from experts.volprof import VVolPlus
 
 config = dict(
     wallet=50,
