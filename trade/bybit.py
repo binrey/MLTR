@@ -129,8 +129,8 @@ def launch(cfg, demo=False):
     bybit_creds = api["bybit_demo"] if demo else api["bybit"]
     bot_token = api["bot_token"]
     
-    bybit_session = HTTP(testnet=False, 
-                         api_key=bybit_creds["api_key"], 
+    bybit_session = HTTP(testnet=False,
+                         api_key=bybit_creds["api_key"],
                          api_secret=bybit_creds["api_secret"],
                          demo=demo)
     bybit_trading = BybitTrading(cfg=cfg,

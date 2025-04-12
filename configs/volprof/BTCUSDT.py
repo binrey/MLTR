@@ -1,6 +1,6 @@
 from common.type import Symbols, TimePeriod
 from common.utils import update_config
-from configs.volprof.base import config
+from configs.volprof.base import backtest, trading
 
 updates = dict(
     symbol = Symbols.BTCUSDT,
@@ -10,4 +10,5 @@ updates = dict(
     decision_maker = {"sharpness": 4}
 )
 
-config = update_config(config, **updates)
+backtest = update_config(backtest, **updates)
+trading = update_config(trading, **updates)

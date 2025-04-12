@@ -5,7 +5,6 @@ import os
 import sys
 from datetime import datetime
 
-import pandas as pd
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -17,18 +16,16 @@ from trade.backtest import launch as backtest_launch
 from trade.backtest import launch_multirun
 from trade.bybit import launch as bybit_launch
 
-load_dotenv() 
-
+load_dotenv()
 
 def run_backtest(config_path):
-    # Load environment variables from .env file
-    cfg = PyConfig(config_path).get_inference()
+    cfg = PyConfig(config_path).get_backtest()
     cfg["save_backup"] = False
     backtest_launch(cfg)
 
 
 def run_multirun(config_paths):
-    cfgs = [PyConfig(path).get_inference() for path in config_paths]
+    cfgs = [PyConfig(path).get_backtest() for path in config_paths]
     launch_multirun(cfgs)
 
 
@@ -46,7 +43,7 @@ def run_optimization(config_path, run_backtests):
 
 
 def run_bybit(config_path, demo=False):
-    cfg = PyConfig(config_path).get_inference()
+    cfg = PyConfig(config_path).get_trading()
     cfg["save_backup"] = True
     cfg["save_plots"] = False
     cfg["visualize"] = False

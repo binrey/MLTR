@@ -8,9 +8,6 @@ from experts.volprof import VolProf
 config = dict(
     wallet=100,
     leverage=1,
-    date_start=np.datetime64("2018-01-01T00:00:00"),
-    date_end=np.datetime64("2025-05-01T00:00:00"),
-    no_trading_days=set(),
     decision_maker=dict(
         type=VolProf,
         sharpness=0,
@@ -43,10 +40,16 @@ config = dict(
     vis_events=Vis.ON_DEAL,
     vis_hist_length=512,
     visualize=False,
-    eval_buyhold=True,
     run_model_device=None,
 )
 
+backtest = update_config(
+    config,
+    date_start=np.datetime64("2018-01-01T00:00:00"),
+    date_end=np.datetime64("2025-05-01T00:00:00"),
+    no_trading_days=set(),
+    eval_buyhold=True,
+)
 
 optimization = update_config(
     config,
@@ -58,3 +61,8 @@ optimization = update_config(
         "sharpness": [3, 4, 5, 6],
         }
     )
+
+trading = update_config(
+    config,
+    credentials="bybit_volprof",
+)

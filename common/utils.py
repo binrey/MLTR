@@ -4,8 +4,6 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import matplotlib.pyplot as plt
-import mplfinance as mpf
 import numpy as np
 import pandas as pd
 import telebot
@@ -14,10 +12,6 @@ import telebot
 from easydict import EasyDict
 from loguru import logger
 from PIL import Image
-
-from common.type import Symbol
-
-# cache = Cache(".tmp")
 
 
 def name_from_cfg(cfg, name):
@@ -49,22 +43,30 @@ class PyConfig():
         spec = importlib.util.spec_from_file_location("config", config_file)
         config_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(config_module)
-        self.cfg = config_module.config
-        try:
+        self.backetest = config_module.backtest
+        self.trading = None
+        if hasattr(config_module, "trading"):
+            self.trading = config_module.trading
+        self.optim = None
+        if hasattr(config_module, "optimization"):
             self.optim = config_module.optimization
-        except:
-            pass
-        
-    def get_inference(self):
-        cfg = deepcopy(self.cfg)
-        for k, v in cfg.items():
-            if type(v) is EasyDict and "func" in v.keys():
-                params = EasyDict({pk: pv for pk, pv in v.params.items()})
-                cfg[k].func = v.func(params)
-            else:
-                cfg[k] = v
-        return cfg
 
+    def _get_inference(self, cfg):
+        cfg_compiled = deepcopy(cfg)
+        for k, v in cfg_compiled.items():
+            if isinstance(v, EasyDict) and "func" in v.keys():
+                params = EasyDict({pk: pv for pk, pv in v.params.items()})
+                cfg_compiled[k].func = v.func(params)
+            else:
+                cfg_compiled[k] = v
+        return cfg_compiled
+    
+    def get_backtest(self):
+        return self._get_inference(self.backetest)
+    
+    def get_trading(self):
+        return self._get_inference(self.trading)
+    
     def get_optimization(self):
         cfg = deepcopy(self.optim)
         for k, vlist in cfg.items():
@@ -103,7 +105,7 @@ class Config(EasyDict):
     def __str__(self):
         out = "config file:\n"
         for k, v in self.__dict__.items():
-            if type(v) is Config:
+            if isinstance(v, Config):
                 out += f"{k}:\n"
                 for kk, vv in v.items():
                     out += f"  {kk}: {vv}\n"
@@ -112,11 +114,8 @@ class Config(EasyDict):
         return out
 
 
-import copy
-
-
 def update_config(config, **kwargs):
-    new_config = copy.deepcopy(config)
+    new_config = deepcopy(config)
     for key, value in kwargs.items():
         if isinstance(value, dict):
             for sub_key, sub_value in value.items():
