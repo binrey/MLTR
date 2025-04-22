@@ -41,13 +41,13 @@ config = dict(
     vis_hist_length=512,
     visualize=False,
     run_model_device=None,
+    no_trading_days=set(),
 )
 
 backtest = update_config(
     config,
     date_start=np.datetime64("2018-01-01T00:00:00"),
     date_end=np.datetime64("2025-05-01T00:00:00"),
-    no_trading_days=set(),
     eval_buyhold=True,
 )
 

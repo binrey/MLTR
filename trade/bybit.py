@@ -126,7 +126,7 @@ class BybitTrading(BaseTradeClass):
 def launch(cfg, demo=False):
     with open("./api.yaml", "r") as f:
         api = yaml.safe_load(f)
-    bybit_creds = api["bybit_demo"] if demo else api["bybit"]
+    bybit_creds = api["bybit_demo"] if demo else api[cfg["credentials"]]
     bot_token = api["bot_token"]
     
     bybit_session = HTTP(testnet=False,
