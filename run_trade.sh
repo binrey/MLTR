@@ -25,7 +25,11 @@ if [ "$DEBUG" -eq 1 ]; then
     CMD="$CMD --debug"
     echo "Running in debug mode"
 fi
-
+CMD="python3 run.py bybit configs/volprof/ETHUSDT.py"
+if [ "$DEBUG" -eq 1 ]; then
+    CMD="$CMD --debug"
+    echo "Running in debug mode"
+fi
 # Execute command
 echo "Executing: $CMD"
 $CMD

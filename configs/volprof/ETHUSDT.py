@@ -3,6 +3,7 @@ from common.utils import update_config
 from configs.volprof.base import backtest, trading
 
 updates = dict(
+    wallet=50,
     symbol = Symbols.ETHUSDT,
     period=TimePeriod.M60,
     hist_size = 128,
