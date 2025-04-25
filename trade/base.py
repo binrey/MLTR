@@ -1,38 +1,39 @@
+import json
 import multiprocessing
+import pickle
 from abc import ABC, abstractmethod
+from copy import copy
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from shutil import rmtree
-
-import pandas as pd
-from loguru import logger
-
-from common.type import Vis
-from common.visualization import Visualizer
-from experts.core.expert import ExpertBase
-from trade.utils import Position
-
-pd.options.mode.chained_assignment = None
-import pickle
-from copy import copy
 from typing import Any, Callable, Optional
 
 import numpy as np
 import pandas as pd
 import stackprinter
+from loguru import logger
 
+from common.type import Vis
 from common.utils import Telebot, date2str
+from common.visualization import Visualizer
+from experts.core.expert import ExpertBase
+from trade.utils import Position
+
+pd.options.mode.chained_assignment = None
+
 
 stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen
- 
+
 
 def log_get_hist(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, *args, **kwargs):
         result = func(self)
         if result is not None:
-            logger.debug(f"load: {result['Date'][-1]} | new: {result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}")
+            logger.debug(
+                f"load: {result['Date'][-1]} | new: {result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}")
         return result
     return wrapper
 
@@ -41,17 +42,17 @@ def log_get_hist(func: Callable[..., Any]) -> Callable[..., Any]:
 class StepData:
     curr: Any = None
     prev: Any = None
-    
+
     def update(self, curr_value: Any):
         self.prev = copy(self.curr)
         self.curr = curr_value
-        
+
     def changed(self, no_none=False) -> bool:
         ch = str(self.curr) != str(self.prev)
         if no_none:
             ch = ch and self.prev is not None
         return ch
-    
+
     def created(self) -> bool:
         return self.curr is not None and self.prev is None
 
@@ -66,7 +67,7 @@ class BaseTradeClass(ABC):
         self.exp = expert
         self.h, self.time = None, StepData()
         self.pos: StepData[Position] = StepData()
-     
+
         self.symbol = cfg['symbol']
         self.period = cfg['period']
         self.visualize = cfg['visualize']
@@ -76,13 +77,14 @@ class BaseTradeClass(ABC):
         self.should_save_backup = cfg.get('save_backup', False)
         self.ticker = cfg['symbol'].ticker
         self.hist_size = cfg['hist_size']
-        self.save_path = Path("real_trading") / f"{self.ticker}-{self.period.value}"
+        self.save_path = Path("logs") / cfg["name"] / f"{self.ticker}-{self.period.value}"
         self.save_path.mkdir(parents=True, exist_ok=True)
         self.backup_path = self.save_path / "backup.pkl"
-        self.visualizer = Visualizer(period=self.period, 
-                                     show=self.visualize, 
+
+        self.visualizer = Visualizer(period=self.period,
+                                     show=self.visualize,
                                      save_to=self.save_path if self.save_plots else None,
-                                     vis_hist_length=self.vis_hist_length)           
+                                     vis_hist_length=self.vis_hist_length)
         self.nmin = self.period.minutes
         self.time = StepData()
         self.serv_time = None
@@ -95,29 +97,43 @@ class BaseTradeClass(ABC):
     @abstractmethod
     def get_current_position(self) -> Position:
         pass
-    
+
     @abstractmethod
     def get_qty_step(self) -> float:
         pass
-    
+
     @abstractmethod
     def get_hist(self):
-        pass    
-    
+        pass
+
     @abstractmethod
     def get_pos_history(self) -> list[Position]:
         pass
 
     def get_rounded_time(self, time: np.datetime64) -> np.datetime64:
-        trounded = np.array(time).astype("datetime64[m]").astype(int)//self.nmin
+        trounded = np.array(time).astype(
+            "datetime64[m]").astype(int)//self.nmin
         return np.datetime64(int(trounded*self.nmin), "m")
+
+    def _get_next_trades_log_path(self) -> Path:
+        """Get the next available filename for trades log.
+
+        Returns:
+            Path: Path to the next available trades log file
+        """
+        base_path = self.save_path / "trades.json"
+        counter = 1
+        while base_path.exists():
+            base_path = self.save_path / f"trades_{counter}.json"
+            counter += 1
+        return base_path
 
     def handle_trade_message(self, message):
         self.server_time = self.get_server_time()
         time_rounded = self.get_rounded_time(self.server_time)
         self.time.update(time_rounded)
         logger.debug(f"server time: {date2str(self.server_time, 'ms')}")
-        
+
         if self.time.changed(no_none=True):
             msg = f"{str(self.pos.curr) if self.pos.curr is not None else 'no pos'}"
             self.update()
@@ -125,12 +141,12 @@ class BaseTradeClass(ABC):
             if logger._core.min_level == 10:
                 print()
             if self.my_telebot is not None:
-                # process = multiprocessing.Process(target=self.my_telebot.send_text, 
+                # process = multiprocessing.Process(target=self.my_telebot.send_text,
                 #                                   args=[msg])
                 # process.start()
                 self.my_telebot.send_text(msg)
         # else:
-        #     print ("\033[A\033[A")  
+        #     print ("\033[A\033[A")
 
     def clear_log_dir(self):
         if self.save_plots:
@@ -172,27 +188,47 @@ class BaseTradeClass(ABC):
         # return self.visualizer([self.pos.prev, self.pos.curr], self.exp)
         return self.visualizer(self.get_pos_history() + [self.pos.curr], self.exp)
 
+    def log_trade(self, position: Position):
+        """Log trade information to a separate JSON file.
+
+        Args:
+            position: The Position object containing trade details
+        """
+        try:
+            trade_data = position.to_dict()
+            open_time_str = date2str(
+                position.open_date, 'ms').replace(':', '-')
+            trade_file = self.save_path / f"pos_{open_time_str}.json"
+            with open(trade_file, 'w') as f:
+                json.dump(trade_data, f, indent=2)
+            logger.debug(
+                f"Logged position for {position.ticker} to {trade_file}")
+
+        except Exception as e:
+            logger.error(f"Error logging trade: {e}")
+
     def update(self):
         self.h = self.get_hist()
         if self.visualize or self.save_plots:
             self.visualizer.update_hist(self.h)
         self.update_market_state()
-        
-        if self.pos.created() or self.pos.deleted() or self.pos.changed(): 
-            if self.pos.deleted(): 
-                logger.debug(f"position closed {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
+
+        if self.pos.created() or self.pos.deleted() or self.pos.changed():
+            if self.pos.deleted():
+                logger.debug(
+                    f"position closed {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
+                self.log_trade(self.pos.prev)
+
             if self.vis_events == Vis.ON_DEAL:
                 # process = multiprocessing.Process(target=self.vis())
                 # process.start()
                 self.vis()
                 # if self.my_telebot is not None:
                 #     self.my_telebot.send_image(saved_img_path)
-        
+
         if self.vis_events == Vis.ON_STEP:
-            self.vis()        
-        
+            self.vis()
+
         self.exp_update(self.h, self.pos.curr)
         if self.should_save_backup:
             self.save_backup()
-
-

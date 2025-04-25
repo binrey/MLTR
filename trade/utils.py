@@ -83,8 +83,6 @@ class Position:
         self.fees = 0
         self.fees_abs = 0
         self._update_fees(self.open_price, self.volume)
-
-        # Record price change events. Each tuple is (date, price)
         
         self.enter_points_hist.append((to_datetime(self.open_date), self.open_price))
         self.enter_price_hist.append((to_datetime(self.open_date), self.open_price))
@@ -211,4 +209,35 @@ class Position:
         return {"enter_points": Line(points=self.enter_points_hist, color='#8c8' if self.side == Side.BUY else '#c88'),
                 "enter_price": Line(points=self.enter_price_hist),
                 "volume": Line(points=self.volume_hist)}
+
+    def to_dict(self) -> dict:
+        """Convert position data to a dictionary that can be safely serialized to YAML.
+        
+        Returns:
+            dict: Dictionary containing all relevant position data in a YAML-serializable format
+        """
+        def convert_datetime(dt):
+            if dt is None:
+                return None
+            return pd.Timestamp(dt).isoformat()
+
+        return {
+            "ticker": self.ticker,
+            "side": str(self.side),
+            "volume": float(self.volume),
+            "open_price": float(self.open_price),
+            "close_price": float(self.close_price) if self.close_price is not None else None,
+            "fees_abs": float(self.fees_abs),
+            "stop_loss": float(self.sl) if self.sl is not None else None,
+            "take_profit": float(self.tp) if self.tp is not None else None,
+            "open_date": convert_datetime(self.open_date),
+            "close_date": convert_datetime(self.close_date),
+            "period": str(self.period),
+            "id": self.id,
+            "sl_history": [(convert_datetime(t), float(p)) for t, p in self.sl_hist],
+            "tp_history": [(convert_datetime(t), float(p)) for t, p in self.tp_hist],
+            "enter_points": [(convert_datetime(t), float(p)) for t, p in self.enter_points_hist],
+            "enter_prices": [(convert_datetime(t), float(p)) for t, p in self.enter_price_hist],
+            "volume_history": [(convert_datetime(t), float(v)) for t, v in self.volume_hist]
+        }
         

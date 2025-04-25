@@ -27,6 +27,7 @@ config = dict(
         type=FixRate,
         rate=0.02,
     ),
+    name=None,
     close_only_by_stops=False,
     hist_size=64,
     tstart=0,
@@ -46,13 +47,15 @@ config = dict(
 
 backtest = update_config(
     config,
-    date_start=np.datetime64("2018-01-01T00:00:00"),
+    name="backtest/volprof",
+    date_start=np.datetime64("2025-01-01T00:00:00"),
     date_end=np.datetime64("2025-05-01T00:00:00"),
     eval_buyhold=True,
 )
 
 optimization = update_config(
     config,
+    name="optimization/volprof",
     hist_size=[32, 64, 128, 256],
     trailing_stop={
         "rate": [0.03, 0.02, 0.01]
@@ -64,5 +67,6 @@ optimization = update_config(
 
 trading = update_config(
     config,
+    name="bybit/volprof",
     credentials="bybit_volprof",
 )

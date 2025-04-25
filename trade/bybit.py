@@ -43,6 +43,7 @@ class BybitTrading(BaseTradeClass):
     def __init__(self, cfg, telebot: Telebot, bybit_session: HTTP) -> None:
         self.session = bybit_session
         super().__init__(cfg=cfg, expert=ByBitExpert(cfg, bybit_session), telebot=telebot)
+        logger.info(f"Initialized BybitTrading with ticker: {self.ticker}, period: {self.period}")
 
     def get_server_time(self) -> np.datetime64:
         while True:
@@ -101,7 +102,7 @@ class BybitTrading(BaseTradeClass):
         t = self.time.curr
         data = None
         while data is None or t != data["Date"][-1]:
-            logger.debug(f"request history data for {t}...")
+            logger.debug(f"Requesting history data for {t}...")
             message = self.session.get_kline(
                 category="linear",
                 symbol=self.ticker,
@@ -117,7 +118,7 @@ class BybitTrading(BaseTradeClass):
         remaining_seconds = (next_update_time - self.get_server_time()).astype(int)
         while remaining_seconds > 0:
             minutes, seconds = divmod(remaining_seconds, 60)
-            print(f"wait {minutes}m {seconds}s until next update...", end="\r")
+            logger.debug(f"Waiting {minutes}m {seconds}s until next update...")
             sleep_time = min(10, remaining_seconds)
             sleep(sleep_time)
             remaining_seconds -= sleep_time
@@ -133,6 +134,7 @@ def launch(cfg, demo=False):
                          api_key=bybit_creds["api_key"],
                          api_secret=bybit_creds["api_secret"],
                          demo=demo)
+    logger.info(f"Starting Bybit trading session (demo={demo})")
     bybit_trading = BybitTrading(cfg=cfg,
                                  telebot=Telebot(bot_token), 
                                  bybit_session=bybit_session)
