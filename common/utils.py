@@ -43,13 +43,15 @@ class PyConfig():
         spec = importlib.util.spec_from_file_location("config", config_file)
         config_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(config_module)
-        self.backetest = config_module.backtest
-        self.trading = None
-        if hasattr(config_module, "trading"):
-            self.trading = config_module.trading
-        self.optim = None
-        if hasattr(config_module, "optimization"):
-            self.optim = config_module.optimization
+        self.base_config = config_module
+        self.optim, self.backetest, self.trading = None, None, None
+        if hasattr(self.base_config, "backtest"):
+            self.backetest = self.base_config.backtest
+        if hasattr(self.base_config, "trading"):
+            self.trading = self.base_config.trading
+
+        if hasattr(self.base_config, "optimization"):
+            self.optim = self.base_config.optimization
 
     def _get_inference(self, cfg):
         cfg_compiled = deepcopy(cfg)
@@ -60,6 +62,18 @@ class PyConfig():
             else:
                 cfg_compiled[k] = v
         return cfg_compiled
+    
+    def get_info(self) -> tuple[str, str, str]:
+        for submodule in self.base_config.__dict__.values():
+            if not isinstance(submodule, dict):
+                continue
+            if all(key in submodule for key in ["decision_maker", "symbol", "period"]):
+                return (
+                    submodule["decision_maker"]["type"].type,
+                    submodule["symbol"].ticker,
+                    submodule["period"].value
+                )
+        return None, None, None
     
     def get_backtest(self):
         return self._get_inference(self.backetest)
@@ -161,8 +175,8 @@ class FeeConst(FeeModel):
 def date2str(date: np.datetime64 | pd.Timestamp, step="s") -> str:
     if isinstance(date, pd.Timestamp):
         return date.strftime("%Y-%m-%d %H:%M:%S")
-    elif isinstance(date, np.datetime64):   
-        return np.datetime_as_string(date.astype(f"datetime64[{step}]"))
+    elif isinstance(date, np.datetime64):
+        return np.datetime_as_string(date.astype(f"datetime64[{step}]"), unit=step).replace("T", " ")
     else:
         raise ValueError(f"Invalid date type: {type(date)}")
 

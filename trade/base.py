@@ -79,7 +79,10 @@ class BaseTradeClass(ABC):
         self.hist_size = cfg['hist_size']
         self.save_path = Path("logs") / cfg["name"] / f"{self.ticker}-{self.period.value}"
         self.save_path.mkdir(parents=True, exist_ok=True)
-        self.backup_path = self.save_path / "backup.pkl"
+        self.backup_path = self.save_path / "backup" / "backup.pkl"
+        self.backup_path.mkdir(parents=True, exist_ok=True)
+        self.trades_log_path = self.save_path / "positions"
+        self.trades_log_path.mkdir(parents=True, exist_ok=True)
 
         self.visualizer = Visualizer(period=self.period,
                                      show=self.visualize,
@@ -114,19 +117,6 @@ class BaseTradeClass(ABC):
         trounded = np.array(time).astype(
             "datetime64[m]").astype(int)//self.nmin
         return np.datetime64(int(trounded*self.nmin), "m")
-
-    def _get_next_trades_log_path(self) -> Path:
-        """Get the next available filename for trades log.
-
-        Returns:
-            Path: Path to the next available trades log file
-        """
-        base_path = self.save_path / "trades.json"
-        counter = 1
-        while base_path.exists():
-            base_path = self.save_path / f"trades_{counter}.json"
-            counter += 1
-        return base_path
 
     def handle_trade_message(self, message):
         self.server_time = self.get_server_time()
@@ -198,7 +188,7 @@ class BaseTradeClass(ABC):
             trade_data = position.to_dict()
             open_time_str = date2str(
                 position.open_date, 'ms').replace(':', '-')
-            trade_file = self.save_path / f"pos_{open_time_str}.json"
+            trade_file = self.trades_log_path / f"{open_time_str}.json"
             with open(trade_file, 'w') as f:
                 json.dump(trade_data, f, indent=2)
             logger.debug(

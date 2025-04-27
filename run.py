@@ -18,6 +18,8 @@ from trade.bybit import launch as bybit_launch
 
 load_dotenv()
 
+LOG_DIR = "logs"
+
 def run_backtest(config_path):
     cfg = PyConfig(config_path).get_backtest()
     cfg["save_backup"] = False
@@ -96,11 +98,12 @@ if __name__ == "__main__":
                    "<level>{level: <8}</level> | "
                    "<level>{message}</level>"
                ))
-    LOG_DIR = f"logs/{run_type.value}"
+
     if not os.path.exists(LOG_DIR):
         os.makedirs(LOG_DIR)
 
-    log_file_path = os.path.join(LOG_DIR, f"{datetime.now()}.log")
+    decision_maker, symbol, period = PyConfig(args.config_paths[0]).get_info()
+    log_file_path = os.path.join(LOG_DIR, run_type.value, f"{decision_maker}", f"{symbol}-{period}", "log_records", f"{datetime.now()}.log")
     logger.add(log_file_path, level=LOG_LEVEL,
                format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}", rotation="10 MB")
 
