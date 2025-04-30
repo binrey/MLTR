@@ -72,8 +72,10 @@ class Position:
         self.volume_hist: List[Point] = []
 
         # Record the initial stop-loss and take-profit if provided.
-        self.update_sl(sl=float(sl) if sl is not None else sl, time=self.open_date)
-        self.update_tp(tp=float(tp) if tp is not None else tp, time=self.open_date)
+        if sl is not None:
+            self.update_sl(sl=float(sl), time=self.open_date)
+        if tp is not None:
+            self.update_tp(tp=float(tp), time=self.open_date)
 
         self.close_price = None
         self.close_date = None
@@ -101,14 +103,12 @@ class Position:
     def update_sl(self, sl: float, time: np.datetime64):
         assert not (self.sl is not None and sl is None), "Set sl to None is not allowed"
         self.sl = sl
-        if sl is not None:
-            self.sl_hist.append((time, sl))
+        self.sl_hist.append((time, sl))
 
     def update_tp(self, tp: float, time: np.datetime64):
         assert not (self.tp is not None and tp is None), "Set tp to None is not allowed"
         self.tp = tp
-        if tp is not None:
-            self.tp_hist.append((time, tp))
+        self.tp_hist.append((time, tp))
 
     def _update_fees(self, price, volume):
         self.fees_abs += self.fee_rate.order_execution_fee(price, volume)

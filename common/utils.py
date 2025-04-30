@@ -1,7 +1,11 @@
 import importlib.util
+import os
+import shutil
+import sys
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +16,8 @@ import telebot
 from easydict import EasyDict
 from loguru import logger
 from PIL import Image
+
+from common.type import RunType
 
 
 def name_from_cfg(cfg, name):
@@ -206,9 +212,32 @@ class Telebot:
 
 
 def date2name(date, prefix=None):
-    s = str(np.array(date).astype('datetime64[s]')).split('.')[0].replace(":", "-") 
+    s = str(np.array(date).astype('datetime64[s]')).split('.')[0].replace(":", "-")
     if prefix is not None and len(prefix) > 0:
         s += f"-{prefix}"
     return s + ".png"
 
 
+class Logger:
+    def __init__(self, log_dir: str, log_level: str):
+        self.log_dir = Path(log_dir)
+        self.log_level = log_level
+
+    def initialize(self, decision_maker: str, symbol: str, period: str, clear_log: bool):
+        if clear_log:
+            if self.log_dir.exists():
+                shutil.rmtree(self.log_dir)
+        if not self.log_dir.exists():
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+        logger.remove()
+        logger.add(sys.stderr, level=self.log_level,
+                format=(
+                    "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+                    "<level>{level: <8}</level> | "
+                    "<level>{message}</level>"
+                ))
+        log_file_path = os.path.join(self.log_dir, f"{decision_maker}", f"{symbol}-{period}", "log_records", f"{datetime.now()}.log")
+        logger.add(log_file_path, level=self.log_level,
+                format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}", rotation="10 MB")
+        
+        os.environ["LOG_DIR"] = str(self.log_dir)

@@ -9,7 +9,7 @@ from data_processing.dataloading import DTYPE
 from trade.utils import Position
 
 pd.options.mode.chained_assignment = None
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -23,10 +23,10 @@ from trade.base import BaseTradeClass, log_get_hist
 stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen
- 
+
 def get_bybit_hist(mresult, size):
     data = np.zeros(size, dtype=DTYPE)
-    
+
     input = np.array(mresult["list"], dtype=np.float64)[::-1]
     data['Id'] = input[:, 0].astype(np.int64)
     data['Date'] = data['Id'].astype("datetime64[ms]")
@@ -35,7 +35,7 @@ def get_bybit_hist(mresult, size):
     data['Low'] = input[:, 3]
     data['Close'] = input[:, 4]
     data['Volume'] = input[:, 5].astype(np.int64)
-    
+
     return data
 
 
@@ -53,49 +53,69 @@ class BybitTrading(BaseTradeClass):
             except Exception as e:
                 logger.error(f"Error getting server time: {e}")
                 sleep(1)
-       
+
     def to_datetime(self, timestamp: Union[int, float]) -> np.datetime64:
         return np.datetime64(int(timestamp), "ms")
-    
+
     def get_pos_history(self, limit=5):
-        positions = self.session.get_closed_pnl(category="linear", limit=limit)["result"]["list"]
-        positions = [self._build_position(pos) for pos in positions if pos["symbol"] == self.ticker]
+        positions = self.session.get_closed_pnl(category="linear", 
+                                                symbol=self.ticker, 
+                                                limit=limit)["result"]["list"]
         return positions
 
     def get_current_position(self):
-            positions = self.session.get_positions(category="linear", symbol=self.ticker)["result"]["list"]
-            positions = [pos for pos in positions if pos["size"] != "0"]
-            return self._build_position(positions[0]) if len(positions) else None
-                
+        pos_object: Optional[Position] = None
+        open_positions = self.session.get_positions(category="linear", symbol=self.ticker)["result"]["list"]
+        open_positions = [pos for pos in open_positions if pos["size"] != "0"]
+        if self.pos.curr:
+            if len(open_positions) == 0:
+                pos_dict = self.get_pos_history(1)[0]
+                self.pos.curr.close(
+                    price=float(pos_dict["avgExitPrice"]),
+                    date=self.to_datetime(pos_dict["updatedTime"]),
+                    indx=int(pos_dict["updatedTime"])
+                    )
+            else:
+                pos_dict = open_positions[0]
+                ticker, price, volume, sl, side, date = self._parse_bybit_position(pos_dict)
+                pos_object = self.pos.curr
+                if sl is not None:
+                    pos_object.update_sl(sl, self.time.prev)
+                # TODO: add to position
+                # pos_object.add_to_position()
+                # TODO: update tp
+                # pos_object.update_tp(pos["takeProfit"], self.time.prev)
+
+        elif len(open_positions):
+            pos_dict = open_positions[0]
+            ticker, price, volume, sl, side, date = self._parse_bybit_position(pos_dict)
+            pos_object = Position(
+                price=float(price),
+                date=date,
+                indx=0,
+                side=side,
+                ticker=ticker,
+                volume=volume,
+                period=self.period,
+                sl=sl,
+            )
+        return pos_object
+    
     def get_qty_step(self):
         msg = self.session.get_instruments_info(
             category="linear",
             symbol=self.ticker,
         )["result"]
         return float(msg["list"][0]["lotSizeFilter"]["qtyStep"])
-                
-    def _build_position(self, pos: Dict[str, Any]):
-        if "avgEntryPrice" in pos.keys():
-            price = pos["avgEntryPrice"]
-        else:
-            price = pos.get("avgPrice", 0)
 
-        pos_object = Position(
-            price=float(price),
-            date=self.to_datetime(pos["updatedTime"]),
-            indx=0,
-            side=Side.from_str(pos["side"]),
-            ticker=pos["symbol"],
-            volume=float(pos["closedSize"] if "closedSize" in pos else pos["size"]),
-            period=self.period,
-            sl=float(pos["stopLoss"]) if "stopLoss" in pos and len(pos["stopLoss"]) else None,
-            )    
-        if "avgExitPrice" in pos.keys():
-            pos_object.close(price=float(pos["avgExitPrice"]),
-                      date=self.to_datetime(pos["updatedTime"]),
-                      indx=int(pos["updatedTime"])
-                      )
-        return pos_object
+    def _parse_bybit_position(self, pos: Dict[str, Any]):
+        sl = float(pos["stopLoss"]) if "stopLoss" in pos and len(pos["stopLoss"]) else None
+        volume = float(pos["closedSize"] if "closedSize" in pos else pos["size"])
+        date = self.to_datetime(pos["updatedTime"])
+        side = Side.from_str(pos["side"])
+        ticker = pos["symbol"]
+        price = pos["avgEntryPrice"] if "avgEntryPrice" in pos else pos.get("avgPrice", 0)
+        return ticker, price, volume, sl, side, date
 
     @log_get_hist
     def get_hist(self):
@@ -113,7 +133,7 @@ class BybitTrading(BaseTradeClass):
             )
             data = get_bybit_hist(message["result"], self.hist_size)
         return data
-    
+
     def wait_until_next_update(self, next_update_time):
         remaining_seconds = (next_update_time - self.get_server_time()).astype(int)
         while remaining_seconds > 0:
@@ -129,17 +149,17 @@ def launch(cfg, demo=False):
         api = yaml.safe_load(f)
     bybit_creds = api["bybit_demo"] if demo else api[cfg["credentials"]]
     bot_token = api["bot_token"]
-    
+
     bybit_session = HTTP(testnet=False,
                          api_key=bybit_creds["api_key"],
                          api_secret=bybit_creds["api_secret"],
                          demo=demo)
     logger.info(f"Starting Bybit trading session (demo={demo})")
     bybit_trading = BybitTrading(cfg=cfg,
-                                 telebot=Telebot(bot_token), 
+                                 telebot=Telebot(bot_token),
                                  bybit_session=bybit_session)
     bybit_trading.initialize()
-    
+
     print()
     while True:
         bybit_trading.handle_trade_message(None)

@@ -1,8 +1,9 @@
 import json
 import multiprocessing
+import os
 import pickle
 from abc import ABC, abstractmethod
-from copy import copy
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -44,7 +45,7 @@ class StepData:
     prev: Any = None
 
     def update(self, curr_value: Any):
-        self.prev = copy(self.curr)
+        self.prev = deepcopy(self.curr)
         self.curr = curr_value
 
     def changed(self, no_none=False) -> bool:
@@ -77,9 +78,9 @@ class BaseTradeClass(ABC):
         self.should_save_backup = cfg.get('save_backup', False)
         self.ticker = cfg['symbol'].ticker
         self.hist_size = cfg['hist_size']
-        self.save_path = Path("logs") / cfg["name"] / f"{self.ticker}-{self.period.value}"
+        self.save_path = Path(os.getenv("LOG_DIR"), cfg["name"], f"{self.ticker}-{self.period.value}")
         self.save_path.mkdir(parents=True, exist_ok=True)
-        self.backup_path = self.save_path / "backup" / "backup.pkl"
+        self.backup_path = self.save_path / "backup"
         self.backup_path.mkdir(parents=True, exist_ok=True)
         self.trades_log_path = self.save_path / "positions"
         self.trades_log_path.mkdir(parents=True, exist_ok=True)
@@ -92,6 +93,7 @@ class BaseTradeClass(ABC):
         self.time = StepData()
         self.serv_time = None
         self.exp_update = self.exp.update
+        self.log_config()
 
     @abstractmethod
     def get_server_time(self) -> np.datetime64:
@@ -145,19 +147,21 @@ class BaseTradeClass(ABC):
             self.save_path.mkdir(parents=True, exist_ok=True)
 
     def save_backup(self):
+        backup_file = self.backup_path / "backup.pkl"
         backup_data = {
             "active_position": self.pos
         }
-        with open(self.backup_path, "wb") as f:
+        with open(backup_file, "wb") as f:
             pickle.dump(backup_data, f)
-        logger.debug(f"backup saved to {self.backup_path}")
+        logger.debug(f"backup saved to {backup_file}")
 
     def load_backup(self):
-        if self.backup_path.exists():
-            with open(self.backup_path, "rb") as f:
+        backup_file = self.backup_path / "backup.pkl"
+        if backup_file.exists():
+            with open(backup_file, "rb") as f:
                 backup_data = pickle.load(f)
             self.pos = backup_data["active_position"]
-            logger.debug(f"backup loaded from {self.backup_path}")
+            logger.debug(f"backup loaded from {backup_file}")
         else:
             logger.debug("no backup found")
 
@@ -172,11 +176,18 @@ class BaseTradeClass(ABC):
     def update_market_state(self) -> None:
         cur_pos = self.get_current_position()
         self.pos.update(cur_pos)
-        logger.debug(f"update market state: current position: {self.pos.curr}")
+        logger.debug(f"update_market_state: current position: {self.pos.curr}")
 
     def vis(self):
         # return self.visualizer([self.pos.prev, self.pos.curr], self.exp)
         return self.visualizer(self.get_pos_history() + [self.pos.curr], self.exp)
+
+    def log_config(self):
+        config_file = self.save_path / "config.pkl"
+        # with open(config_file, 'w') as f:
+        #     json.dump(self.cfg, f, indent=2)
+        pickle.dump(self.cfg, open(config_file, "wb"))
+        logger.debug(f"Config saved to {config_file}")
 
     def log_trade(self, position: Position):
         """Log trade information to a separate JSON file.

@@ -1,11 +1,15 @@
+import os
 from datetime import datetime
 from pathlib import Path
 
 import mplfinance as mpf
 import numpy as np
 import pandas as pd
+from dotenv import load_dotenv
 from pybit.unified_trading import HTTP
 
+load_dotenv()
+FINDATA = os.getenv("FINDATA", "fin_data")
 
 class BybitDownloader:
     def __init__(self, symbol, period, start_date=None, init_data=None):
@@ -80,17 +84,17 @@ class BybitDownloader:
 
 
 if __name__ == "__main__":
-    symbol = "ETHUSDT"
-    period = 60
-    init_data = f"/Users/andrybin/Yandex.Disk.localized/fin_data/bybit/M{period}/{symbol}.csv"
-    bb_loader = BybitDownloader(symbol=symbol, 
-                                period=period, 
-                                start_date="2018-01-01",
+    symbol = "BTCUSDT"
+    period = 1
+    init_data = Path(FINDATA) / f"bybit/M{period}/{symbol}.csv"
+    bb_loader = BybitDownloader(symbol=symbol,
+                                period=period,
+                                start_date="2025-04-01",
                                 init_data=init_data
                                 )
 
     h = bb_loader.get_history()
     h.to_csv(init_data)
-    
+
     print(h)
     mpf.plot(h, type='line')

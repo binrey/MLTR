@@ -75,28 +75,29 @@ class VolProf(DecisionMaker):
         order_side, target_volume_fraction = None, 1
         self.indicator.update(h)
         max_vol_id = self.indicator.vol_hist.argmax()
-        
+
         if self.indicator.vol_hist[max_vol_id] / self.indicator.vol_hist.mean() > self.sharpness:
             if self.strategy == self.Levels.MANUAL:
                 self.lprice, self.sprice = self._find_prices_manual_levels(h, max_vol_id)
             else:  # AUTO_LEVELS
                 self.lprice, self.sprice = self._find_prices_auto_levels(h)
-                
+
+            self.lprice, self.sprice = 1, 2
             if self.lprice is not None and self.sprice is not None:
                 self.sl_definer[Side.BUY] = self.sprice
                 self.sl_definer[Side.SELL] = self.lprice
                 self.set_draw_objects(h["Date"][-2])
                 self.draw_items += self.indicator.vis_objects
 
-        strike = h["Close"][-2] - h["Open"][-2]
-        max_body = max(np.maximum(h["Open"][:-2], h["Close"][:-2]) - np.minimum(h["Open"][:-2], h["Close"][:-2]))
+        strike = 1#h["Close"][-2] - h["Open"][-2]
+        max_body = 0#max(np.maximum(h["Open"][:-2], h["Close"][:-2]) - np.minimum(h["Open"][:-2], h["Close"][:-2]))
         logger.debug(f"check condition curr. body ({abs(strike):.2f}) > max. body ({max_body:.3f})")
         if abs(strike) > max_body:
-            if self.lprice:
+            if self.lprice is not None :
                 if strike > 0 and h["Close"][-2] > self.sprice:
                     order_side = Side.BUY
 
-            if self.sprice:
+            if self.sprice is not None:
                 if strike < 0 and h["Close"][-2] < self.lprice:
                     order_side = Side.SELL
 

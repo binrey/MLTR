@@ -137,34 +137,34 @@ class ExpertFormation(ExpertBase):
                                volume=order_volume,
                                time_id=h["Id"][-1])
             
-            
+
 class BacktestExpert(ExpertFormation):
     def __init__(self, cfg, session: Broker):
         self.cfg = cfg
         self.session = session
         super(BacktestExpert, self).__init__(cfg)
-        
+
     def create_orders(self, *, side, volume, time_id):
         self.orders = [Order(0, side, ORDER_TYPE.MARKET, volume, time_id, time_id)]
         log_message = f"{time_id} send order {self.orders[0]}"
 
         self.session.set_active_orders(self.orders)
         logger.debug(log_message)
-    
+
     @log_modify_sl    
     def modify_sl(self, sl: Optional[float]):
         self.session.update_sl(sl)
 
     @log_modify_tp
     def modify_tp(self, tp: Optional[float]):
-        self.session.update_tp(tp)        
-            
+        self.session.update_tp(tp)
+
 class ByBitExpert(ExpertFormation):
     def __init__(self, cfg, session: HTTP):
         self.cfg = cfg
         self.session = session
         super(ByBitExpert, self).__init__(cfg)
-        
+
     def create_orders(self, *, side, volume, time_id=None):
         try:
             resp = self.session.place_order(
@@ -182,7 +182,7 @@ class ByBitExpert(ExpertFormation):
         except Exception as ex:
             logger.error(ex)
 
-    @log_modify_sl 
+    @log_modify_sl
     def modify_sl(self, sl: Optional[float]):
         if sl is None:
             return
@@ -194,7 +194,7 @@ class ByBitExpert(ExpertFormation):
             )
         except Exception as ex:
             logger.error(ex)
-            
+
     @log_modify_tp
     def modify_tp(self, tp: Optional[float]):
         if tp is None:

@@ -124,7 +124,7 @@ class BackTestResults:
         close_prices = df.resample("D").last()["price"]
         self.daily_hist["buy_and_hold"] = (close_prices - close_prices[0]) * self.wallet/close_prices[0]
         self.daily_hist["buy_and_hold"].iloc[-1] = self.daily_hist["buy_and_hold"].iloc[-2]
-        
+
         self.daily_hist["unrealized_profit"] = -self.daily_hist["buy_and_hold"].diff() * np.sign(self.daily_hist["profit_csum_nofees"])
         return perf_counter() - t0
 

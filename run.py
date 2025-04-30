@@ -2,8 +2,6 @@
 
 import argparse
 import os
-import sys
-from datetime import datetime
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -11,28 +9,24 @@ from loguru import logger
 from backtesting.cross_validation import CrossValidation
 from backtesting.optimization import Optimizer
 from common.type import RunType
-from common.utils import PyConfig
+from common.utils import Logger, PyConfig
 from trade.backtest import launch as backtest_launch
 from trade.backtest import launch_multirun
 from trade.bybit import launch as bybit_launch
 
 load_dotenv()
 
-LOG_DIR = "logs"
-
-def run_backtest(config_path):
-    cfg = PyConfig(config_path).get_backtest()
+def run_backtest(cfg: PyConfig):
+    logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, True)
     cfg["save_backup"] = False
     backtest_launch(cfg)
 
 
-def run_multirun(config_paths):
-    cfgs = [PyConfig(path).get_backtest() for path in config_paths]
+def run_multirun(cfgs: list[PyConfig]):
     launch_multirun(cfgs)
 
 
-def run_optimization(config_path, run_backtests):
-    cfg = PyConfig(config_path).get_optimization()
+def run_optimization(cfg: PyConfig, run_backtests):
     cfg["visualize"] = False
     cfg["save_backup"] = False
     cfg["save_plots"] = False
@@ -44,16 +38,15 @@ def run_optimization(config_path, run_backtests):
     logger.info(f"\n{str(results)}")
 
 
-def run_bybit(config_path, demo=False):
-    cfg = PyConfig(config_path).get_trading()
+def run_bybit(cfg: PyConfig, demo=False):
+    logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, True)
     cfg["save_backup"] = True
     cfg["save_plots"] = False
     cfg["visualize"] = False
     bybit_launch(cfg, demo)
 
 
-def run_cross_validation(config_path):
-    cfg = PyConfig(config_path).get_optimization()
+def run_cross_validation(cfg: PyConfig):
     cfg["visualize"] = False
     cfg["save_backup"] = False
     cfg["save_plots"] = False
@@ -90,32 +83,20 @@ if __name__ == "__main__":
 
     run_type = RunType.from_str(args.run_type)
 
-    LOG_LEVEL = "DEBUG" if args.debug else "INFO"
-    logger.remove()
-    logger.add(sys.stderr, level=LOG_LEVEL,
-               format=(
-                   "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-                   "<level>{level: <8}</level> | "
-                   "<level>{message}</level>"
-               ))
+    logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), run_type.value),
+                            log_level="DEBUG" if args.debug else "INFO")
 
-    if not os.path.exists(LOG_DIR):
-        os.makedirs(LOG_DIR)
-
-    decision_maker, symbol, period = PyConfig(args.config_paths[0]).get_info()
-    log_file_path = os.path.join(LOG_DIR, run_type.value, f"{decision_maker}", f"{symbol}-{period}", "log_records", f"{datetime.now()}.log")
-    logger.add(log_file_path, level=LOG_LEVEL,
-               format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}", rotation="10 MB")
+    cfgs = [PyConfig(path) for path in args.config_paths]
 
     if run_type == RunType.BYBIT:
-        run_bybit(args.config_paths[0], args.debug)
+        run_bybit(cfgs[0].get_trading(), args.debug)
     elif run_type == RunType.OPTIMIZE:
-        run_optimization(args.config_paths[0], args.run_backtests)
+        run_optimization(cfgs[0].get_optimization(), args.run_backtests)
     elif run_type == RunType.MULTIRUN:
-        run_multirun(args.config_paths)
+        run_multirun([cfg.get_backtest() for cfg in cfgs])
     elif run_type == RunType.BACKTEST:
-        run_backtest(args.config_paths[0])
+        run_backtest(cfgs[0].get_backtest())
     elif run_type == RunType.CROSS_VALIDATION:
-        run_cross_validation(args.config_paths[0])
+        run_cross_validation(cfgs[0].get_optimization())
     else:
         raise ValueError(f"Invalid run type: {run_type}")

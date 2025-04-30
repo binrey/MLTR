@@ -18,7 +18,7 @@ class Broker:
         self.positions: List[Position] = []
         self.orders = []
         self.profit_hist = {"dates": [], "profit_csum_nofees": [], "fees_csum": []}
-        
+
         self.time = None
         self.hist_id = None
         self.open_price = None
@@ -45,18 +45,18 @@ class Broker:
             self.time = self.hist_window["Date"][-1]
             self.hist_id = self.hist_window["Id"][-1]
             self.open_price = self.hist_window["Open"][-1]
-            
+
             closed_position = self.update()
             callback({"timestamp": self.time})  # TODO remove time
-            closed_position_new = self.update()
+            closed_position_new = self.update(check_sl_tp=False)
             if closed_position is None:
                 if closed_position_new is not None:
                     closed_position = closed_position_new
             elif closed_position_new is not None:
-                if self.update() is not None:
+                if self.update(check_sl_tp=False) is not None:
                     raise ValueError("closed positions disagreement!")
             self.update_profit_curve(closed_position)
-            
+
         if self.active_position is not None:
             self.update_profit_curve(
                 self.close_active_pos(price=self.open_price,
@@ -77,7 +77,7 @@ class Broker:
         if closed_position is not None:
             self.cumulative_profit += closed_position.profit_abs
             self.cumulative_fees += closed_position.fees_abs
-        
+
         active_profit = 0
         # If an active position exists, add its unrealized profit
         if self.active_position is not None:
@@ -120,13 +120,13 @@ class Broker:
         self.positions.append(closed_position)
         return closed_position
 
-    def update(self):
+    def update(self, check_sl_tp=True):
         closed_position = None
         last_low = self.hist_window["Low"][-2]
         last_high = self.hist_window["High"][-2]
         last_time = self.hist_window["Date"][-2]
         last_hist_id = self.hist_window["Id"][-2]
-        
+
         if self.active_position is not None and self.active_position.sl is not None:
             self.active_orders.append(Order(
                             price=self.active_position.sl, 
@@ -144,9 +144,10 @@ class Broker:
                             volume=self.active_position.volume,
                             indx=self.active_position.open_indx, 
                             time=self.active_position.open_date))
-            
+
         for i, order in enumerate(self.active_orders):
             triggered_price: float = None
+            triggered_id = None
             triggered_side: Optional[Side] = None
             triggered_date: np.datetime64 = None
             if order.type == ORDER_TYPE.MARKET and order.open_indx == self.hist_id:
@@ -161,7 +162,9 @@ class Broker:
                     order.volume,
                 )
                 # order.change(self.hist_id, self.open_price)
-            if order.type in (ORDER_TYPE.LIMIT, ORDER_TYPE.STOPLOSS, ORDER_TYPE.TAKEPROF) and order.open_indx != self.hist_id:
+            if (check_sl_tp and
+                order.type in (ORDER_TYPE.LIMIT, ORDER_TYPE.STOPLOSS, ORDER_TYPE.TAKEPROF) and
+                order.open_indx != self.hist_id):
                 if (last_low > order.price and self.open_price < order.price) or (
                     last_high < order.price and self.open_price > order.price
                 ):
@@ -187,7 +190,7 @@ class Broker:
                         order.volume,
                     )
 
-            if triggered_price is not None:
+            if triggered_price is not None and triggered_id is not None:
                 self.close_orders(triggered_id, i)
                 if self.active_position is not None:
                     if self.active_position.side.value * triggered_side.value < 0:

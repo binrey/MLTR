@@ -11,13 +11,16 @@ class Side(Enum):
     SELL = -1
 
     @staticmethod
-    def from_str(side: str):
+    def from_str(side: str, none_if_invalid=True):
         if side.lower() == "buy":
             return Side.BUY
         elif side.lower() == "sell":
             return Side.SELL
         else:
-            raise ValueError(f"{side} is not valid value, set ['buy' or 'sell']")
+            if none_if_invalid:
+                return None
+            else:
+                raise ValueError(f"{side} is not valid value, set ['buy' or 'sell']")
 
     @staticmethod
     def from_int(side: int):

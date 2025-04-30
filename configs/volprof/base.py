@@ -6,8 +6,6 @@ from experts.position_control import FixRate, SLDynamic, SLFixed, TPFromSL, Trai
 from experts.volprof import VolProf
 
 config = dict(
-    wallet=100,
-    leverage=1,
     decision_maker=dict(
         type=VolProf,
         sharpness=0,
@@ -27,7 +25,10 @@ config = dict(
         type=FixRate,
         rate=0.02,
     ),
-    name=None,
+    
+    name="volprof",
+    wallet=100,
+    leverage=1,
     close_only_by_stops=False,
     hist_size=64,
     tstart=0,
@@ -43,6 +44,7 @@ config = dict(
     visualize=False,
     run_model_device=None,
     no_trading_days=set(),
+    clear_logs=False,
 )
 
 backtest = update_config(
@@ -50,12 +52,12 @@ backtest = update_config(
     name="backtest/volprof",
     date_start=np.datetime64("2025-01-01T00:00:00"),
     date_end=np.datetime64("2025-05-01T00:00:00"),
-    eval_buyhold=True,
+    eval_buyhold=False,
+    clear_logs=True
 )
 
 optimization = update_config(
     config,
-    name="optimization/volprof",
     hist_size=[32, 64, 128, 256],
     trailing_stop={
         "rate": [0.03, 0.02, 0.01]
@@ -67,6 +69,5 @@ optimization = update_config(
 
 trading = update_config(
     config,
-    name="bybit/volprof",
     credentials="bybit_volprof",
 )
