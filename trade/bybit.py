@@ -90,7 +90,7 @@ class BybitTrading(BaseTradeClass):
             pos_dict = open_positions[0]
             ticker, price, volume, sl, side, date = self._parse_bybit_position(pos_dict)
             pos_object = Position(
-                price=float(price),
+                open_price=float(price),
                 date=date,
                 indx=0,
                 side=side,

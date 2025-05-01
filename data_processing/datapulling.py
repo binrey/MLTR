@@ -1,32 +1,30 @@
-import os
 from datetime import datetime
 from pathlib import Path
 
 import mplfinance as mpf
 import numpy as np
 import pandas as pd
-from dotenv import load_dotenv
 from pybit.unified_trading import HTTP
 
-load_dotenv()
-FINDATA = os.getenv("FINDATA", "fin_data")
+from common.type import Symbol, TimePeriod
+
 
 class BybitDownloader:
-    def __init__(self, symbol, period, start_date=None, init_data=None):
-        self.symbol = symbol
-        self.period = period
+    def __init__(self, symbol: Symbol, period: TimePeriod, start_date=None, init_data=None):
+        self.symbol = symbol.ticker
+        self.period = period.minutes
         self.init_data = init_data
-        self.start_date = start_date if type(start_date) is pd.Timestamp else pd.to_datetime(start_date)
+        self.start_date = start_date if isinstance(start_date, pd.Timestamp) else pd.to_datetime(start_date)
         self.init_dirs()
-        
+
     def init_dirs(self):
         if self.init_data is not None:
             self.init_data = Path(self.init_data)
             if not self.init_data.exists():
                 self.init_data.parent.mkdir(parents=True, exist_ok=True)
                 self.init_data = None
-        
-    def get_klines(self, start_date, size: int=1000, end: datetime=None): 
+
+    def get_klines(self, start_date, size: int=1000, end: datetime=None):
         if start_date is not None and isinstance(start_date, datetime):
             start_date=start_date.timestamp()*1000
         if end is not None and isinstance(end, datetime):
@@ -65,7 +63,6 @@ class BybitDownloader:
         data.set_index(data.Date, drop=True, inplace=True)
         data.drop("Date", axis=1, inplace=True)
         return data
-                
 
     def get_history(self):
         if self.init_data is not None:
@@ -84,17 +81,20 @@ class BybitDownloader:
 
 
 if __name__ == "__main__":
-    symbol = "BTCUSDT"
-    period = 1
-    init_data = Path(FINDATA) / f"bybit/M{period}/{symbol}.csv"
-    bb_loader = BybitDownloader(symbol=symbol,
-                                period=period,
-                                start_date="2025-04-01",
-                                init_data=init_data
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("--symbol", type=str, default="BTCUSDT")
+    parser.add_argument("--period", type=int, default=1)
+    parser.add_argument("--start_date", type=str, default="2025-04-20")
+    parser.add_argument("--init_data", type=str, default=None)
+    args = parser.parse_args()
+
+    bb_loader = BybitDownloader(symbol=args.symbol,
+                                period=args.period,
+                                start_date=args.start_date,
+                                init_data=args.init_data
                                 )
+    hist = bb_loader.get_history().to_csv(args.init_data)
 
-    h = bb_loader.get_history()
-    h.to_csv(init_data)
-
-    print(h)
-    mpf.plot(h, type='line')
+    print(hist)
+    mpf.plot(hist, type='line')

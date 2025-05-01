@@ -17,8 +17,6 @@ from easydict import EasyDict
 from loguru import logger
 from PIL import Image
 
-from common.type import RunType
-
 
 def name_from_cfg(cfg, name):
     return name + ":" + "-".join([f"{v}" for k, v in cfg.items()])
@@ -239,5 +237,3 @@ class Logger:
         log_file_path = os.path.join(self.log_dir, f"{decision_maker}", f"{symbol}-{period}", "log_records", f"{datetime.now()}.log")
         logger.add(log_file_path, level=self.log_level,
                 format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}", rotation="10 MB")
-        
-        os.environ["LOG_DIR"] = str(self.log_dir)

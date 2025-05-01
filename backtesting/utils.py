@@ -23,7 +23,7 @@ class BackTestResults:
         self.tickers = set()
         self.wallet = 0
         self.ndeals = 0
-        self.deals_hist = None
+        self.positions = []
         self.fig = None
         self.legend_ax1 = []
         
@@ -49,6 +49,8 @@ class BackTestResults:
         self.ndeals += len(bktest_broker.positions)
         self.wallet += bktest_broker.cfg["wallet"]
         self.tickers.update([pos.ticker for pos in bktest_broker.positions])
+        self.positions.extend(bktest_broker.positions)
+        
         daily_hist, monthly_hist = self.process_profit_hist(bktest_broker.profit_hist)
         
         if self.daily_hist.empty:

@@ -1,3 +1,4 @@
+import json
 from enum import Enum
 from typing import Any, List, Optional
 
@@ -6,7 +7,7 @@ import pandas as pd
 from loguru import logger
 
 from common.type import Line, Point, Side, to_datetime
-from common.utils import FeeConst, FeeModel, date2str
+from common.utils import FeeConst, FeeModel
 
 
 class ORDER_TYPE(Enum):
@@ -79,6 +80,7 @@ class Position:
 
         self.close_price = None
         self.close_date = None
+        self.close_indx = None
         self.profit = None
         self.profit_abs = None
         self.fee_rate = fee_rate if fee_rate is not None else FeeConst(0, 0)
@@ -231,7 +233,9 @@ class Position:
             "stop_loss": float(self.sl) if self.sl is not None else None,
             "take_profit": float(self.tp) if self.tp is not None else None,
             "open_date": convert_datetime(self.open_date),
+            "open_indx": int(self.open_indx),
             "close_date": convert_datetime(self.close_date),
+            "close_indx": int(self.close_indx),
             "period": str(self.period),
             "id": self.id,
             "sl_history": [(convert_datetime(t), float(p)) for t, p in self.sl_hist],
@@ -241,3 +245,52 @@ class Position:
             "volume_history": [(convert_datetime(t), float(v)) for t, v in self.volume_hist]
         }
         
+    @staticmethod
+    def from_dict(data: dict) -> "Position":
+        """Create a Position instance from a dictionary.
+        
+        Args:
+            data (dict): Dictionary containing position data
+            
+        Returns:
+            Position: New Position instance
+        """
+        # Convert string dates back to numpy datetime64
+        open_date = np.datetime64(data['open_date']) if data['open_date'] else None
+        open_indx = int(data['open_indx']) if 'open_indx' in data else 0
+        close_date = np.datetime64(data['close_date']) if data['close_date'] else None
+        close_indx = int(data['close_indx']) if 'close_indx' in data else 0
+        
+        # Create the position
+        position = Position(
+            price=data['open_price'],
+            side=Side[data['side']],
+            date=open_date,
+            indx=open_indx,
+            ticker=data['ticker'],
+            volume=data['volume'],
+            period=data['period'],
+            sl=data['stop_loss'],
+            tp=data['take_profit'],
+            fee_rate=FeeConst(0, 0)  # Default fee rate, can be updated if needed
+        )
+        
+        # Set additional attributes if they exist
+        if close_date is not None and data['close_price'] is not None:
+            position.close(data['close_price'], close_date, close_indx)
+        
+        # Set fee-related attributes
+        position.fees_abs = data['fees_abs']
+        
+        # Restore history arrays
+        position.sl_hist = [(np.datetime64(t), float(p)) for t, p in data['sl_history']]
+        position.tp_hist = [(np.datetime64(t), float(p)) for t, p in data['tp_history']]
+        position.enter_points_hist = [(np.datetime64(t), float(p)) for t, p in data['enter_points']]
+        position.enter_price_hist = [(np.datetime64(t), float(p)) for t, p in data['enter_prices']]
+        position.volume_hist = [(np.datetime64(t), float(v)) for t, v in data['volume_history']]
+        
+        return position
+    
+    @staticmethod
+    def from_json_file(file_path: str) -> "Position":
+        return Position.from_dict(json.load(open(file_path, "r")))

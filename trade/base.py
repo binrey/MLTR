@@ -78,7 +78,7 @@ class BaseTradeClass(ABC):
         self.should_save_backup = cfg.get('save_backup', False)
         self.ticker = cfg['symbol'].ticker
         self.hist_size = cfg['hist_size']
-        self.save_path = Path(os.getenv("LOG_DIR"), cfg["name"], f"{self.ticker}-{self.period.value}")
+        self.save_path = Path(os.getenv("LOG_DIR"), cfg["conftype"], cfg["name"], f"{self.ticker}-{self.period.value}")
         self.save_path.mkdir(parents=True, exist_ok=True)
         self.backup_path = self.save_path / "backup"
         self.backup_path.mkdir(parents=True, exist_ok=True)
@@ -91,7 +91,6 @@ class BaseTradeClass(ABC):
                                      vis_hist_length=self.vis_hist_length)
         self.nmin = self.period.minutes
         self.time = StepData()
-        self.serv_time = None
         self.exp_update = self.exp.update
         self.log_config()
 
@@ -121,10 +120,12 @@ class BaseTradeClass(ABC):
         return np.datetime64(int(trounded*self.nmin), "m")
 
     def handle_trade_message(self, message):
-        self.server_time = self.get_server_time()
-        time_rounded = self.get_rounded_time(self.server_time)
-        self.time.update(time_rounded)
-        logger.debug(f"server time: {date2str(self.server_time, 'ms')}")
+        server_time = self.get_server_time()
+        self.time.update(self.get_rounded_time(server_time))
+        if self.time.prev is None:
+            logger.info(f"START: {date2str(server_time, 'ms')}")
+        else:
+            logger.debug(f"server time: {date2str(server_time, 'ms')}")
 
         if self.time.changed(no_none=True):
             msg = f"{str(self.pos.curr) if self.pos.curr is not None else 'no pos'}"

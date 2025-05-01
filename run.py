@@ -17,9 +17,11 @@ from trade.bybit import launch as bybit_launch
 load_dotenv()
 
 def run_backtest(cfg: PyConfig):
+    logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.BACKTEST.value),
+                            log_level="DEBUG" if os.getenv("DEBUG") else "INFO")
     logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, True)
     cfg["save_backup"] = False
-    backtest_launch(cfg)
+    return backtest_launch(cfg)
 
 
 def run_multirun(cfgs: list[PyConfig]):
@@ -39,6 +41,8 @@ def run_optimization(cfg: PyConfig, run_backtests):
 
 
 def run_bybit(cfg: PyConfig, demo=False):
+    logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.BYBIT.value),
+                            log_level="DEBUG" if os.getenv("DEBUG") else "INFO")
     logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, True)
     cfg["save_backup"] = True
     cfg["save_plots"] = False
@@ -82,10 +86,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     run_type = RunType.from_str(args.run_type)
-
-    logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), run_type.value),
-                            log_level="DEBUG" if args.debug else "INFO")
-
     cfgs = [PyConfig(path) for path in args.config_paths]
 
     if run_type == RunType.BYBIT:
