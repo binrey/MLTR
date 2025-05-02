@@ -5,7 +5,7 @@ from configs.volprof.base import backtest, trading
 updates = dict(
     wallet=50,
     symbol = Symbols.BTCUSDT,
-    period=TimePeriod.M60,
+    period=TimePeriod.M1,
     hist_size = 64,
     trailing_stop = {"rate": 0.02},
     decision_maker = {"sharpness": 4}
