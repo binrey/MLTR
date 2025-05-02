@@ -67,15 +67,15 @@ class TimePeriod(Enum):
         
 class RunType(Enum):
     BACKTEST = "backtest"
-    OPTIMIZE = "optimize"
+    OPTIMIZE = "optimization"
     CROSS_VALIDATION = "cross_validation"
     BYBIT = "bybit"
     MULTIRUN = "multirun"
 
-    @staticmethod
-    def from_str(label):
-        if label in ("backtest", "optimize", "bybit", "cross_validation", "multirun"):
-            return RunType[label.upper()]
+    @classmethod
+    def from_str(cls, label):
+        if label.upper() in cls.__members__:
+            return cls[label.upper()]
         else:
             raise ValueError(f"Unknown run type: {label}")
             

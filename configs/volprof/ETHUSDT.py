@@ -3,11 +3,11 @@ from common.utils import update_config
 from configs.volprof.base import backtest, trading
 
 updates = dict(
-    wallet=50,
+    wallet=100,
     symbol = Symbols.ETHUSDT,
     period=TimePeriod.M60,
     hist_size = 128,
-    trailing_stop = {"rate": 0.01},
+    trailing_stop = {"rate": 0.02},
     decision_maker = {"sharpness": 3}
 )
 

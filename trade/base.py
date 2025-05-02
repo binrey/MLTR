@@ -78,6 +78,7 @@ class BaseTradeClass(ABC):
         self.should_save_backup = cfg.get('save_backup', False)
         self.ticker = cfg['symbol'].ticker
         self.hist_size = cfg['hist_size']
+        self.log_trades = cfg['log_trades']
         self.save_path = Path(os.getenv("LOG_DIR"), cfg["conftype"], cfg["name"], f"{self.ticker}-{self.period.value}")
         self.save_path.mkdir(parents=True, exist_ok=True)
         self.backup_path = self.save_path / "backup"
@@ -219,7 +220,8 @@ class BaseTradeClass(ABC):
             if self.pos.deleted():
                 logger.debug(
                     f"position closed {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
-                self.log_trade(self.pos.prev)
+                if self.log_trades:
+                    self.log_trade(self.pos.prev)
 
             if self.vis_events == Vis.ON_DEAL:
                 # process = multiprocessing.Process(target=self.vis())

@@ -29,6 +29,9 @@ def run_multirun(cfgs: list[PyConfig]):
 
 
 def run_optimization(cfg: PyConfig, run_backtests):
+    logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.OPTIMIZE.value),
+                            log_level=os.getenv("LOGLEVEL"))
+    logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, True)
     cfg["visualize"] = False
     cfg["save_backup"] = False
     cfg["save_plots"] = False

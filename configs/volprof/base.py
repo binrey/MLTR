@@ -35,7 +35,7 @@ config = dict(
     tstart=0,
     tend=None,
     period=TimePeriod.M60,
-    symbol=Symbols.BTCUSDT,
+    symbol=Symbols.ETHUSDT,
     data_type="bybit",
     fee_rate=FeeRate(0.1, 0.00016),
     save_backup=False,
@@ -53,7 +53,8 @@ backtest = update_config(
     date_start=np.datetime64("2018-01-01T00:00:00"),
     date_end=np.datetime64("2025-05-01T00:00:00"),
     eval_buyhold=True,
-    clear_logs=True
+    clear_logs=True,
+    log_trades=False,
 )
 
 optimization = update_config(
@@ -61,7 +62,9 @@ optimization = update_config(
     conftype="optimization",
     date_start=np.datetime64("2018-01-01T00:00:00"),
     date_end=np.datetime64("2025-05-01T00:00:00"),
-    clear_logs=True,
+    clear_logs=False,
+    log_trades=False,
+    eval_buyhold=False,
     hist_size=[32, 64, 128, 256],
     trailing_stop={
         "rate": [0.03, 0.02, 0.01]
@@ -75,5 +78,6 @@ trading = update_config(
     config,
     conftype="trading",
     credentials="bybit_volprof",
-    clear_logs=False
+    clear_logs=False,
+    log_trades=True
 )

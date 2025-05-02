@@ -240,8 +240,8 @@ class Optimizer:
         # Save and plot results
         # self._plot_optimization_results(opt_summary, symbol, period)
 
-        return self.OptimizationResults(score_name=self.sortby, 
-                                        opt_summary=opt_summary, 
+        return self.OptimizationResults(score_name=self.sortby,
+                                        opt_summary=opt_summary,
                                         configs_by_run=self.cfgs,
                                         positions_by_run=self.btests)
 
