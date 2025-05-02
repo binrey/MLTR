@@ -48,11 +48,11 @@ class PyConfig():
         config_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(config_module)
         self.base_config = config_module
-        self.optim, self.backetest, self.trading = None, None, None
+        self.optim, self.backetest, self.bybit = None, None, None
         if hasattr(self.base_config, "backtest"):
             self.backetest = self.base_config.backtest
-        if hasattr(self.base_config, "trading"):
-            self.trading = self.base_config.trading
+        if hasattr(self.base_config, "bybit"):
+            self.bybit = self.base_config.bybit
 
         if hasattr(self.base_config, "optimization"):
             self.optim = self.base_config.optimization
@@ -82,8 +82,8 @@ class PyConfig():
     def get_backtest(self):
         return self._get_inference(self.backetest)
     
-    def get_trading(self):
-        return self._get_inference(self.trading)
+    def get_bybit(self):
+        return self._get_inference(self.bybit)
     
     def get_optimization(self):
         cfg = deepcopy(self.optim)

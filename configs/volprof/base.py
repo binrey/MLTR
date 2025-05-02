@@ -74,10 +74,11 @@ optimization = update_config(
         }
     )
 
-trading = update_config(
+bybit = update_config(
     config,
-    conftype="trading",
+    conftype="bybit",
     credentials="bybit_volprof",
     clear_logs=False,
-    log_trades=True
+    log_trades=True,
+    save_backup=True,
 )

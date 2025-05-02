@@ -1,6 +1,6 @@
 from common.type import Symbols, TimePeriod
 from common.utils import update_config
-from configs.volprof.base import backtest, trading
+from configs.volprof.base import backtest, bybit
 
 updates = dict(
     wallet=50,
@@ -12,4 +12,4 @@ updates = dict(
 )
 
 backtest = update_config(backtest, **updates)
-trading = update_config(trading, **updates)
+bybit = update_config(bybit, **updates)

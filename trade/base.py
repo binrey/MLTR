@@ -75,7 +75,7 @@ class BaseTradeClass(ABC):
         self.save_plots = cfg['save_plots']
         self.vis_hist_length = cfg['vis_hist_length']
         self.vis_events = cfg['vis_events']
-        self.should_save_backup = cfg.get('save_backup', False)
+        self.should_save_backup = cfg['save_backup']
         self.ticker = cfg['symbol'].ticker
         self.hist_size = cfg['hist_size']
         self.log_trades = cfg['log_trades']

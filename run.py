@@ -45,7 +45,7 @@ def run_optimization(cfg: PyConfig, run_backtests):
 
 def run_bybit(cfg: PyConfig, demo=False):
     logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.BYBIT.value),
-                            log_level="DEBUG" if os.getenv("DEBUG") else "INFO")
+                            log_level=os.getenv("LOGLEVEL"))
     logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, True)
     cfg["save_backup"] = True
     cfg["save_plots"] = False
@@ -82,8 +82,8 @@ if __name__ == "__main__":
         nargs="+",
         help="Path to one or more configuration files. For multirun, specify multiple files."
     )
-    parser.add_argument("--debug", action="store_true",
-                        help="Enable debug logging")
+    parser.add_argument("--demo", action="store_true",
+                        help="Enable demo trading")
     parser.add_argument("--run_backtests", action="store_true",
                         help="Whether to run backtests during optimization.")
     args = parser.parse_args()
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     cfgs = [PyConfig(path) for path in args.config_paths]
 
     if run_type == RunType.BYBIT:
-        run_bybit(cfgs[0].get_trading(), args.debug)
+        run_bybit(cfgs[0].get_bybit(), args.demo)
     elif run_type == RunType.OPTIMIZE:
         run_optimization(cfgs[0].get_optimization(), args.run_backtests)
     elif run_type == RunType.MULTIRUN:
