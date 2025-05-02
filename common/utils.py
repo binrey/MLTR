@@ -221,8 +221,8 @@ class Logger:
         self.log_dir = Path(log_dir)
         self.log_level = log_level
 
-    def initialize(self, decision_maker: str, symbol: str, period: str, clear_log: bool):
-        if clear_log:
+    def initialize(self, decision_maker: str, symbol: str, period: str, clear_logs: bool):
+        if clear_logs:
             if self.log_dir.exists():
                 shutil.rmtree(self.log_dir)
         if not self.log_dir.exists():

@@ -19,7 +19,7 @@ load_dotenv()
 def run_backtest(cfg: PyConfig):
     logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.BACKTEST.value),
                             log_level=os.getenv("LOGLEVEL"))
-    logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, True)
+    logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, cfg["clear_logs"])
     cfg["save_backup"] = False
     return backtest_launch(cfg)
 
@@ -31,7 +31,7 @@ def run_multirun(cfgs: list[PyConfig]):
 def run_optimization(cfg: PyConfig, run_backtests):
     logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.OPTIMIZE.value),
                             log_level=os.getenv("LOGLEVEL"))
-    logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, True)
+    logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, cfg["clear_logs"])
     cfg["visualize"] = False
     cfg["save_backup"] = False
     cfg["save_plots"] = False
@@ -46,7 +46,7 @@ def run_optimization(cfg: PyConfig, run_backtests):
 def run_bybit(cfg: PyConfig, demo=False):
     logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.BYBIT.value),
                             log_level=os.getenv("LOGLEVEL"))
-    logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, True)
+    logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, cfg["clear_logs"])
     cfg["save_backup"] = True
     cfg["save_plots"] = False
     cfg["visualize"] = False
