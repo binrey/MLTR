@@ -27,13 +27,14 @@ config = dict(
     ),
     
     name="volprof",
+    conftype=None,
     wallet=100,
     leverage=1,
     close_only_by_stops=False,
     hist_size=64,
     tstart=0,
     tend=None,
-    period=TimePeriod.M1,
+    period=TimePeriod.M60,
     symbol=Symbols.BTCUSDT,
     data_type="bybit",
     fee_rate=FeeRate(0.1, 0.00016),
@@ -44,20 +45,23 @@ config = dict(
     visualize=False,
     run_model_device=None,
     no_trading_days=set(),
-    clear_logs=False,
 )
 
 backtest = update_config(
     config,
-    name="backtest/volprof",
-    date_start=np.datetime64("2025-01-01T00:00:00"),
+    conftype="backtest",
+    date_start=np.datetime64("2018-01-01T00:00:00"),
     date_end=np.datetime64("2025-05-01T00:00:00"),
-    eval_buyhold=False,
+    eval_buyhold=True,
     clear_logs=True
 )
 
 optimization = update_config(
     config,
+    conftype="optimization",
+    date_start=np.datetime64("2018-01-01T00:00:00"),
+    date_end=np.datetime64("2025-05-01T00:00:00"),
+    clear_logs=True,
     hist_size=[32, 64, 128, 256],
     trailing_stop={
         "rate": [0.03, 0.02, 0.01]
@@ -69,5 +73,7 @@ optimization = update_config(
 
 trading = update_config(
     config,
+    conftype="trading",
     credentials="bybit_volprof",
+    clear_logs=False
 )

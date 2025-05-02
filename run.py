@@ -18,7 +18,7 @@ load_dotenv()
 
 def run_backtest(cfg: PyConfig):
     logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.BACKTEST.value),
-                            log_level="DEBUG" if os.getenv("DEBUG") else "INFO")
+                            log_level=os.getenv("LOGLEVEL"))
     logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, True)
     cfg["save_backup"] = False
     return backtest_launch(cfg)

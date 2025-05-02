@@ -84,17 +84,17 @@ if __name__ == "__main__":
     positions_real.sort(key=lambda x: x.open_date)
     positions_test.sort(key=lambda x: x.open_date)
     
-    time_lags, slippages = np.zeros(len(positions_test)), np.zeros(len(positions_test))
+    time_lags, slippages = [], []
     match_count = 0
     
     for i, (pos_test, pos_real) in enumerate(zip(positions_test, positions_real)):
         date_real = pos_real.open_date.astype("datetime64[m]")
         date_test = pos_test.open_date.astype("datetime64[m]")
         if date_real == date_test and pos_real.side == pos_test.side:
-            time_lags[i] = (pos_real.open_date.astype("datetime64[ms]") -
-                            pos_test.open_date.astype("datetime64[ms]")).astype(int)/1000
+            time_lags.append((pos_real.open_date.astype("datetime64[ms]") -
+                            pos_test.open_date.astype("datetime64[ms]")).astype(int)/1000)
             match_count += 1
-            slippages[i] = (pos_real.open_price - pos_test.open_price) * pos_test.side.value / pos_test.open_price
+            slippages.append((pos_real.open_price - pos_test.open_price) * pos_test.side.value / pos_test.open_price)
         logger.debug(f"{pos_test.open_date}, slip: {slippages[i]*100:8.4f}%, tlag: {time_lags[i]:8.2f}s")
         
     logger.info(f"Mean time lag: {np.mean(time_lags):.2f}s")
