@@ -1,9 +1,11 @@
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 import mplfinance as mpf
 import numpy as np
 import pandas as pd
+from loguru import logger
 from pybit.unified_trading import HTTP
 
 from common.type import Symbol, TimePeriod
@@ -24,11 +26,11 @@ class BybitDownloader:
                 self.init_data.parent.mkdir(parents=True, exist_ok=True)
                 self.init_data = None
 
-    def get_klines(self, start_date, size: int=1000, end: datetime=None):
+    def get_klines(self, start_date, size: int=1000, end_date: Optional[datetime]=None):
         if start_date is not None and isinstance(start_date, datetime):
             start_date=start_date.timestamp()*1000
-        if end is not None and isinstance(end, datetime):
-            end=end.timestamp()*1000
+        if end_date is not None and isinstance(end_date, datetime):
+            end_date=end_date.timestamp()*1000
 
         session = HTTP()
         message = session.get_kline(
@@ -36,7 +38,7 @@ class BybitDownloader:
             symbol=self.symbol,
             interval=str(self.period),
             start=start_date,
-            end=end,
+            end=end_date,
             limit=size
         )
         return message["result"]
@@ -64,19 +66,33 @@ class BybitDownloader:
         data.drop("Date", axis=1, inplace=True)
         return data
 
-    def get_history(self):
+    def get_history(self, start_date: pd.Timestamp, end_date: Optional[pd.Timestamp] = None):
+        start_date = pd.to_datetime(start_date)
+        end_date = pd.to_datetime(end_date)
         if self.init_data is not None:
             h = self.read_from_file(self.init_data)
-            self.start_date = h.index[-1]
+            start_date = h.index[-1]
         else:
-            h = self._get_data_from_message(self.get_klines(start_date=self.start_date))
-        print(h.index[-1])
-        res = self._get_data_from_message(self.get_klines(start_date=h.index[-1]))[1:]
+            h = self._get_data_from_message(self.get_klines(start_date=start_date,
+                                                            end_date=end_date))
+        start_saved_date = h.index[0]
+        end_saved_date = h.index[-1]
+        logger.info(f"Start date: {start_saved_date}")
+        logger.info(f"Last date : {end_saved_date}")
+        
+        if start_date >= start_saved_date and end_date <= end_saved_date:
+            logger.info(f"Data already exists in database")
+            return h
+
+        res = self._get_data_from_message(self.get_klines(start_date=h.index[-1],
+                                                          end_date=end_date))[1:]
         h = pd.concat([h, res])
         while res.shape[0]:
-            print(h.index[-1])
-            res = self._get_data_from_message(self.get_klines(start_date=h.index[-1]))[1:]
+            logger.info(f"Last date : {h.index[-1]}")
+            res = self._get_data_from_message(self.get_klines(start_date=h.index[-1],
+                                                              end_date=end_date))[1:]
             h = pd.concat([h, res])
+        h.to_csv(self.init_data)
         return h
 
 

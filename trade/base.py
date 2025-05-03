@@ -54,6 +54,11 @@ class StepData:
             ch = ch and self.prev is not None
         return ch
 
+    def changed_side(self) -> bool:
+        if self.curr is None or self.prev is None:
+            return False
+        return self.curr.side != self.prev.side
+
     def created(self) -> bool:
         return self.curr is not None and self.prev is None
 
@@ -217,18 +222,18 @@ class BaseTradeClass(ABC):
         self.update_market_state()
 
         if self.pos.created() or self.pos.deleted() or self.pos.changed():
-            if self.pos.deleted():
-                logger.debug(
-                    f"position closed {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
-                if self.log_trades:
-                    self.log_trade(self.pos.prev)
-
             if self.vis_events == Vis.ON_DEAL:
                 # process = multiprocessing.Process(target=self.vis())
                 # process.start()
                 self.vis()
                 # if self.my_telebot is not None:
                 #     self.my_telebot.send_image(saved_img_path)
+
+        if self.pos.deleted() or self.pos.changed_side():
+            logger.debug(
+                f"position closed {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
+            if self.log_trades:
+                self.log_trade(self.pos.prev)
 
         if self.vis_events == Vis.ON_STEP:
             self.vis()

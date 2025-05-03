@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -11,8 +11,12 @@ from trade.utils import ORDER_TYPE, Order, Position
 
 
 class Broker:
-    def __init__(self, cfg: Optional[dict] = None):
-        self.cfg = cfg
+    def __init__(self, cfg: Dict[str, Any]):
+        self.symbol = cfg["symbol"]
+        self.period = cfg["period"]
+        self.fee_rate = cfg["fee_rate"]
+        self.close_last_position = cfg["close_last_position"]
+        self.wallet = cfg["wallet"]
         self.active_orders: List[Order] = []
         self.active_position: Position = None
         self.positions: List[Position] = []
@@ -24,8 +28,7 @@ class Broker:
         self.open_price = None
         self.cumulative_profit = 0
         self.cumulative_fees = 0
-        if cfg is not None:
-            self.mw = MovingWindow(cfg)
+        self.mw = MovingWindow(cfg)
 
     @property
     def profits(self):
@@ -57,7 +60,7 @@ class Broker:
                     raise ValueError("closed positions disagreement!")
             self.update_profit_curve(closed_position)
 
-        if self.active_position is not None:
+        if self.active_position is not None and self.close_last_position:
             self.update_profit_curve(
                 self.close_active_pos(price=self.open_price,
                                       time=self.time,
@@ -224,10 +227,10 @@ class Broker:
                         side=triggered_side,
                         date=triggered_date,
                         indx=triggered_id,
-                        ticker=self.cfg["symbol"].ticker,
+                        ticker=self.symbol.ticker,
                         volume=triggered_vol,
-                        period=self.cfg['period'],
-                        fee_rate=self.cfg['fee_rate'],
+                        period=self.period,
+                        fee_rate=self.fee_rate,
                         sl=sl,
                     )
                     triggered_vol = 0

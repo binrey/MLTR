@@ -22,10 +22,12 @@ class BackTestResults:
         self.buy_and_hold = None
         self.tickers = set()
         self.wallet = 0
+        self.deposit = 0
         self.ndeals = 0
         self.positions = []
         self.fig = None
         self.legend_ax1 = []
+        self.metrics = {}
         
     @property
     def date_start(self):
@@ -47,7 +49,7 @@ class BackTestResults:
 
     def add(self, bktest_broker: Broker):
         self.ndeals += len(bktest_broker.positions)
-        self.wallet += bktest_broker.cfg["wallet"]
+        self.wallet += bktest_broker.wallet
         self.tickers.update([pos.ticker for pos in bktest_broker.positions])
         self.positions.extend(bktest_broker.positions)
         
@@ -334,7 +336,7 @@ class BackTestResults:
         logger.info(
             sformat(0).format("FINAL PROFIT", self.final_profit_rel)
             + f" %"
-            + f" ({self.fees/self.final_profit*100:.1f}% fees)"
+            + f" ({self.fees/(self.final_profit*100 + 1e-6):.1f}% fees)"
         )
         logger.info(
             sformat(1).format("DEALS/MONTH", self.ndeals_per_month)

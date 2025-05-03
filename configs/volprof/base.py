@@ -50,11 +50,12 @@ config = dict(
 backtest = update_config(
     config,
     conftype="backtest",
-    date_start=np.datetime64("2018-01-01T00:00:00"),
-    date_end=np.datetime64("2025-05-01T00:00:00"),
+    date_start=np.datetime64("2025-05-02T23:31:00"),
+    date_end=np.datetime64("2025-05-05T23:31:00"),
     eval_buyhold=True,
     clear_logs=True,
-    log_trades=False,
+    log_trades=True,
+    close_last_position=True,
 )
 
 optimization = update_config(

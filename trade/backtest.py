@@ -55,11 +55,11 @@ class BackTest(BaseTradeClass):
     def postprocess(self) -> BackTestResults:
         bt_res = BackTestResults()
         bt_res.add(self.session)
+        bt_res.eval_daily_metrics()
         if bt_res.ndeals == 0:
             logger.warning("No trades!")
             return bt_res
         
-        bt_res.eval_daily_metrics()
         if self.cfg['eval_buyhold']:
             dates = self.session.mw.hist["Date"][self.session.mw.id2start: self.session.mw.id2end]
             closes = self.session.mw.hist["Close"][self.session.mw.id2start: self.session.mw.id2end]            
