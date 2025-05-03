@@ -135,13 +135,17 @@ class BybitTrading(BaseTradeClass):
         return data
 
     def wait_until_next_update(self, next_update_time):
-        remaining_seconds = (next_update_time - self.get_server_time()).astype(int)
+        total_seconds = (next_update_time - self.get_server_time()).astype(int)
+        remaining_seconds = total_seconds
         while remaining_seconds > 0:
             minutes, seconds = divmod(remaining_seconds, 60)
-            logger.debug(f"Waiting {minutes}m {seconds}s until next update...")
-            sleep_time = min(10, remaining_seconds)
+            progress = int(((total_seconds - remaining_seconds) / total_seconds) * 30) if total_seconds > 0 else 0
+            bar = '[' + '#' * progress + '-' * (30 - progress) + ']'
+            print(f"\rWaiting {minutes:02d}m {seconds:02d}s {bar}", end="", flush=True)
+            sleep_time = min(1, remaining_seconds)
             sleep(sleep_time)
             remaining_seconds -= sleep_time
+        print("\rWaiting 00m 00s [##############################]", flush=True)  # Clear line at the end
 
 
 def launch(cfg, demo=False):

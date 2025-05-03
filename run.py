@@ -14,7 +14,7 @@ from trade.backtest import launch as backtest_launch
 from trade.backtest import launch_multirun
 from trade.bybit import launch as bybit_launch
 
-load_dotenv()
+load_dotenv(override=True)
 
 def run_backtest(cfg: PyConfig):
     logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.BACKTEST.value),
