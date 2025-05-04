@@ -11,6 +11,7 @@ from loguru import logger
 
 from backtesting.backtest_broker import Broker
 from backtesting.utils import BackTestResults
+from data_processing import PULLERS
 from experts.experts import BacktestExpert
 from trade.base import BaseTradeClass, log_get_hist
 from trade.utils import Position
@@ -67,8 +68,10 @@ class BackTest(BaseTradeClass):
         return bt_res
 
 def launch(cfg) -> BackTestResults:
+    PULLERS["bybit"](**cfg)
     backtest_trading = BackTest(cfg)
     backtest_trading.initialize()
+    
     backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
     bt_res = backtest_trading.postprocess()
 

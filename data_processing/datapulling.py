@@ -66,31 +66,34 @@ class BybitDownloader:
         data.drop("Date", axis=1, inplace=True)
         return data
 
-    def get_history(self, start_date: pd.Timestamp, end_date: Optional[pd.Timestamp] = None):
-        start_date = pd.to_datetime(start_date)
-        end_date = pd.to_datetime(end_date)
+    def get_history(self, date_start: pd.Timestamp, date_end: Optional[pd.Timestamp] = None):
+        date_start = pd.to_datetime(date_start)
+        date_end = pd.to_datetime(date_end)
+        
+        logger.info(
+            f"Pulling data for {self.symbol} from {date_start} to {date_end}")
         if self.init_data is not None:
             h = self.read_from_file(self.init_data)
-            start_date = h.index[-1]
+            date_start = h.index[-1]
         else:
-            h = self._get_data_from_message(self.get_klines(start_date=start_date,
-                                                            end_date=end_date))
+            h = self._get_data_from_message(self.get_klines(start_date=date_start,
+                                                            end_date=date_end))
         start_saved_date = h.index[0]
         end_saved_date = h.index[-1]
         logger.info(f"Start date: {start_saved_date}")
         logger.info(f"Last date : {end_saved_date}")
         
-        if start_date >= start_saved_date and end_date <= end_saved_date:
+        if date_start >= start_saved_date and date_end <= end_saved_date:
             logger.info(f"Data already exists in database")
             return h
 
         res = self._get_data_from_message(self.get_klines(start_date=h.index[-1],
-                                                          end_date=end_date))[1:]
+                                                          end_date=date_end))[1:]
         h = pd.concat([h, res])
         while res.shape[0]:
             logger.info(f"Last date : {h.index[-1]}")
             res = self._get_data_from_message(self.get_klines(start_date=h.index[-1],
-                                                              end_date=end_date))[1:]
+                                                              end_date=date_end))[1:]
             h = pd.concat([h, res])
         h.to_csv(self.init_data)
         return h
