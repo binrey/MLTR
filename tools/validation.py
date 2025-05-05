@@ -78,7 +78,7 @@ def process_logfile(log_file) -> list[Position]:
     cfg = pickle.load(open(log_file.parent.parent / "config.pkl", "rb"))
     cfg.update({"date_start": start_time, "date_end": end_time,
                 "eval_buyhold": False, "clear_logs": True, "conftype": "backtest",
-                "close_last_position": False})
+                "close_last_position": False, "visualize": False})
     btest_res = run_backtest(cfg)
 
     return btest_res.positions
@@ -104,7 +104,8 @@ if __name__ == "__main__":
     ir = 0
     for pos_test in positions_test:
         date_test = pos_test.open_date.astype("datetime64[m]")
-        logline = f"{date_test}"
+        logline = f"{date_test} {pos_test.side:<4}"
+        found_real = False
         for pos_real in positions_real[ir:]:
             date_real = pos_real.open_date.astype("datetime64[m]")
             if date_real == date_test and pos_real.side == pos_test.side:
@@ -115,7 +116,16 @@ if __name__ == "__main__":
                 slippages.append((pos_real.open_price - pos_test.open_price)
                                  * pos_test.side.value / pos_test.open_price)
                 logline += f" <- OK: open slip: {slippages[-1]*100:8.4f}%, time lag: {time_lags[-1]:8.2f}s"
+                found_real = True
                 break
+            else:
+                if date_real < date_test:
+                    logger.info(f"{date_real.astype('datetime64[m]')} {pos_real.side:<4} -> NO TEST")
+                    ir += 1
+                else:
+                    break
+        if not found_real:
+            logline += " <- NO REAL"
         logger.info(logline)
 
     logger.info("----------------------------------------")
