@@ -58,26 +58,50 @@ class BybitTrading(BaseTradeClass):
         return np.datetime64(int(timestamp), "ms")
 
     def get_pos_history(self, limit=5):
-        positions = self.session.get_closed_pnl(category="linear", 
-                                                symbol=self.ticker, 
+        positions = self.session.get_closed_pnl(category="linear",
+                                                symbol=self.ticker,
                                                 limit=limit)["result"]["list"]
         return positions
 
+    def _get_pos_from_message_dict(self, pos_dict):
+        ticker, price, volume, sl, side, date = self._parse_bybit_position(pos_dict)
+        pos = Position(
+            price=float(price),
+            date=date,
+            indx=0,
+            side=side,
+            ticker=ticker,
+            volume=volume,
+            period=self.period,
+            sl=sl,
+        )
+        logger.debug(f"Getting pos from bybit: {pos}...")
+        return pos
+        
+
+    def _close_current_pos(self):
+        pos_dict = self.get_pos_history(1)[0]
+        self.pos.curr.close(
+            price=float(pos_dict["avgExitPrice"]),
+            date=self.to_datetime(pos_dict["updatedTime"]),
+            indx=int(pos_dict["updatedTime"])
+            )
+        logger.debug(f"Closing self.pos.curr: {self.pos.curr}")
+
     def get_current_position(self):
         pos_object: Optional[Position] = None
+        dict2position = None
         open_positions = self.session.get_positions(category="linear", symbol=self.ticker)["result"]["list"]
         open_positions = [pos for pos in open_positions if pos["size"] != "0"]
         if self.pos.curr:
             if len(open_positions) == 0:
-                pos_dict = self.get_pos_history(1)[0]
-                self.pos.curr.close(
-                    price=float(pos_dict["avgExitPrice"]),
-                    date=self.to_datetime(pos_dict["updatedTime"]),
-                    indx=int(pos_dict["updatedTime"])
-                    )
+                self._close_current_pos()
+            elif Side.from_str(open_positions[0]["side"]) != self.pos.curr.side:
+                self._close_current_pos()
+                dict2position = open_positions[0]
             else:
                 pos_dict = open_positions[0]
-                ticker, price, volume, sl, side, date = self._parse_bybit_position(pos_dict)
+                _, _, _, sl, _, _ = self._parse_bybit_position(pos_dict)
                 pos_object = self.pos.curr
                 if sl is not None:
                     pos_object.update_sl(sl, self.time.prev)
@@ -85,20 +109,13 @@ class BybitTrading(BaseTradeClass):
                 # pos_object.add_to_position()
                 # TODO: update tp
                 # pos_object.update_tp(pos["takeProfit"], self.time.prev)
+                return pos_object
 
         elif len(open_positions):
-            pos_dict = open_positions[0]
-            ticker, price, volume, sl, side, date = self._parse_bybit_position(pos_dict)
-            pos_object = Position(
-                price=float(price),
-                date=date,
-                indx=0,
-                side=side,
-                ticker=ticker,
-                volume=volume,
-                period=self.period,
-                sl=sl,
-            )
+            dict2position = open_positions[0]
+
+        if dict2position is not None:
+            pos_object = self._get_pos_from_message_dict(dict2position)
         return pos_object
     
     def get_qty_step(self):
@@ -135,8 +152,8 @@ class BybitTrading(BaseTradeClass):
         return data
 
     def wait_until_next_update(self, next_update_time):
-        total_seconds = (next_update_time - self.get_server_time()).astype(int)
-        remaining_seconds = total_seconds
+        total_seconds = self.period.to_timedelta().astype(int)*60
+        remaining_seconds = (next_update_time - self.get_server_time()).astype(int)
         while remaining_seconds > 0:
             minutes, seconds = divmod(remaining_seconds, 60)
             progress = int(((total_seconds - remaining_seconds) / total_seconds) * 30) if total_seconds > 0 else 0

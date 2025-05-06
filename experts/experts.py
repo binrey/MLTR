@@ -41,10 +41,10 @@ class ExpertFormation(ExpertBase):
         volume = self.normalize_volume(volume)
         logger.debug(f"estimated lot: {volume}")
         return volume
-    
+
     def normalize_volume(self, volume):
         return round(volume/self.cfg["symbol"].qty_step, 0)*self.cfg["symbol"].qty_step
-            
+
     def create_or_update_sl(self, h):
         if self.active_position is not None:
             if self.active_position.sl is None:
@@ -58,7 +58,8 @@ class ExpertFormation(ExpertBase):
                 sl = min(sl, h["Open"][-1] - self.symbol.tick_size*self.traid_stops_min_size_multiplier)
             else:
                 sl = max(sl, h["Open"][-1] + self.symbol.tick_size*self.traid_stops_min_size_multiplier)
-            self.modify_sl(sl)                
+            if sl != self.active_position.sl:
+                self.modify_sl(sl)
 
     def create_or_update_tp(self, h):
         if self.active_position is not None:

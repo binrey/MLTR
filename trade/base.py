@@ -126,6 +126,7 @@ class BaseTradeClass(ABC):
         return np.datetime64(int(trounded*self.nmin), "m")
 
     def handle_trade_message(self, message):
+        logger.debug("")
         server_time = self.get_server_time()
         self.time.update(self.get_rounded_time(server_time))
         if self.time.prev is None:
@@ -134,8 +135,8 @@ class BaseTradeClass(ABC):
             logger.debug(f"server time: {date2str(server_time, 'ms')}")
 
         if self.time.changed(no_none=True):
-            msg = f"{str(self.pos.curr) if self.pos.curr is not None else 'no pos'}"
             self.update()
+            msg = f"self.pos.curr: {str(self.pos.curr) if self.pos.curr is not None else 'None'}"
             logger.debug(msg)
             if logger._core.min_level == 10:
                 print()
