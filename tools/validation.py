@@ -65,17 +65,21 @@ def process_logfile(log_file) -> list[Position]:
         lines = f.readlines()
         for line in lines:
             if "START" in line:
-                start_time = extract_datetimes(line)
+                start_time = np.datetime64(extract_datetimes(line), "[m]")
             if "server time" in line:
-                end_time = extract_datetimes(line)
+                end_time = np.datetime64(extract_datetimes(line), "[m]")
 
     assert start_time is not None, f"No start time found in {log_file}"
     assert end_time is not None, f"No end time found in {log_file}"
-    logger.info(
-        f"Pulling data for {SYMBOL.ticker} from {start_time} to {end_time}")
-    PULLERS[BROKER](SYMBOL, PERIOD, start_time, end_time)
-
+    
     cfg = pickle.load(open(log_file.parent.parent / "config.pkl", "rb"))
+    # Take into account history size
+    hist_window = cfg["period"].to_timedelta()*cfg["hist_size"]
+    date_start_pull = start_time - hist_window
+    logger.info(
+        f"Pulling data for {SYMBOL.ticker} from {date_start_pull} ({start_time} - {hist_window}) to {end_time}")
+    PULLERS[BROKER](SYMBOL, PERIOD, date_start_pull, end_time)
+
     cfg.update({"date_start": start_time, "date_end": end_time,
                 "eval_buyhold": False, "clear_logs": True, "conftype": "backtest",
                 "close_last_position": False, "visualize": False})

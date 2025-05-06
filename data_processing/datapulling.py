@@ -14,7 +14,7 @@ from common.type import Symbol, TimePeriod
 class BybitDownloader:
     def __init__(self, symbol: Symbol, period: TimePeriod, start_date=None, init_data=None):
         self.symbol = symbol.ticker
-        self.period = period.minutes
+        self.period = period
         self.init_data = init_data
         self.start_date = start_date if isinstance(start_date, pd.Timestamp) else pd.to_datetime(start_date)
         self.init_dirs()
@@ -24,7 +24,8 @@ class BybitDownloader:
             self.init_data = Path(self.init_data)
             if not self.init_data.exists():
                 self.init_data.parent.mkdir(parents=True, exist_ok=True)
-                self.init_data = None
+                self.init_data.touch()
+                self.init_data.write_text("Date,Open,High,Low,Close,Volume\n")
 
     def get_klines(self, start_date, size: int=1000, end_date: Optional[datetime]=None):
         if start_date is not None and isinstance(start_date, datetime):
@@ -36,7 +37,7 @@ class BybitDownloader:
         message = session.get_kline(
             category="linear",
             symbol=self.symbol,
-            interval=str(self.period),
+            interval=str(self.period.minutes),
             start=start_date,
             end=end_date,
             limit=size
@@ -59,7 +60,6 @@ class BybitDownloader:
         return data
 
     def read_from_file(self, filename):
-        # filename - csv file name
         data = pd.read_csv(filename)
         data.Date = pd.to_datetime(data.Date, format="mixed")
         data.set_index(data.Date, drop=True, inplace=True)
@@ -74,26 +74,29 @@ class BybitDownloader:
             f"Pulling data for {self.symbol} from {date_start} to {date_end}")
         if self.init_data is not None:
             h = self.read_from_file(self.init_data)
-            date_start = h.index[-1]
         else:
             h = self._get_data_from_message(self.get_klines(start_date=date_start,
                                                             end_date=date_end))
-        start_saved_date = h.index[0]
-        end_saved_date = h.index[-1]
+        start_saved_date = h.index[0] if len(h) > 0 else None
+        end_saved_date = h.index[-1] if len(h) > 0 else None
         logger.info(f"Start date: {start_saved_date}")
         logger.info(f"Last date : {end_saved_date}")
-        
-        if date_start >= start_saved_date and date_end <= end_saved_date:
-            logger.info(f"Data already exists in database")
-            return h
 
-        res = self._get_data_from_message(self.get_klines(start_date=h.index[-1],
-                                                          end_date=date_end))[1:]
+        if start_saved_date is not None and end_saved_date is not None:
+            if date_start >= start_saved_date and date_end <= end_saved_date:
+                logger.info(f"Data already exists in database")
+                return h
+
+        res = self._get_data_from_message(
+            self.get_klines(start_date=h.index[-1] if len(h) > 0 else date_start,
+                            end_date=None))
+        if len(h) > 0:
+            res = res[1:]
         h = pd.concat([h, res])
         while res.shape[0]:
             logger.info(f"Last date : {h.index[-1]}")
             res = self._get_data_from_message(self.get_klines(start_date=h.index[-1],
-                                                              end_date=date_end))[1:]
+                                                              end_date=None))[1:]
             h = pd.concat([h, res])
         h.to_csv(self.init_data)
         return h
