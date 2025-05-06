@@ -104,9 +104,7 @@ class VolProf(DecisionMaker):
         if self.lprice or self.sprice:
             logger.debug(f"found enter points: long: {self.lprice}, short: {self.sprice}")
 
-        order_side = np.random.choice([Side.BUY, Side.SELL, None])
         logger.debug(f"order_side: {order_side}")
-
         return DecisionMaker.Response(side=order_side, target_volume_fraction=target_volume_fraction)
 
     def setup_sl(self, side: Side):
