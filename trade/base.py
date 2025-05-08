@@ -120,6 +120,10 @@ class BaseTradeClass(ABC):
     def get_pos_history(self) -> list[Position]:
         pass
 
+    @abstractmethod
+    def get_wallet(self) -> float:
+        pass
+
     def get_rounded_time(self, time: np.datetime64) -> np.datetime64:
         trounded = np.array(time).astype(
             "datetime64[m]").astype(int)//self.nmin
@@ -180,6 +184,8 @@ class BaseTradeClass(ABC):
             self.load_backup()
         else:
             self.clear_log_dir()
+            
+        logger.info(f"Market wallet: {self.get_wallet()}")
 
     def update_market_state(self) -> None:
         cur_pos = self.get_current_position()

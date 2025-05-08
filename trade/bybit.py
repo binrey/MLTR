@@ -77,7 +77,6 @@ class BybitTrading(BaseTradeClass):
         )
         logger.debug(f"Getting pos from bybit: {pos}...")
         return pos
-        
 
     def _close_current_pos(self):
         pos_dict = self.get_pos_history(1)[0]
@@ -117,7 +116,11 @@ class BybitTrading(BaseTradeClass):
         if dict2position is not None:
             pos_object = self._get_pos_from_message_dict(dict2position)
         return pos_object
-    
+
+    def get_wallet(self):
+        msg = self.session.get_wallet_balance(accountType="UNIFIED")["result"]
+        return float(msg["list"][0]["totalWalletBalance"])
+
     def get_qty_step(self):
         msg = self.session.get_instruments_info(
             category="linear",
