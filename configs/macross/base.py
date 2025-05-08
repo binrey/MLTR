@@ -2,14 +2,19 @@ import numpy as np
 
 from common.type import Symbols, TimePeriod, Vis
 from common.utils import FeeRate, update_config
+from experts.ma_cross import ClsMACross
 from experts.position_control import FixRate, SLDynamic, SLFixed, TPFromSL, TrailingStop
-from experts.volprof import VolProf
 
 config = dict(
     decision_maker=dict(
-        type=VolProf,
-        sharpness=0,
-        strategy=VolProf.Levels.MANUAL
+        type=ClsMACross,
+        mode = "contrtrend",
+        ma_fast_period=16,
+        ma_slow_period=256,
+        upper_levels = 2,
+        lower_levels = 20,
+        min_step=0.25,
+        speed=0.5
     ),
     sl_processor=dict(
         type=SLDynamic,
@@ -25,7 +30,7 @@ config = dict(
         type=FixRate,
         rate=0.02,
     ),
-
+    
     name="volprof",
     conftype=None,
     wallet=100,
@@ -50,8 +55,8 @@ config = dict(
 backtest = update_config(
     config,
     conftype="backtest",
-    date_start=np.datetime64("2025-05-03T22:28:34"),
-    date_end=np.datetime64("2025-05-05T00:00:00"),
+    date_start=np.datetime64("2025-01-03T22:28:34"),
+    date_end=np.datetime64("2025-05-01T00:00:00"),
     eval_buyhold=True,
     clear_logs=True,
     log_trades=True,

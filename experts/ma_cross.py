@@ -12,11 +12,13 @@ class ClsMACross(DecisionMaker):
     type = "macross"
 
     def __init__(self, cfg):
-        super(ClsMACross, self).__init__(cfg)
-        self.mode = self.cfg["mode"]
-        self.model = None
-        if Path("model.pt").exists():
-            self.model = torch.jit.load("model.pt")
+        super(ClsMACross, self).__init__(cfg["hist_size"], cfg["period"], cfg["symbol"])
+        cfg.pop("hist_size")
+        cfg.pop("period")
+        cfg.pop("symbol")
+        self.indicators = self.setup_indicators(cfg)
+        
+        
 
     def setup_indicators(self, cfg):
         self.ma_fast = MovingAverage(period=cfg["ma_fast_period"])
