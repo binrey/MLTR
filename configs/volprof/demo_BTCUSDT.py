@@ -4,11 +4,11 @@ from configs.volprof.base import backtest, bybit
 
 updates = dict(
     wallet=100,
-    symbol = Symbols.ETHUSDT,
-    period=TimePeriod.M60,
-    hist_size = 128,
+    symbol = Symbols.BTCUSDT,
+    period=TimePeriod.M1,
+    hist_size = 64,
     trailing_stop = {"rate": 0.02},
-    decision_maker = {"sharpness": 3}
+    decision_maker = {"sharpness": 4}
 )
 
 backtest = update_config(backtest, **updates)

@@ -5,7 +5,7 @@ from configs.volprof.base import backtest, bybit
 updates = dict(
     wallet=100,
     symbol = Symbols.ETHUSDT,
-    period=TimePeriod.M60,
+    period=TimePeriod.M1,
     hist_size = 128,
     trailing_stop = {"rate": 0.02},
     decision_maker = {"sharpness": 3}
