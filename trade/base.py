@@ -34,7 +34,7 @@ def log_get_hist(func: Callable[..., Any]) -> Callable[..., Any]:
         result = func(self)
         if result is not None:
             logger.debug(
-                f"load: {result['Date'][-1]} | new: {result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}")
+                f"load: {result['Date'][-1]} | new: {result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}, v:{result['Volume'][-2]}")
         return result
     return wrapper
 

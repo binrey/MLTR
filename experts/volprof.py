@@ -17,7 +17,7 @@ class VolProf(DecisionMaker):
         """Strategy type for HVOL price level detection"""
         MANUAL = "manual"  # Uses predefined volume distribution bins
         AUTO = "auto"  # Uses shadow intersection analysis
-    
+
     def __init__(self, cfg):
         super().__init__(hist_size=cfg.pop("hist_size"),
                          period=cfg.pop("period"),
@@ -28,7 +28,7 @@ class VolProf(DecisionMaker):
         self.short_bin = 1
         self.sharpness = cfg["sharpness"]
         self.strategy = cfg["strategy"]
-        
+
         self.description = DecisionMaker.make_description(self.type, cfg)
 
     def setup_indicators(self, cfg: dict[str, Any]):
@@ -50,24 +50,25 @@ class VolProf(DecisionMaker):
         potential_prices = np.linspace(h["Low"].min(), h["High"].max(), 100)
         upper_scores = np.zeros(len(potential_prices))
         bottom_scores = np.zeros(len(potential_prices))
-        
+
         for i, price in enumerate(potential_prices):
             upper_shadow_hits = np.sum((h["High"] >= price) & (np.maximum(h["Open"], h["Close"]) <= price))
             bottom_shadow_hits = np.sum((np.minimum(h["Open"], h["Close"]) >= price) & (h["Low"] <= price))
-            
+
             body_hits = np.sum(
                 (np.minimum(h["Open"], h["Close"]) <= price) &
                 (np.maximum(h["Open"], h["Close"]) >= price)
             )
-            
+
             upper_scores[i] = upper_shadow_hits - body_hits
             bottom_scores[i] = bottom_shadow_hits - body_hits
-        
+
         lprice = potential_prices[np.argmax(upper_scores)]
         sprice = potential_prices[np.argmax(bottom_scores)]
-        
+
         logger.debug(f"check condition: sprice ({sprice:.2f}) < Open ({h['Open'][-1]:.2f}) < lprice ({lprice:.2f})")
         if sprice < h["Open"][-1] < lprice:
+            logger.debug(f"NEW entry points: long: {lprice:.2f}, short: {sprice:.2f}")
             return lprice, sprice
         return None, None
 
@@ -83,6 +84,7 @@ class VolProf(DecisionMaker):
                 self.lprice, self.sprice = self._find_prices_auto_levels(h)
 
             if self.lprice is not None and self.sprice is not None:
+                logger.debug(f"Entry points: long: {self.lprice}, short: {self.sprice}")
                 self.sl_definer[Side.BUY] = self.sprice
                 self.sl_definer[Side.SELL] = self.lprice
                 self.set_draw_objects(h["Date"][-2])
@@ -100,18 +102,15 @@ class VolProf(DecisionMaker):
                 if strike < 0 and h["Close"][-2] < self.lprice:
                     order_side = Side.SELL
 
-        if self.lprice or self.sprice:
-            logger.debug(f"found enter points: long: {self.lprice}, short: {self.sprice}")
-
         logger.debug(f"order_side: {order_side}")
         return DecisionMaker.Response(side=order_side, target_volume_fraction=target_volume_fraction)
 
     def setup_sl(self, side: Side):
         return self.sl_definer[side]
-    
+
     def setup_tp(self, side: Side):
         return self.tp_definer[side]
-    
+
     def update_inner_state(self, h):
         return super().update_inner_state(h)
         

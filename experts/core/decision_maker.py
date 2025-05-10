@@ -13,8 +13,10 @@ class DecisionMaker(ABC):
     @dataclass
     class Response:
         side: Side | None
-        target_volume_fraction: Optional[float] = None #  Define position volume have to be
-        increment_volume_fraction: Optional[float] = None #  How mutch increase position, target isn't defined
+        # Define position volume have to be
+        target_volume_fraction: Optional[float] = None
+        # How mutch increase position, target isn't defined
+        increment_volume_fraction: Optional[float] = None
         increment_by_num_lots: Optional[int] = None
 
         @property
@@ -28,32 +30,34 @@ class DecisionMaker(ABC):
         self.draw_items = []
         self.cache_dir = set_indicator_cache_dir(symbol, period, hist_size)
         self.description = None
-            
+
     @staticmethod
     def make_description(ds_type, cfg):
         return ds_type + ": " + "|".join([f"{k}:{v}" for k, v in cfg.items()])
-    
+
     def __str__(self):
         return self.description
-    
+
     @abstractmethod
     def setup_indicators(self, cfg, indicator_cache_dir: PosixPath):
         pass
-    
+
     def set_draw_objects(self, time=None):
         self.draw_items = []
         if self.lprice is not None and time:
-            self.draw_items.append(Line([(to_datetime(time), self.lprice), (None, self.lprice)], color="green"))
+            self.draw_items.append(
+                Line([(to_datetime(time), self.lprice), (None, self.lprice)], color="green"))
         if self.sprice is not None and time:
-            self.draw_items.append(Line([(to_datetime(time), self.sprice), (None, self.sprice)], color="red"))
-            
+            self.draw_items.append(
+                Line([(to_datetime(time), self.sprice), (None, self.sprice)], color="red"))
+
         # for indicator in self.indicators:
         #     self.draw_items += indicator.vis_objects
-    
+
     @abstractmethod
     def look_around(self, h) -> "DecisionMaker.Response":
         pass
-    
+
     @abstractmethod
     def update_inner_state(self, h) -> None:
         pass
