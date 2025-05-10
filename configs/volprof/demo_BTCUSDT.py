@@ -1,14 +1,10 @@
-from common.type import Symbols, TimePeriod
+from common.type import TimePeriod
 from common.utils import update_config
-from configs.volprof.base import backtest, bybit
+from configs.volprof.BTCUSDT import backtest, bybit
 
 updates = dict(
-    wallet=100,
-    symbol = Symbols.BTCUSDT,
+    wallet=1000,
     period=TimePeriod.M1,
-    hist_size = 64,
-    trailing_stop = {"rate": 0.02},
-    decision_maker = {"sharpness": 4}
 )
 
 backtest = update_config(backtest, **updates)

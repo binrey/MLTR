@@ -3,7 +3,7 @@ from common.utils import update_config
 from configs.volprof.base import backtest, bybit
 
 updates = dict(
-    wallet=100,
+    wallet=200,
     symbol = Symbols.BTCUSDT,
     period=TimePeriod.M60,
     hist_size = 64,
