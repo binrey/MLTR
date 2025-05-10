@@ -18,7 +18,7 @@ class VolDistribution:
         self.vol_profile = None
         self.cache = {}
         self.cache_dir = Path(cache_dir) / "vol_distribution" if cache_dir else None
-        if self.cache_dir:  
+        if self.cache_dir:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             self._load_cache()
 
@@ -82,11 +82,14 @@ class VolDistribution:
 
     def update(self, h: np.ndarray) -> TimeVolumeProfile:
         cache_key = self._get_cache_key(h)
-        
+
         # Try to load from cache first
         if self._load_from_cache(cache_key):
             bars = [(x, y) for x, y in zip(self.price_bins, self.vol_hist)]
             self.vol_profile = TimeVolumeProfile(time=h["Date"][1], hist=bars)
+            logger.debug("volume profile:\n" +
+                         " ".join([f"{p:10.1f}" for (p, v) in self.vol_profile.hist]) + "\n" + 
+                         " ".join([f"{v:10.1f}" for (p, v) in self.vol_profile.hist]))
             return self.vol_profile
 
         # If not in cache, calculate and cache the results
