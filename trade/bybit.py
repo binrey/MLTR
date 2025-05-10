@@ -24,20 +24,6 @@ stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков
 # export QT_QPA_PLATFORM=offscreen
 
-def get_bybit_hist(mresult, size):
-    data = np.zeros(size, dtype=DTYPE)
-
-    input = np.array(mresult["list"], dtype=np.float64)[::-1]
-    data['Id'] = input[:, 0].astype(np.int64)
-    data['Date'] = data['Id'].astype("datetime64[ms]")
-    data['Open'] = input[:, 1]
-    data['High'] = input[:, 2]
-    data['Low'] = input[:, 3]
-    data['Close'] = input[:, 4]
-    data['Volume'] = input[:, 5].astype(np.int64)
-
-    return data
-
 
 class BybitTrading(BaseTradeClass):
     def __init__(self, cfg, telebot: Telebot, bybit_session: HTTP) -> None:
@@ -56,6 +42,21 @@ class BybitTrading(BaseTradeClass):
 
     def to_datetime(self, timestamp: Union[int, float]) -> np.datetime64:
         return np.datetime64(int(timestamp), "ms")
+
+    @staticmethod
+    def get_bybit_hist(mresult, size):
+        data = np.zeros(size, dtype=DTYPE)
+
+        input = np.array(mresult["list"], dtype=np.float64)[::-1]
+        data['Id'] = input[:, 0].astype(np.int64)
+        data['Date'] = data['Id'].astype("datetime64[ms]")
+        data['Open'] = input[:, 1]
+        data['High'] = input[:, 2]
+        data['Low'] = input[:, 3]
+        data['Close'] = input[:, 4]
+        data['Volume'] = input[:, 5].astype(np.int64)
+
+        return data
 
     def get_pos_history(self, limit=5):
         positions = self.session.get_closed_pnl(category="linear",
@@ -150,12 +151,12 @@ class BybitTrading(BaseTradeClass):
                     interval=str(self.period.minutes),
                     start=0,
                     end=t.astype("datetime64[ms]").astype(int),
-                limit=self.hist_size
+                    limit=self.hist_size
                 )
-                data = get_bybit_hist(message["result"], self.hist_size)
             except Exception as e:
                 logger.error(f"Error getting history data: {e}")
                 sleep(1)
+            data = self.get_bybit_hist(message["result"], self.hist_size)    
         return data
 
     def wait_until_next_update(self, next_update_time):
