@@ -87,17 +87,13 @@ class VolDistribution:
         if self._load_from_cache(cache_key):
             bars = [(x, y) for x, y in zip(self.price_bins, self.vol_hist)]
             self.vol_profile = TimeVolumeProfile(time=h["Date"][1], hist=bars)
-            logger.debug("volume profile:\n" +
-                         " ".join([f"{p:10.1f}" for (p, v) in self.vol_profile.hist]) + "\n" + 
-                         " ".join([f"{v:10.1f}" for (p, v) in self.vol_profile.hist]))
             return self.vol_profile
 
-        # If not in cache, calculate and cache the results
         self._update_without_cache(h)
-        
-        # Save to cache
         self._save_to_cache(cache_key)
-        
+        logger.debug("volume profile:\n" +
+                        " ".join([f"{p:10.1f}" for (p, v) in self.vol_profile.hist]) + "\n" + 
+                        " ".join([f"{v:10.1f}" for (p, v) in self.vol_profile.hist]))
         return self.vol_profile
 
     def _update_without_cache(self, h: np.ndarray) -> TimeVolumeProfile:
