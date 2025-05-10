@@ -29,7 +29,7 @@ class BackTest(BaseTradeClass):
         self.session = Broker(cfg)
         super().__init__(cfg=cfg, expert=BacktestExpert(cfg=cfg, session=self.session))
         self.init_save_path()
-    
+
     def init_save_path(self):
         if self.cfg["save_plots"]:
             save_path = Path("backtests") / f"{self.cfg['symbol'].ticker}"
@@ -42,6 +42,9 @@ class BackTest(BaseTradeClass):
 
     def get_current_position(self) -> Position:
         return self.session.active_position
+
+    def get_wallet(self) -> float:
+        return self.session.wallet
 
     @log_get_hist
     def get_hist(self):
@@ -63,7 +66,7 @@ class BackTest(BaseTradeClass):
         
         if self.cfg['eval_buyhold']:
             dates = self.session.mw.hist["Date"][self.session.mw.id2start: self.session.mw.id2end]
-            closes = self.session.mw.hist["Close"][self.session.mw.id2start: self.session.mw.id2end]            
+            closes = self.session.mw.hist["Close"][self.session.mw.id2start: self.session.mw.id2end]
             bt_res.compute_buy_and_hold(dates=dates, closes=closes)
         return bt_res
 
