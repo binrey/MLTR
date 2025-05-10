@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import PosixPath
-from typing import Any, List, Optional
+from typing import Optional
 
 from pandas import Period
 
