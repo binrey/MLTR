@@ -143,15 +143,19 @@ class BybitTrading(BaseTradeClass):
         data = None
         while data is None or t != data["Date"][-1]:
             logger.debug(f"Requesting history data for {t}...")
-            message = self.session.get_kline(
-                category="linear",
-                symbol=self.ticker,
-                interval=str(self.period.minutes),
-                start=0,
-                end=t.astype("datetime64[ms]").astype(int),
+            try:
+                message = self.session.get_kline(
+                    category="linear",
+                    symbol=self.ticker,
+                    interval=str(self.period.minutes),
+                    start=0,
+                    end=t.astype("datetime64[ms]").astype(int),
                 limit=self.hist_size
-            )
-            data = get_bybit_hist(message["result"], self.hist_size)
+                )
+                data = get_bybit_hist(message["result"], self.hist_size)
+            except Exception as e:
+                logger.error(f"Error getting history data: {e}")
+                sleep(1)
         return data
 
     def wait_until_next_update(self, next_update_time):
