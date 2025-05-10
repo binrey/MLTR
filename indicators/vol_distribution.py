@@ -91,7 +91,7 @@ class VolDistribution:
 
         self._update_without_cache(h)
         self._save_to_cache(cache_key)
-        logger.debug("volume profile:\n" +
+        logger.debug("Volume profile:\n" +
                         " ".join([f"{p:10.1f}" for (p, v) in self.vol_profile.hist]) + "\n" + 
                         " ".join([f"{v:10.1f}" for (p, v) in self.vol_profile.hist]))
         return self.vol_profile

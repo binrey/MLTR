@@ -84,7 +84,7 @@ class VolProf(DecisionMaker):
                 self.lprice, self.sprice = self._find_prices_auto_levels(h)
 
             if self.lprice is not None and self.sprice is not None:
-                logger.debug(f"Entry points: long: {self.lprice}, short: {self.sprice}")
+                logger.debug(f"Entry points: long: {self.lprice:.2f}, short: {self.sprice:.2f}")
                 self.sl_definer[Side.BUY] = self.sprice
                 self.sl_definer[Side.SELL] = self.lprice
                 self.set_draw_objects(h["Date"][-2])

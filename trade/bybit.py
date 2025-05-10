@@ -44,17 +44,17 @@ class BybitTrading(BaseTradeClass):
         return np.datetime64(int(timestamp), "ms")
 
     @staticmethod
-    def get_bybit_hist(mresult, size):
-        data = np.zeros(size, dtype=DTYPE)
-
+    def get_bybit_hist(mresult):
         input = np.array(mresult["list"], dtype=np.float64)[::-1]
+        data = np.zeros(input.shape[0], dtype=DTYPE)
+
         data['Id'] = input[:, 0].astype(np.int64)
         data['Date'] = data['Id'].astype("datetime64[ms]")
         data['Open'] = input[:, 1]
         data['High'] = input[:, 2]
         data['Low'] = input[:, 3]
         data['Close'] = input[:, 4]
-        data['Volume'] = input[:, 5].astype(np.int64)
+        data['Volume'] = input[:, 5]
 
         return data
 
@@ -156,7 +156,7 @@ class BybitTrading(BaseTradeClass):
             except Exception as e:
                 logger.error(f"Error getting history data: {e}")
                 sleep(1)
-            data = self.get_bybit_hist(message["result"], self.hist_size)    
+            data = self.get_bybit_hist(message["result"])
         return data
 
     def wait_until_next_update(self, next_update_time):

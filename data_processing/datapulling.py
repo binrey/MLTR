@@ -9,14 +9,14 @@ from loguru import logger
 from pybit.unified_trading import HTTP
 
 from common.type import Symbol, TimePeriod
+from trade.bybit import BybitTrading
 
 
 class BybitDownloader:
-    def __init__(self, symbol: Symbol, period: TimePeriod, start_date=None, init_data=None):
+    def __init__(self, symbol: Symbol, period: TimePeriod, init_data=None):
         self.symbol = symbol.ticker
         self.period = period
         self.init_data = init_data
-        self.start_date = start_date if isinstance(start_date, pd.Timestamp) else pd.to_datetime(start_date)
         self.init_dirs()
 
     def init_dirs(self):
@@ -46,18 +46,12 @@ class BybitDownloader:
 
     @staticmethod
     def _get_data_from_message(mresult):
-        data = {}
-        input = np.array(mresult["list"], dtype=np.float64)[::-1]
-        data["Date"] = pd.to_datetime(input[:, 0].astype(np.int64)*1000000)
-        data["Open"] = input[:, 1]
-        data["High"] = input[:, 2]
-        data["Low"]  = input[:, 3]
-        data["Close"]= input[:, 4]
-        data["Volume"] = input[:, 5]
+        data = BybitTrading.get_bybit_hist(mresult)
         data = pd.DataFrame(data)
         data.set_index(data.Date, drop=True, inplace=True)
         data.drop("Date", axis=1, inplace=True)
         return data
+
 
     def read_from_file(self, filename):
         data = pd.read_csv(filename)
@@ -66,9 +60,9 @@ class BybitDownloader:
         data.drop("Date", axis=1, inplace=True)
         return data
 
-    def get_history(self, date_start: pd.Timestamp, date_end: Optional[pd.Timestamp] = None):
+    def get_history(self, date_start: Optional[pd.Timestamp] = None, date_end: Optional[pd.Timestamp] = None):
         date_start = pd.to_datetime(date_start)
-        date_end = pd.to_datetime(date_end)
+        date_end = pd.to_datetime(date_end) if date_end is not None else None
         
         logger.info(
             f"Pulling data for {self.symbol} from {date_start} to {date_end}")
