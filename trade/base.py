@@ -1,11 +1,9 @@
 import json
-import multiprocessing
 import os
 import pickle
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from shutil import rmtree
 from typing import Any, Callable, Optional
@@ -84,7 +82,8 @@ class BaseTradeClass(ABC):
         self.ticker = cfg['symbol'].ticker
         self.hist_size = cfg['hist_size']
         self.log_trades = cfg['log_trades']
-        self.save_path = Path(os.getenv("LOG_DIR"), cfg["conftype"], cfg["name"], f"{self.ticker}-{self.period.value}")
+        self.save_path = Path(os.getenv(
+            "LOG_DIR"), cfg["conftype"], cfg["name"], f"{self.ticker}-{self.period.value}")
         self.save_path.mkdir(parents=True, exist_ok=True)
         self.backup_path = self.save_path / "backup"
         self.backup_path.mkdir(parents=True, exist_ok=True)
@@ -140,7 +139,7 @@ class BaseTradeClass(ABC):
 
         if self.time.changed(no_none=True):
             self.update()
-            msg = f"self.pos.curr: {str(self.pos.curr) if self.pos.curr is not None else 'None'}"
+            msg = f"{self.ticker}-{self.period.value}: {str(self.pos.curr) if self.pos.curr is not None else 'None'}"
             logger.debug(msg)
             if logger._core.min_level == 10:
                 print()
@@ -184,7 +183,7 @@ class BaseTradeClass(ABC):
             self.load_backup()
         else:
             self.clear_log_dir()
-            
+
         logger.info(f"Market wallet: {self.get_wallet()}")
 
     def update_market_state(self) -> None:
