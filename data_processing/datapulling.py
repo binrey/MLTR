@@ -9,7 +9,7 @@ from loguru import logger
 from pybit.unified_trading import HTTP
 
 from common.type import Symbol, TimePeriod
-from trade.bybit import BybitTrading
+from trade.utils import get_bybit_hist
 
 
 class BybitDownloader:
@@ -46,7 +46,7 @@ class BybitDownloader:
 
     @staticmethod
     def _get_data_from_message(mresult):
-        data = BybitTrading.get_bybit_hist(mresult)
+        data = get_bybit_hist(mresult)
         data = pd.DataFrame(data)
         data.set_index(data.Date, drop=True, inplace=True)
         data.drop("Date", axis=1, inplace=True)

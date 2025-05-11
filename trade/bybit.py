@@ -5,8 +5,7 @@ from loguru import logger
 
 from common.type import Side
 from common.utils import Telebot
-from data_processing.dataloading import DTYPE
-from trade.utils import Position
+from trade.utils import Position, get_bybit_hist
 
 pd.options.mode.chained_assignment = None
 from typing import Any, Dict, Optional, Union
@@ -42,21 +41,6 @@ class BybitTrading(BaseTradeClass):
 
     def to_datetime(self, timestamp: Union[int, float]) -> np.datetime64:
         return np.datetime64(int(timestamp), "ms")
-
-    @staticmethod
-    def get_bybit_hist(mresult):
-        input = np.array(mresult["list"], dtype=np.float64)[::-1]
-        data = np.zeros(input.shape[0], dtype=DTYPE)
-
-        data['Id'] = input[:, 0].astype(np.int64)
-        data['Date'] = data['Id'].astype("datetime64[ms]")
-        data['Open'] = input[:, 1]
-        data['High'] = input[:, 2]
-        data['Low'] = input[:, 3]
-        data['Close'] = input[:, 4]
-        data['Volume'] = input[:, 5]
-
-        return data
 
     def get_pos_history(self, limit=5):
         positions = self.session.get_closed_pnl(category="linear",
@@ -156,7 +140,7 @@ class BybitTrading(BaseTradeClass):
             except Exception as e:
                 logger.error(f"Error getting history data: {e}")
                 sleep(1)
-            data = self.get_bybit_hist(message["result"])
+            data = get_bybit_hist(message["result"])
         return data
 
     def wait_until_next_update(self, next_update_time):
