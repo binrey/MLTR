@@ -1,6 +1,3 @@
-from pathlib import Path
-
-import torch
 
 from common.type import Side
 from indicators.ma import MovingAverage
@@ -13,21 +10,26 @@ class ClsMACross(DecisionMaker):
 
     def __init__(self, cfg):
         super(ClsMACross, self).__init__(cfg["hist_size"], cfg["period"], cfg["symbol"])
-        cfg.pop("hist_size")
-        cfg.pop("period")
-        cfg.pop("symbol")
-        self.indicators = self.setup_indicators(cfg)
-        
-        
+        self.mode = cfg["mode"]
+        self.ma_fast_period = cfg["ma_fast_period"]
+        self.ma_slow_period = cfg["ma_slow_period"]
+        self.upper_levels = cfg["upper_levels"]
+        self.lower_levels = cfg["lower_levels"]
+        self.min_step = cfg["min_step"]
+        self.speed = cfg["speed"]
+        self.indicators = self.setup_indicators()
 
-    def setup_indicators(self, cfg):
-        self.ma_fast = MovingAverage(period=cfg["ma_fast_period"])
+        self.description = DecisionMaker.make_description(self.type, cfg)
+
+
+    def setup_indicators(self):
+        self.ma_fast = MovingAverage(period=self.ma_fast_period)
         self.ma_slow = MovingAverage(
-            period=cfg["ma_slow_period"],
-            upper_levels=cfg["upper_levels"],
-            lower_levels=cfg["lower_levels"],
-            min_step=cfg["min_step"],
-            speed=cfg["speed"])
+            period=self.ma_slow_period,
+            upper_levels=self.upper_levels,
+            lower_levels=self.lower_levels,
+            min_step=self.min_step,
+            speed=self.speed)
         return [self.ma_fast, self.ma_slow]
 
     def look_around(self, h) -> bool:
@@ -37,7 +39,7 @@ class ClsMACross(DecisionMaker):
         levels_curr, levels_prev = self.ma_slow.current_ma_values, self.ma_slow.previous_ma_values
         ma_slow_prev, ma_slow_curr = levels_prev[0], levels_curr[0]
         ma_fast_prev, ma_fast_curr = self.ma_fast.previous_ma_values[0], self.ma_fast.current_ma_values[0]
-        
+
         if self.mode == "trend":
             if ma_fast_curr > ma_slow_curr:
                 order_side = Side.BUY
@@ -67,16 +69,18 @@ class ClsMACross(DecisionMaker):
             self.sl_definer[Side.BUY] = h["Low"].min()
             self.sl_definer[Side.SELL] = h["High"].max()
             self.set_draw_objects(h["Date"][-2])
+            self.draw_items += self.ma_slow.vis_objects
+            self.draw_items += self.ma_fast.vis_objects
 
-        return DecisionMaker.Response(side=order_side, 
+        return DecisionMaker.Response(side=order_side,
                                       target_volume_fraction=volume_fraction,
                                       increment_by_num_lots = lots_to_order)
-    
+
     def setup_sl(self, side: Side):
         return self.sl_definer[side]
-    
+
     def setup_tp(self, side: Side):
         return self.tp_definer[side]
-    
+
     def update_inner_state(self, h):
         return super().update_inner_state(h)

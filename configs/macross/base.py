@@ -2,8 +2,8 @@ import numpy as np
 
 from common.type import Symbols, TimePeriod, Vis
 from common.utils import FeeRate, update_config
+from experts.core.position_control import *
 from experts.ma_cross import ClsMACross
-from experts.position_control import FixRate, SLDynamic, SLFixed, TPFromSL, TrailingStop
 
 config = dict(
     decision_maker=dict(
@@ -17,26 +17,27 @@ config = dict(
         speed=0.5
     ),
     sl_processor=dict(
-        type=SLDynamic,
-        active=True,
-        percent_value=0
+        type=SLFixed,
+        active=False,
+        percent_value=2
     ),
     tp_processor=dict(
         type=TPFromSL,
         active=False,
-        scale=0
+        scale=2
     ),
     trailing_stop=dict(
         type=FixRate,
-        rate=0.02,
+        rate=0.0,
     ),
     
-    name="volprof",
+    name="macross",
     conftype=None,
-    wallet=100,
-    leverage=1,
+    wallet=1000,
+    lot=0.02,
+    leverage=5,
     close_only_by_stops=False,
-    hist_size=64,
+    hist_size=1028,
     tstart=0,
     tend=None,
     period=TimePeriod.M60,
@@ -55,7 +56,7 @@ config = dict(
 backtest = update_config(
     config,
     conftype="backtest",
-    date_start=np.datetime64("2025-01-03T22:28:34"),
+    date_start=np.datetime64("2020-01-03T22:28:34"),
     date_end=np.datetime64("2025-05-01T00:00:00"),
     eval_buyhold=True,
     clear_logs=True,

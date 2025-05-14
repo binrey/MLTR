@@ -140,11 +140,8 @@ class BaseTradeClass(ABC):
     def create_orders(self, side: Side, volume: float, time_id: Optional[int] = None):
         # Normalize volume to qty_step
         volume = round(volume / self.qty_step, 0) * self.qty_step
-        if volume == 0:
-            logger.warning(
-                f"Normalized volume is 0, set to minimum {self.qty_step}")
-            volume = self.qty_step
-        self._create_orders(side, volume, time_id)
+        if volume:
+            self._create_orders(side, volume, time_id)
 
     def get_rounded_time(self, time: np.datetime64) -> np.datetime64:
         trounded = np.array(time).astype(
