@@ -2,7 +2,7 @@ import numpy as np
 
 from common.type import Symbols, TimePeriod, Vis
 from common.utils import FeeRate, update_config
-from experts.position_control import FixRate, SLDynamic, SLFixed, TPFromSL, TrailingStop
+from experts.core.position_control import *
 from experts.volprof import VolProf
 
 config = dict(
@@ -29,7 +29,7 @@ config = dict(
     name="volprof",
     conftype=None,
     wallet=100,
-    leverage=1,
+    leverage=5,
     close_only_by_stops=False,
     hist_size=64,
     tstart=0,
@@ -50,8 +50,8 @@ config = dict(
 backtest = update_config(
     config,
     conftype="backtest",
-    date_start=np.datetime64("2025-05-03T22:28:34"),
-    date_end=np.datetime64("2025-05-05T00:00:00"),
+    date_start=np.datetime64("2018-01-01T00:00:00"),
+    date_end=np.datetime64("2025-05-20T17:00:00"),
     eval_buyhold=True,
     clear_logs=True,
     log_trades=True,

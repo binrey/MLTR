@@ -8,7 +8,7 @@ from loguru import logger
 from backtesting.backtest_broker import Position
 from common.type import Side
 from experts.core.decision_maker import DecisionMaker
-from experts.position_control import StopsController, TrailingStop
+from experts.core.position_control import StopsController, TrailingStop
 
 # from indicators import *
 
