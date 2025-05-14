@@ -2,6 +2,7 @@ import random
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
+from typing import Any, Callable, Optional
 
 import matplotlib.colors as mcolors
 import numpy as np
@@ -12,9 +13,9 @@ from loguru import logger
 from backtesting.backtest_broker import Broker
 from backtesting.utils import BackTestResults
 from data_processing import PULLERS
-from experts.experts import BacktestExpert
+from experts.core import ExpertFormation
 from trade.base import BaseTradeClass, log_get_hist
-from trade.utils import Position
+from trade.utils import ORDER_TYPE, Order, Position, log_modify_sl, log_modify_tp
 
 pd.options.mode.chained_assignment = None
 
@@ -27,12 +28,18 @@ stackprinter.set_excepthook(style='color')
 class BackTest(BaseTradeClass):
     def __init__(self, cfg) -> None:
         self.session = Broker(cfg)
-        super().__init__(cfg=cfg, expert=BacktestExpert(cfg=cfg, session=self.session))
+        self.eval_buyhold = cfg["eval_buyhold"]
+        super().__init__(cfg=cfg, 
+                         expert=ExpertFormation(cfg=cfg,
+                                                create_orders_func=self.create_orders,
+                                                modify_sl_func=self.modify_sl,
+                                                modify_tp_func=self.modify_tp),
+                         telebot=None)
         self.init_save_path()
 
     def init_save_path(self):
-        if self.cfg["save_plots"]:
-            save_path = Path("backtests") / f"{self.cfg['symbol'].ticker}"
+        if self.save_plots:
+            save_path = Path("backtests") / f"{self.ticker}"
             if save_path.exists():
                 rmtree(save_path)
             save_path.mkdir(parents=True)
@@ -54,7 +61,23 @@ class BackTest(BaseTradeClass):
         return self.session.positions
 
     def get_qty_step(self):
-        return self.cfg["equaty_step"]
+        return self.qty_step
+
+    def _create_orders(self, side, volume, time_id):
+        orders = [Order(0, side, ORDER_TYPE.MARKET, volume, time_id, time_id)]
+        log_message = f"Send order {orders[0]}"
+
+        self.session.set_active_orders(orders)
+        logger.debug(log_message)
+        return orders
+        
+    @log_modify_sl
+    def modify_sl(self, sl: Optional[float]):
+        self.session.update_sl(sl)
+
+    @log_modify_tp
+    def modify_tp(self, tp: Optional[float]):
+        self.session.update_tp(tp)
 
     def postprocess(self) -> BackTestResults:
         bt_res = BackTestResults()
@@ -64,7 +87,7 @@ class BackTest(BaseTradeClass):
             logger.warning("No trades!")
             return bt_res
         
-        if self.cfg['eval_buyhold']:
+        if self.eval_buyhold:
             dates = self.session.mw.hist["Date"][self.session.mw.id2start: self.session.mw.id2end]
             closes = self.session.mw.hist["Close"][self.session.mw.id2start: self.session.mw.id2end]
             bt_res.compute_buy_and_hold(dates=dates, closes=closes)

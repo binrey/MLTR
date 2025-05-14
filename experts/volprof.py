@@ -85,8 +85,8 @@ class VolProf(DecisionMaker):
 
             if self.lprice is not None and self.sprice is not None:
                 logger.debug(f"Entry points: long: {self.lprice:.2f}, short: {self.sprice:.2f}")
-                self.sl_definer[Side.BUY] = self.sprice
-                self.sl_definer[Side.SELL] = self.lprice
+                self.sl_definer[Side.BUY] = self.sprice#min(self.sprice, h["Low"][-2])
+                self.sl_definer[Side.SELL] = self.lprice#max(self.lprice, h["High"][-2])
                 self.set_draw_objects(h["Date"][-2])
                 self.draw_items += self.indicator.vis_objects
 

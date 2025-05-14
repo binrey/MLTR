@@ -5,7 +5,7 @@ from loguru import logger
 
 from common.type import Side
 from common.utils import Telebot
-from trade.utils import Position, get_bybit_hist
+from trade.utils import Position, get_bybit_hist, log_modify_sl, log_modify_tp
 
 pd.options.mode.chained_assignment = None
 from typing import Any, Dict, Optional, Union
@@ -16,7 +16,7 @@ import stackprinter
 import yaml
 from pybit.unified_trading import HTTP
 
-from experts.experts import ByBitExpert
+from experts.core import ExpertFormation
 from trade.base import BaseTradeClass, log_get_hist
 
 stackprinter.set_excepthook(style='color')
@@ -27,7 +27,7 @@ stackprinter.set_excepthook(style='color')
 class BybitTrading(BaseTradeClass):
     def __init__(self, cfg, telebot: Telebot, bybit_session: HTTP) -> None:
         self.session = bybit_session
-        super().__init__(cfg=cfg, expert=ByBitExpert(cfg, bybit_session), telebot=telebot)
+        super().__init__(cfg=cfg, expert=ExpertFormation(cfg, self.create_orders, self.modify_sl, self.modify_tp), telebot=telebot)
         logger.info(f"Initialized BybitTrading with ticker: {self.ticker}, period: {self.period}")
 
     def get_server_time(self) -> np.datetime64:
@@ -156,6 +156,48 @@ class BybitTrading(BaseTradeClass):
             remaining_seconds -= sleep_time
         print("\rWaiting 00m 00s [##############################]", flush=True)  # Clear line at the end
 
+    def _create_orders(self, side: Side, volume: float, time_id: Optional[int] = None):
+        try:
+            resp = self.session.place_order(
+                category="linear",
+                symbol=self.ticker,
+                side=side.name.capitalize(),
+                orderType="Market",
+                qty=volume,
+                timeInForce="GTC",
+                # orderLinkId="spot-test-po1stonly",
+                # stopLoss="" if sl is None else str(abs(sl)),
+                # takeProfit="" if tp is None else str(tp)
+                )
+            logger.debug(f"place order result: {resp.get('result', '--')}")
+        except Exception as ex:
+            logger.error(ex)
+
+    @log_modify_sl
+    def modify_sl(self, sl: Optional[float]):
+        if sl is None:
+            return
+        try:
+            self.session.set_trading_stop(
+                category="linear",
+                symbol=self.ticker,
+                stopLoss=sl
+            )
+        except Exception as ex:
+            logger.error(ex)
+
+    @log_modify_tp
+    def modify_tp(self, tp: Optional[float]):
+        if tp is None:
+            return
+        try:
+            self.session.set_trading_stop(
+                category="linear",
+                symbol=self.ticker,
+                takeProfit=tp
+            )
+        except Exception as ex:
+            logger.error(ex)
 
 def launch(cfg, demo=False):
     with open("./api.yaml", "r") as f:

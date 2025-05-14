@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Optional
 
 import mplfinance as mpf
-import numpy as np
 import pandas as pd
 from loguru import logger
 from pybit.unified_trading import HTTP

@@ -19,7 +19,7 @@ load_dotenv()
 LOCAL_LOGS_DIR = Path(os.getenv("LOG_DIR"))
 BROKER = "bybit"
 EXPERT = "volprof"
-SYMBOL = Symbols.BTCUSDT
+SYMBOL = Symbols.ETHUSDT
 PERIOD = TimePeriod.M1
 TAG = f"{SYMBOL.ticker}-{PERIOD.value}"
 
@@ -133,6 +133,6 @@ if __name__ == "__main__":
         logger.info(logline)
 
     logger.info("----------------------------------------")
-    logger.info(f"Mean time lag: {np.mean(time_lags):.2f}s")
-    logger.info(f"Match rate: {match_count / len(positions_test) * 100:.2f}%")
-    logger.info(f"Mean slippage: {np.mean(slippages)*100:.4f}%")
+    logger.info(f"Mean time lag: " + (f"{np.mean(time_lags):.2f}s" if len(positions_test) > 0 else "NO TEST"))
+    logger.info(f"Match rate: " + (f"{match_count / len(positions_test) * 100:.2f}%" if len(positions_test) > 0 else "NO TEST"))
+    logger.info(f"Mean slippage: " + (f"{np.mean(slippages)*100:.4f}%" if len(positions_test) > 0 else "NO TEST"))

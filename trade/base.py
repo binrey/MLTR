@@ -13,7 +13,7 @@ import pandas as pd
 import stackprinter
 from loguru import logger
 
-from common.type import Vis
+from common.type import Side, Vis
 from common.utils import Telebot, date2str
 from common.visualization import Visualizer
 from experts.core.expert import ExpertBase
@@ -66,20 +66,20 @@ class StepData:
 
 class BaseTradeClass(ABC):
     def __init__(self, cfg, expert: ExpertBase, telebot: Optional[Telebot] = None) -> None:
-        self.cfg = cfg
+
         self.my_telebot = telebot
         self.exp = expert
         self.h, self.time = None, StepData()
         self.pos: StepData[Position] = StepData()
 
-        self.symbol = cfg['symbol']
+        self.ticker = cfg["symbol"].ticker
+        self.qty_step = cfg["symbol"].qty_step
         self.period = cfg['period']
         self.visualize = cfg['visualize']
         self.save_plots = cfg['save_plots']
         self.vis_hist_length = cfg['vis_hist_length']
         self.vis_events = cfg['vis_events']
         self.should_save_backup = cfg['save_backup']
-        self.ticker = cfg['symbol'].ticker
         self.hist_size = cfg['hist_size']
         self.log_trades = cfg['log_trades']
         self.save_path = Path(os.getenv(
@@ -90,6 +90,8 @@ class BaseTradeClass(ABC):
         self.trades_log_path = self.save_path / "positions"
         self.trades_log_path.mkdir(parents=True, exist_ok=True)
 
+        assert self.qty_step == self.get_qty_step()
+
         self.visualizer = Visualizer(period=self.period,
                                      show=self.visualize,
                                      save_to=self.save_path if self.save_plots else None,
@@ -97,7 +99,7 @@ class BaseTradeClass(ABC):
         self.nmin = self.period.minutes
         self.time = StepData()
         self.exp_update = self.exp.update
-        self.log_config()
+        self.log_config(cfg)
 
     @abstractmethod
     def get_server_time(self) -> np.datetime64:
@@ -122,6 +124,27 @@ class BaseTradeClass(ABC):
     @abstractmethod
     def get_wallet(self) -> float:
         pass
+
+    @abstractmethod
+    def _create_orders(self, side: Side, volume: float, time_id: Optional[int] = None):
+        pass
+
+    @abstractmethod
+    def modify_sl(self, sl: Optional[float]):
+        pass
+
+    @abstractmethod
+    def modify_tp(self, tp: Optional[float]):
+        pass
+
+    def create_orders(self, side: Side, volume: float, time_id: Optional[int] = None):
+        # Normalize volume to qty_step
+        volume = round(volume / self.qty_step, 0) * self.qty_step
+        if volume == 0:
+            logger.warning(
+                f"Normalized volume is 0, set to minimum {self.qty_step}")
+            volume = self.qty_step
+        self._create_orders(side, volume, time_id)
 
     def get_rounded_time(self, time: np.datetime64) -> np.datetime64:
         trounded = np.array(time).astype(
@@ -195,11 +218,11 @@ class BaseTradeClass(ABC):
         # return self.visualizer([self.pos.prev, self.pos.curr], self.exp)
         return self.visualizer(self.get_pos_history() + [self.pos.curr], self.exp)
 
-    def log_config(self):
+    def log_config(self, cfg):
         config_file = self.save_path / "config.pkl"
         # with open(config_file, 'w') as f:
         #     json.dump(self.cfg, f, indent=2)
-        pickle.dump(self.cfg, open(config_file, "wb"))
+        pickle.dump(cfg, open(config_file, "wb"))
         logger.debug(f"Config saved to {config_file}")
 
     def log_trade(self, position: Position):

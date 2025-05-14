@@ -1,6 +1,6 @@
 import json
 from enum import Enum
-from typing import Any, List, Optional
+from typing import Any, Callable, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -9,6 +9,22 @@ from loguru import logger
 from common.type import Line, Point, Side, to_datetime
 from common.utils import FeeConst, FeeModel
 from data_processing.dataloading import DTYPE
+
+
+def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(self, sl: Optional[float]):
+        logger.debug(f"Modifying sl: {self.session.active_position.sl} -> {sl}")
+        result = func(self, sl)
+        return result
+    return wrapper
+
+
+def log_modify_tp(func: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(self, tp: Optional[float]):
+        logger.debug(f"Modifying tp: {self.session.active_position.tp} -> {tp}")
+        result = func(self, tp)
+        return result
+    return wrapper
 
 
 def get_bybit_hist(mresult):
