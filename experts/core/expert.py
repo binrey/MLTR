@@ -109,12 +109,13 @@ class ExpertFormation(ExpertBase):
                 sl = self.trailing_stop.get_stop_loss(
                     self.active_position, hist=h)
 
-            if self.active_position.side == Side.BUY:
-                sl = min(sl, h["Open"][-1] - self.symbol.tick_size *
-                         self.traid_stops_min_size_multiplier)
-            else:
-                sl = max(sl, h["Open"][-1] + self.symbol.tick_size *
-                         self.traid_stops_min_size_multiplier)
+            if sl is not None:
+                if self.active_position.side == Side.BUY:
+                    sl = min(sl, h["Open"][-1] - self.symbol.tick_size *
+                            self.traid_stops_min_size_multiplier)
+                else:
+                    sl = max(sl, h["Open"][-1] + self.symbol.tick_size *
+                            self.traid_stops_min_size_multiplier)
             if sl != self.active_position.sl:
                 self.modify_sl(sl)
 
