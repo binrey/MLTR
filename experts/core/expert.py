@@ -190,9 +190,9 @@ class ExpertFormation(ExpertBase):
                 # if order_volume < self.active_position.volume:
                 #     return
             else:
-                # Add to old
                 order_volume = max(0, target_volume -
                                    self.active_position.volume)
+
         if order_volume > 0:
             self.create_orders(side=target_state.side,
                                volume=order_volume,
