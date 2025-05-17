@@ -157,12 +157,15 @@ class BackTestResults:
     def relative2wallet(self, data: pd.Series):
         return data/self.wallet*100
 
+    def relative2deposit(self, data: pd.Series):
+        return data/self.deposit*100
+
     def add_profit_curve(self, days: pd.Index, values: pd.Series, name: str, color: str, linewidth: float, alpha: float):
         self.fig.axes[0].plot(days, values, linewidth=linewidth, color=color, alpha=alpha)
         self.legend_ax1.append(name)
         
     def add_from_other_results(self, btest_results: "BackTestResults", color: str, linewidth: float = 1, alpha: float = 0.5):
-        self.add_profit_curve(btest_results.daily_hist.index, btest_results.relative2wallet(btest_results.daily_hist["profit_csum"]), 
+        self.add_profit_curve(btest_results.daily_hist.index, btest_results.relative2deposit(btest_results.daily_hist["profit_csum"]), 
                               btest_results.tickers_set, color, linewidth, alpha)
 
     def plot_results(self, title: Optional[str] = None, plot_profit_without_fees: bool = True):
@@ -172,16 +175,16 @@ class BackTestResults:
             self.fig.suptitle(title, fontsize=16)
             self.fig.subplots_adjust(top=0.9)
         
-        self.add_profit_curve(self.daily_hist.index, self.relative2wallet(self.daily_hist["profit_csum"]), 
+        self.add_profit_curve(self.daily_hist.index, self.relative2deposit(self.daily_hist["profit_csum"]), 
                               self.tickers_set, color="b", linewidth=3, alpha=0.5)
         if plot_profit_without_fees:
-            self.add_profit_curve(self.daily_hist.index, self.relative2wallet(self.daily_hist["profit_csum_nofees"]), 
+            self.add_profit_curve(self.daily_hist.index, self.relative2deposit(self.daily_hist["profit_csum_nofees"]), 
                                   f"{self.tickers_set } without fees", color="b", linewidth=1, alpha=0.5)
 
         if "buy_and_hold" in self.daily_hist.columns:
             ax1.plot(
                 self.daily_hist.index,
-                self.daily_hist["buy_and_hold"]/self.wallet*100,
+                self.relative2wallet(self.daily_hist["buy_and_hold"]),
                 linewidth=2,
                 color="g",
                 alpha=0.6,
@@ -192,7 +195,7 @@ class BackTestResults:
 
         ax2.plot(
             self.daily_hist.index,
-            self.daily_hist["deposit"]/self.wallet*100,
+            self.relative2deposit(self.daily_hist["deposit"]),
             "-",
             linewidth=3,
             alpha=0.3,
@@ -201,7 +204,7 @@ class BackTestResults:
 
         ax3.bar(
             self.monthly_hist.index,
-            self.monthly_hist["finres"]/self.wallet*100,
+            self.relative2deposit(self.monthly_hist["finres"]),
             width=20,
             color="g",
             alpha=0.6,
