@@ -5,29 +5,26 @@ from common.utils import FeeRate, update_config
 from experts.core.position_control import *
 from experts.ma_cross import ClsMACross
 
+
 config = dict(
     decision_maker=dict(
         type=ClsMACross,
         mode = "contrtrend",
         ma_fast_period=16,
-        upper_levels = 2,
-        lower_levels = 20,
+        upper_levels = 3,
+        lower_levels = 60,
         min_step=0.25,
-        speed=0.5
     ),
     sl_processor=dict(
         type=SLFixed,
         active=False,
-        percent_value=2
     ),
     tp_processor=dict(
         type=TPFromSL,
         active=False,
-        scale=2
     ),
     trailing_stop=dict(
         type=FixRate,
-        rate=0.0,
     ),
     
     name="macross",
@@ -57,7 +54,7 @@ backtest = update_config(
     config,
     conftype="backtest",
     date_start=np.datetime64("2018-01-01T00:00:00"),
-    date_end=np.datetime64("2025-04-01T00:00:00"),
+    date_end=np.datetime64("2025-05-01T00:00:00"),
     eval_buyhold=True,
     clear_logs=True,
     log_trades=True,

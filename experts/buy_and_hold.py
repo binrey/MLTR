@@ -14,9 +14,7 @@ class BuyAndHold(DecisionMaker):
     type = "buy_and_hold"
 
     def __init__(self, cfg):
-        super().__init__(hist_size=cfg.pop("hist_size"),
-                         period=cfg.pop("period"),
-                         symbol=cfg.pop("symbol"))
+        super().__init__(cfg)
         self.indicators = []
         self.description = DecisionMaker.make_description(self.type, cfg)
 
