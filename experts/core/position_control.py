@@ -72,7 +72,7 @@ class TPFromSL(StopsController):
 
 class TrailingStop:
     def __init__(self, cfg):
-        self.rate = cfg["rate"]
+        self.rate = cfg.get("rate", 0)
 
     def get_stop_loss(self, active_position, hist: np.ndarray) -> float:
         raise NotImplementedError("Subclasses must implement this method")
