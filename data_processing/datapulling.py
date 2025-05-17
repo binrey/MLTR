@@ -86,7 +86,7 @@ class BybitDownloader:
         if len(h) > 0:
             res = res[1:]
         h = pd.concat([h, res])
-        while res.shape[0]:
+        while res.shape[0] and h.index[-1] < date_end:
             logger.info(f"Last date : {h.index[-1]}")
             res = self._get_data_from_message(self.get_klines(start_date=h.index[-1],
                                                               end_date=None))[1:]

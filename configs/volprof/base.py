@@ -45,6 +45,7 @@ config = dict(
     visualize=False,
     run_model_device=None,
     no_trading_days=set(),
+    close_last_position=True
 )
 
 backtest = update_config(
@@ -55,7 +56,6 @@ backtest = update_config(
     eval_buyhold=True,
     clear_logs=True,
     log_trades=True,
-    close_last_position=True,
 )
 
 optimization = update_config(

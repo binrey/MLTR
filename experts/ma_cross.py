@@ -1,4 +1,5 @@
 
+from typing import Any
 from common.type import Side
 from indicators.ma import MovingAverage
 
@@ -8,15 +9,15 @@ from .core.expert import DecisionMaker
 class ClsMACross(DecisionMaker):
     type = "macross"
 
-    def __init__(self, cfg):
-        super(ClsMACross, self).__init__(cfg["hist_size"], cfg["period"], cfg["symbol"])
+    def __init__(self, cfg: dict[str, Any]):
+        super(ClsMACross, self).__init__(cfg)
         self.mode = cfg["mode"]
-        self.ma_fast_period = cfg["ma_fast_period"]
-        self.ma_slow_period = cfg["ma_slow_period"]
+        self.ma_slow_period = self.hist_size
+        self.ma_fast_period = self.ma_slow_period//cfg["ma_fast_period"]
         self.upper_levels = cfg["upper_levels"]
         self.lower_levels = cfg["lower_levels"]
         self.min_step = cfg["min_step"]
-        self.speed = cfg["speed"]
+        self.speed = self.min_step #cfg["speed"]
         self.indicators = self.setup_indicators()
 
         self.description = DecisionMaker.make_description(self.type, cfg)

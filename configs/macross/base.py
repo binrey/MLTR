@@ -10,7 +10,6 @@ config = dict(
         type=ClsMACross,
         mode = "contrtrend",
         ma_fast_period=16,
-        ma_slow_period=256,
         upper_levels = 2,
         lower_levels = 20,
         min_step=0.25,
@@ -34,10 +33,10 @@ config = dict(
     name="macross",
     conftype=None,
     wallet=1000,
-    lot=0.02,
-    leverage=5,
+    lot=0.08,
+    leverage=1,
     close_only_by_stops=False,
-    hist_size=1028,
+    hist_size=256,
     tstart=0,
     tend=None,
     period=TimePeriod.M60,
@@ -51,17 +50,17 @@ config = dict(
     visualize=False,
     run_model_device=None,
     no_trading_days=set(),
+    close_last_position=True,
 )
 
 backtest = update_config(
     config,
     conftype="backtest",
-    date_start=np.datetime64("2020-01-03T22:28:34"),
-    date_end=np.datetime64("2025-05-01T00:00:00"),
+    date_start=np.datetime64("2018-01-01T00:00:00"),
+    date_end=np.datetime64("2025-04-01T00:00:00"),
     eval_buyhold=True,
     clear_logs=True,
     log_trades=True,
-    close_last_position=True,
 )
 
 optimization = update_config(
@@ -72,12 +71,14 @@ optimization = update_config(
     clear_logs=False,
     log_trades=False,
     eval_buyhold=False,
-    hist_size=[32, 64, 128, 256],
-    trailing_stop={
-        "rate": [0.03, 0.02, 0.01]
-        },
+    hist_size=[256],
+    lot=[0.02, 0.04, 0.08],
     decision_maker={
-        "sharpness": [3, 4, 5, 6],
+        "ma_fast_period": [16, 32, 64],
+        "upper_levels": [0, 5, 10],
+        "lower_levels": [20, 30, 40],
+        "min_step": [0.125, 0.25, 0.5],
+        # "speed": [0.125, 0.25, 0.5],
         }
     )
 

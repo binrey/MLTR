@@ -48,14 +48,14 @@ class PyConfig():
         config_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(config_module)
         self.base_config = config_module
-        self.optim, self.backetest, self.bybit = None, None, None
+        self.optimization, self.backetest, self.bybit = None, None, None
         if hasattr(self.base_config, "backtest"):
             self.backetest = self.base_config.backtest
         if hasattr(self.base_config, "bybit"):
             self.bybit = self.base_config.bybit
 
         if hasattr(self.base_config, "optimization"):
-            self.optim = self.base_config.optimization
+            self.optimization = self.base_config.optimization
 
     def _get_inference(self, cfg):
         cfg_compiled = deepcopy(cfg)
@@ -86,7 +86,7 @@ class PyConfig():
         return self._get_inference(self.bybit)
     
     def get_optimization(self):
-        cfg = deepcopy(self.optim)
+        cfg = deepcopy(self.optimization)
         for k, vlist in cfg.items():
             vlist_new = []
             # If it's already a list of possible values...

@@ -10,6 +10,7 @@ from pathlib import Path
 from shutil import rmtree
 from time import time
 from typing import Any, Dict, List, Tuple
+from tqdm import tqdm
 
 import numpy as np
 import pandas as pd
@@ -264,8 +265,11 @@ class Optimizer:
         if not cache_dir.exists():
             return cfgs, btests
 
-        # Recursively find all pickle files
-        for p in sorted(cache_dir.rglob("*.pickle")):
+        # Get all pickle files
+        pickle_files = sorted(cache_dir.rglob("*.pickle"))
+        
+        # Recursively find all pickle files with progress bar
+        for p in tqdm(pickle_files, desc="Loading backtest results"):
             try:
                 with open(p, "rb") as f:
                     cfg, btest = pickle.load(f)
@@ -323,9 +327,10 @@ class Optimizer:
         opt_summary = pd.DataFrame(opt_summary)
 
         # Remove constant columns except symbol
-        for k in list(opt_summary.columns):
-            if k != "symbol" and len(set(map(str, opt_summary[k]))) == 1:
-                del opt_summary[k]
+        if opt_summary.shape[0] > 1:
+            for k in list(opt_summary.columns):
+                if k != "symbol" and len(set(map(str, opt_summary[k]))) == 1:
+                    del opt_summary[k]
 
         opt_summary.sort_values(by=["APR"], ascending=False, inplace=True)
         return opt_summary

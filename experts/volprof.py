@@ -18,10 +18,8 @@ class VolProf(DecisionMaker):
         MANUAL = "manual"  # Uses predefined volume distribution bins
         AUTO = "auto"  # Uses shadow intersection analysis
 
-    def __init__(self, cfg):
-        super().__init__(hist_size=cfg.pop("hist_size"),
-                         period=cfg.pop("period"),
-                         symbol=cfg.pop("symbol"))
+    def __init__(self, cfg: dict[str, Any]):
+        super().__init__(cfg)
         self.indicators = self.setup_indicators(cfg)
         
         self.long_bin = 1

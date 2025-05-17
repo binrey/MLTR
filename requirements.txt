@@ -12,6 +12,7 @@ telebot
 pybit
 diskcache
 tqdm
-torch
+# torch
 line-profiler==4.1.3
 python-dotenv==1.0.0
+tabulate
