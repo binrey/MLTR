@@ -13,7 +13,7 @@ from data_processing.dataloading import DTYPE
 
 def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, sl: Optional[float]):
-        logger.debug(f"Modifying sl: {self.session.active_position.sl} -> {sl}")
+        logger.debug(f"Modifying sl: {self.get_current_position().sl} -> {sl}")
         result = func(self, sl)
         return result
     return wrapper
@@ -21,7 +21,7 @@ def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
 
 def log_modify_tp(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, tp: Optional[float]):
-        logger.debug(f"Modifying tp: {self.session.active_position.tp} -> {tp}")
+        logger.debug(f"Modifying tp: {self.get_current_position().tp} -> {tp}")
         result = func(self, tp)
         return result
     return wrapper
