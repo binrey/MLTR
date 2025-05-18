@@ -5,7 +5,13 @@ from loguru import logger
 
 from common.type import Side
 from common.utils import Telebot
-from trade.utils import Position, get_bybit_hist, log_creating_order, log_modify_sl, log_modify_tp
+from trade.utils import (
+    Position,
+    get_bybit_hist,
+    log_creating_order,
+    log_modify_sl,
+    log_modify_tp,
+)
 
 pd.options.mode.chained_assignment = None
 from typing import Any, Dict, Optional, Union
@@ -114,6 +120,7 @@ class BybitTrading(BaseTradeClass):
         return float(msg["list"][0]["lotSizeFilter"]["qtyStep"])
 
     def _parse_bybit_position(self, pos: Dict[str, Any]):
+        logger.debug(f"Parsing position: {pos}")
         sl = float(pos["stopLoss"]) if "stopLoss" in pos and len(pos["stopLoss"]) else None
         volume = float(pos["closedSize"] if "closedSize" in pos else pos["size"])
         date = self.to_datetime(pos["updatedTime"])

@@ -125,7 +125,8 @@ class ExpertFormation(ExpertBase):
                 tp = self.tp_processor.create(hist=h,
                                               active_position=self.active_position,
                                               decision_maker=self.decision_maker)
-                self.modify_tp(tp)
+                if tp != self.active_position.tp:
+                    self.modify_tp(tp)
 
     def get_body(self, h):
         self.create_or_update_sl(h)
@@ -135,7 +136,7 @@ class ExpertFormation(ExpertBase):
         if self.close_only_by_stops and self.active_position:
             return
 
-        target_state = self.decision_maker.look_around(h)
+        target_state: DecisionMaker.Response = self.decision_maker.look_around(h)
 
         if h["Date"][-1] in self.no_trading_days:
             self._reset_state()

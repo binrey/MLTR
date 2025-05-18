@@ -138,10 +138,30 @@ class BaseTradeClass(ABC):
         pass
 
     def create_orders(self, side: Side, volume: float, time_id: Optional[int] = None):
-        # Normalize volume to qty_step
         volume = round(volume, Symbol.qty_digits(self.qty_step))
-        if volume:
-            self._create_orders(side, volume, time_id)
+        if not volume:
+            return
+        if self.pos.curr is None:
+            target_volume = volume*side.value
+        else:
+            target_volume = round(self.pos.curr.volume*self.pos.curr.side.value + volume*side.value, Symbol.qty_digits(self.qty_step))
+        self._create_orders(side, volume, time_id)
+
+        # cur_pos = self.get_current_position()
+        open_positions = self.session.get_positions(category="linear", symbol=self.ticker)["result"]["list"]
+        open_positions = [pos for pos in open_positions if pos["size"] != "0"]
+        ticker, price, cur_volume, sl, cur_side, date = self._parse_bybit_position(open_positions[0])
+       
+        volume_diff = target_volume - cur_volume*cur_side.value
+        while volume_diff != 0:
+            logger.error(f"Volume diff: {volume_diff}, target_volume: {target_volume}, cur_volume: {cur_volume}, cur_side: {cur_side}")
+            # self._create_orders(side=Side.reverse(side), volume=abs(target_volume), time_id=time_id)
+            self._create_orders(side=Side.from_int(volume_diff), volume=abs(volume_diff), time_id=time_id)
+            # cur_pos = self.get_current_position()
+            open_positions = self.session.get_positions(category="linear", symbol=self.ticker)["result"]["list"]
+            open_positions = [pos for pos in open_positions if pos["size"] != "0"]
+            ticker, price, cur_volume, sl, cur_side, date = self._parse_bybit_position(open_positions[0])
+            volume_diff = target_volume - cur_volume*cur_side.value
 
     def get_rounded_time(self, time: np.datetime64) -> np.datetime64:
         trounded = np.array(time).astype(
