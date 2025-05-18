@@ -1,3 +1,4 @@
+import argparse
 import os
 import pickle
 import re
@@ -17,11 +18,18 @@ from trade.utils import Position
 load_dotenv()
 
 LOCAL_LOGS_DIR = Path(os.getenv("LOG_DIR"))
-BROKER = "bybit"
-EXPERT = "volprof"
-SYMBOL = Symbols.ETHUSDT
-PERIOD = TimePeriod.M1
-TAG = f"{SYMBOL.ticker}-{PERIOD.value}"
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Validate trading positions')
+    parser.add_argument('--broker', type=str, default="bybit", help='Broker name (default: bybit)')
+    parser.add_argument('--expert', type=str, default="volprof", help='Expert name (default: volprof)')
+    parser.add_argument('--symbol', type=str, default="ETHUSDT",
+                       choices=[attr for attr in dir(Symbols) if not attr.startswith('_')],
+                       help='Trading symbol (default: ETHUSDT)')
+    parser.add_argument('--period', type=str, default="M1", 
+                       choices=[p.name for p in TimePeriod.__members__.values()],
+                       help='Time period (default: M1)')
+    return parser.parse_args()
 
 
 def extract_datetimes(line):
@@ -89,6 +97,13 @@ def process_logfile(log_file) -> list[Position]:
 
 
 if __name__ == "__main__":
+    args = parse_args()
+    BROKER = args.broker
+    EXPERT = args.expert
+    SYMBOL = getattr(Symbols, args.symbol)
+    PERIOD = getattr(TimePeriod, args.period)
+    TAG = f"{SYMBOL.ticker}-{PERIOD.value}"
+    
     log_dir = LOCAL_LOGS_DIR / BROKER / EXPERT / TAG
     positions_real = download_logs(log_dir)
     positions_test = process_log_dir(log_dir)
