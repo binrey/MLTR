@@ -15,7 +15,7 @@ from backtesting.utils import BackTestResults
 from data_processing import PULLERS
 from experts.core import ExpertFormation
 from trade.base import BaseTradeClass, log_get_hist
-from trade.utils import ORDER_TYPE, Order, Position, log_modify_sl, log_modify_tp
+from trade.utils import ORDER_TYPE, Order, Position, log_creating_order, log_modify_sl, log_modify_tp
 
 pd.options.mode.chained_assignment = None
 
@@ -63,12 +63,10 @@ class BackTest(BaseTradeClass):
     def get_qty_step(self):
         return self.qty_step
 
+    @log_creating_order
     def _create_orders(self, side, volume, time_id):
         orders = [Order(0, side, ORDER_TYPE.MARKET, volume, time_id, time_id)]
-        log_message = f"Send order {orders[0]}"
-
         self.session.set_active_orders(orders)
-        logger.debug(log_message)
         return orders
         
     @log_modify_sl
@@ -108,7 +106,7 @@ def launch(cfg) -> BackTestResults:
     return bt_res
 
 
-def launch_multirun(cfgs: list[dict]):
+def launch_multirun(cfgs: list[dict]) -> BackTestResults:
     bt_res_combined = BackTestResults()
     bt_res_composition = []
 

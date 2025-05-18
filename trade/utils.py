@@ -11,6 +11,15 @@ from common.utils import FeeConst, FeeModel
 from data_processing.dataloading import DTYPE
 
 
+def log_creating_order(func: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(self, side: Side, volume: float, time_id: Optional[int] = None):
+        logger.debug(f"Creating order {side} {volume}...")
+        result = func(self, side, volume, time_id)
+        logger.debug(f"Order created: {result}")
+        return result
+    return wrapper
+
+
 def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, sl: Optional[float]):
         logger.debug(f"Modifying sl: {self.get_current_position().sl} -> {sl}")

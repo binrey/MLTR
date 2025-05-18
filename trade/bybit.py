@@ -5,7 +5,7 @@ from loguru import logger
 
 from common.type import Side
 from common.utils import Telebot
-from trade.utils import Position, get_bybit_hist, log_modify_sl, log_modify_tp
+from trade.utils import Position, get_bybit_hist, log_creating_order, log_modify_sl, log_modify_tp
 
 pd.options.mode.chained_assignment = None
 from typing import Any, Dict, Optional, Union
@@ -156,7 +156,9 @@ class BybitTrading(BaseTradeClass):
             remaining_seconds -= sleep_time
         print("\rWaiting 00m 00s [##############################]", flush=True)  # Clear line at the end
 
+    @log_creating_order
     def _create_orders(self, side: Side, volume: float, time_id: Optional[int] = None):
+        resp = None
         try:
             resp = self.session.place_order(
                 category="linear",
@@ -168,10 +170,10 @@ class BybitTrading(BaseTradeClass):
                 # orderLinkId="spot-test-po1stonly",
                 # stopLoss="" if sl is None else str(abs(sl)),
                 # takeProfit="" if tp is None else str(tp)
-                )
-            logger.debug(f"place order result: {resp.get('result', '--')}")
+                )["retMsg"]
         except Exception as ex:
-            logger.error(ex)
+            resp = ex
+        return resp
 
     @log_modify_sl
     def modify_sl(self, sl: Optional[float]):

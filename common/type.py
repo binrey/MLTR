@@ -127,6 +127,9 @@ class Symbol:
     tick_size: float = None
     qty_step: float = None
     
+    @classmethod
+    def qty_digits(cls, qty_step: float):
+        return len(str(qty_step).split(".")[1])
     
 class Symbols:
     BTCUSDT = Symbol(ticker="BTCUSDT", tick_size=0.001, qty_step=0.001)

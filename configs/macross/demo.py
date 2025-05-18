@@ -6,7 +6,7 @@ from experts.ma_cross import ClsMACross
 updates = dict(
     wallet=1000,
     period=TimePeriod.M1,
-    hist_size=32,
+    hist_size=16,
     decision_maker=dict(
         type=ClsMACross,
         mode = "contrtrend",

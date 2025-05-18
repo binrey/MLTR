@@ -13,11 +13,11 @@ import pandas as pd
 import stackprinter
 from loguru import logger
 
-from common.type import Side, Vis
+from common.type import Side, Symbol, Vis
 from common.utils import Telebot, date2str
 from common.visualization import Visualizer
 from experts.core.expert import ExpertBase
-from trade.utils import Position
+from trade.utils import Position, log_creating_order
 
 pd.options.mode.chained_assignment = None
 
@@ -139,7 +139,7 @@ class BaseTradeClass(ABC):
 
     def create_orders(self, side: Side, volume: float, time_id: Optional[int] = None):
         # Normalize volume to qty_step
-        volume = round(volume / self.qty_step, 0) * self.qty_step
+        volume = round(volume, Symbol.qty_digits(self.qty_step))
         if volume:
             self._create_orders(side, volume, time_id)
 

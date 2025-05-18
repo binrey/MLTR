@@ -111,10 +111,11 @@ class Broker:
         if self.active_position is not None and tp is not None:
             self.active_position.update_tp(tp, self.time)
 
-    def set_active_orders(self, new_orders_list: List[Order]):
+    def set_active_orders(self, new_orders_list: List[Order]) -> str:
         if len(new_orders_list):
             self.close_orders(self.hist_id)
             self.active_orders = new_orders_list
+        return "OK"
 
     def close_active_pos(self, price, time, hist_id):
         self.active_position.close(price, time, hist_id)
