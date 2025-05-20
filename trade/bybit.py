@@ -91,14 +91,14 @@ class BybitTrading(BaseTradeClass):
                 dict2position = open_positions[0]
             else:
                 pos_dict = open_positions[0]
-                _, _, volume, sl, _, _ = self._parse_bybit_position(pos_dict)
+                ticker, price, volume, sl, side, date = self._parse_bybit_position(pos_dict)
                 pos_object = self.pos.curr
                 if sl is not None:
                     pos_object.update_sl(sl, self.time.prev)
-                if volume != pos_object.volume:
-                    logger.error(f"Volume changed: {volume}, {pos_object.volume}")
-                # TODO: add to position
-                # pos_object.add_to_position()
+                if volume < pos_object.volume:
+                    logger.error(f"Attempt to reduce position volume: {pos_object.volume} -> {volume}")
+                else:
+                    pos_object.add_to_position(volume-pos_object.volume, float(price), self.time.prev)
                 # TODO: update tp
                 # pos_object.update_tp(pos["takeProfit"], self.time.prev)
                 return pos_object

@@ -9,6 +9,7 @@ import pandas as pd
 class Side(Enum):
     BUY = 1
     SELL = -1
+    NONE = 0
 
     @staticmethod
     def from_str(side: str, none_if_invalid=True):
@@ -29,10 +30,10 @@ class Side(Enum):
         elif side < 0:
             return Side.SELL
         else:
-            raise ValueError(f"{side} undefined")
+            return Side.NONE
 
     def __str__(self):
-        return "BUY" if self == Side.BUY else "SELL"
+        return self.name
     
     @staticmethod
     def reverse(side):
@@ -130,6 +131,10 @@ class Symbol:
     @classmethod
     def qty_digits(cls, qty_step: float):
         return len(str(qty_step).split(".")[1])
+    
+    @classmethod
+    def round_qty(cls, qty_step: float, qty: float):
+        return round(qty, cls.qty_digits(qty_step))
     
 class Symbols:
     BTCUSDT = Symbol(ticker="BTCUSDT", tick_size=0.001, qty_step=0.001)

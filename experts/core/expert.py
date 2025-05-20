@@ -6,7 +6,7 @@ from loguru import logger
 
 # import torch
 from backtesting.backtest_broker import Position
-from common.type import Side
+from common.type import Side, Symbol
 from experts.core.decision_maker import DecisionMaker
 from experts.core.position_control import StopsController, TrailingStop
 
@@ -21,7 +21,7 @@ def init_target_from_cfg(cfg):
 
 class ExpertBase(ABC):
     def __init__(self, cfg):
-        self.symbol = cfg["symbol"]
+        self.symbol: Symbol = cfg["symbol"]
         self.close_only_by_stops = cfg["close_only_by_stops"]
         self.no_trading_days = cfg["no_trading_days"]
         self.hist_size = cfg["hist_size"]
@@ -92,12 +92,9 @@ class ExpertFormation(ExpertBase):
 
     def estimate_volume(self, h):
         volume = self.wallet/h["Open"][-1]*self.leverage
-        volume = self.normalize_volume(volume)
+        volume = self.symbol.round_qty(self.symbol.qty_step, volume)
         logger.debug(f"estimated lot: {volume}")
         return volume
-
-    def normalize_volume(self, volume):
-        return round(volume/self.symbol.qty_step, 0)*self.symbol.qty_step
 
     def create_or_update_sl(self, h):
         if self.active_position is not None:
