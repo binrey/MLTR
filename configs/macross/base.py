@@ -1,6 +1,6 @@
 import numpy as np
 
-from common.type import Symbols, TimePeriod, Vis
+from common.type import ConfigType, Symbols, TimePeriod, Vis
 from common.utils import FeeRate, update_config
 from experts.core.position_control import *
 from experts.ma_cross import ClsMACross
@@ -18,6 +18,7 @@ config = dict(
     sl_processor=dict(
         type=SLFixed,
         active=False,
+        percent_value=0.5,
     ),
     tp_processor=dict(
         type=TPFromSL,
@@ -25,6 +26,7 @@ config = dict(
     ),
     trailing_stop=dict(
         type=FixRate,
+        rate=0.25,
     ),
     
     name="macross",
@@ -48,11 +50,12 @@ config = dict(
     run_model_device=None,
     no_trading_days=set(),
     close_last_position=True,
+    handle_trade_errors=False
 )
 
 backtest = update_config(
     config,
-    conftype="backtest",
+    conftype=ConfigType.BACKTEST,
     date_start=np.datetime64("2018-01-01T00:00:00"),
     date_end=np.datetime64("2025-05-01T00:00:00"),
     eval_buyhold=True,
@@ -62,7 +65,7 @@ backtest = update_config(
 
 optimization = update_config(
     config,
-    conftype="optimization",
+    conftype=ConfigType.OPTIMIZE,
     date_start=np.datetime64("2018-01-01T00:00:00"),
     date_end=np.datetime64("2025-05-01T00:00:00"),
     clear_logs=False,
@@ -81,9 +84,10 @@ optimization = update_config(
 
 bybit = update_config(
     config,
-    conftype="bybit",
+    conftype=ConfigType.BYBIT,
     credentials="bybit_volprof",
     clear_logs=False,
     log_trades=True,
     save_backup=True,
+    handle_trade_errors=True,
 )

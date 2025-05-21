@@ -10,7 +10,7 @@ import numpy as np
 from dotenv import load_dotenv
 from loguru import logger
 
-from common.type import Symbols, TimePeriod
+from common.type import ConfigType, Symbols, TimePeriod
 from data_processing import PULLERS
 from run import run_backtest
 from trade.utils import Position
@@ -89,7 +89,7 @@ def process_logfile(log_file) -> list[Position]:
     PULLERS[BROKER](SYMBOL, PERIOD, date_start_pull, end_time)
 
     cfg.update({"date_start": start_time, "date_end": end_time,
-                "eval_buyhold": False, "clear_logs": True, "conftype": "backtest",
+                "eval_buyhold": False, "clear_logs": True, "conftype": ConfigType.BACKTEST,
                 "close_last_position": False, "visualize": False})
     btest_res = run_backtest(cfg)
 

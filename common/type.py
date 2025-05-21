@@ -6,6 +6,13 @@ import numpy as np
 import pandas as pd
 
 
+class ConfigType(Enum):
+    BACKTEST = "backtest"
+    OPTIMIZE = "optimization"
+    CROSS_VALIDATION = "cross_validation"
+    BYBIT = "bybit"
+    MULTIRUN = "multirun"
+
 class Side(Enum):
     BUY = 1
     SELL = -1
@@ -141,3 +148,4 @@ class Symbols:
     ETHUSDT = Symbol(ticker="ETHUSDT", tick_size=0.01, qty_step=0.01)
     XRPUSDT = Symbol(ticker="XRPUSDT", tick_size=0.0001, qty_step=1)
     SOLUSDT = Symbol(ticker="SOLUSDT", tick_size=0.001, qty_step=0.1)
+

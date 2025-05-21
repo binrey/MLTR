@@ -54,21 +54,6 @@ class BybitTrading(BaseTradeClass):
                                                 limit=limit)["result"]["list"]
         return positions
 
-    def _get_pos_from_message_dict(self, pos_dict):
-        ticker, price, volume, sl, side, date = self._parse_bybit_position(pos_dict)
-        pos = Position(
-            price=float(price),
-            date=date,
-            indx=0,
-            side=side,
-            ticker=ticker,
-            volume=volume,
-            period=self.period,
-            sl=sl,
-        )
-        logger.debug(f"Getting pos from bybit: {pos}...")
-        return pos
-
     def _close_current_pos(self):
         pos_dict = self.get_pos_history(1)[0]
         self.pos.curr.close(
@@ -114,12 +99,12 @@ class BybitTrading(BaseTradeClass):
                 if open_position.volume < pos_object.volume:
                     logger.error(f"Attempt to reduce position volume: {pos_object.volume} -> {open_position.volume}")
                 else:
-                    pos_object.add_to_position(open_position.volume - pos_object.volume, float(open_position.price), self.time.prev)
+                    pos_object.add_to_position(open_position.volume - pos_object.volume, float(open_position.open_price), self.time.prev)
                 # TODO: update tp
                 # pos_object.update_tp(pos["takeProfit"], self.time.prev)
                 return pos_object
 
-        elif len(open_position):
+        elif open_position is not None:
             pos_object = open_position
 
         return pos_object

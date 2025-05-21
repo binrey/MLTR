@@ -66,13 +66,14 @@ class StepData:
 
 
 class BaseTradeClass(ABC):
-    def __init__(self, cfg, expert: ExpertBase, telebot: Optional[Telebot] = None) -> None:
+    def __init__(self, cfg: dict[str, Any], expert: ExpertBase, telebot: Optional[Telebot] = None) -> None:
 
         self.my_telebot = telebot
         self.exp = expert
         self.h, self.time = None, StepData()
         self.pos: StepData[Position] = StepData()
 
+        self.runtime_type = cfg["conftype"]
         self.ticker = cfg["symbol"].ticker
         self.qty_step = cfg["symbol"].qty_step
         self.period = cfg['period']
@@ -83,8 +84,9 @@ class BaseTradeClass(ABC):
         self.should_save_backup = cfg['save_backup']
         self.hist_size = cfg['hist_size']
         self.log_trades = cfg['log_trades']
+        self.handle_trade_errors = cfg['handle_trade_errors']
         self.save_path = Path(os.getenv(
-            "LOG_DIR"), cfg["conftype"], cfg["name"], f"{self.ticker}-{self.period.value}")
+            "LOG_DIR"), cfg["conftype"].value, cfg["name"], f"{self.ticker}-{self.period.value}")
         self.save_path.mkdir(parents=True, exist_ok=True)
         self.backup_path = self.save_path / "backup"
         self.backup_path.mkdir(parents=True, exist_ok=True)
@@ -142,6 +144,13 @@ class BaseTradeClass(ABC):
     def get_open_position(self):
         pass
 
+    def _compute_volume_diff(self, open_position: Position, target_volume: float):
+        cur_volume, cur_side = 0, Side.NONE
+        if open_position is not None:
+            cur_volume = open_position.volume
+            cur_side = open_position.side
+        return Symbol.round_qty(self.qty_step, target_volume - cur_volume*cur_side.value)
+
     def create_orders(self, side: Side, volume: float, time_id: Optional[int] = None):
         volume = Symbol.round_qty(self.qty_step, volume)
         if not volume:
@@ -152,26 +161,18 @@ class BaseTradeClass(ABC):
             target_volume = Symbol.round_qty(self.qty_step, self.pos.curr.volume*self.pos.curr.side.value + volume*side.value)
         self._create_orders(side, volume, time_id)
 
-        # cur_volume, cur_side = 0, Side.BUY
-        # # cur_pos = self.get_current_position()
-        # open_positions = self.get_open_positions()
-        # if target_volume != 0:
-        #     while len(open_positions) == 0:
-        #         sleep(1)
-        #         logger.warning(f"Waiting for getting open position")
-        #         open_positions = self.get_open_positions()
-                
-        #     ticker, price, cur_volume, sl, cur_side, date = self._parse_bybit_position(open_positions[0])
-       
-        # volume_diff = Symbol.round_qty(self.qty_step, target_volume - cur_volume*cur_side.value)
-        # while volume_diff != 0:
-        #     logger.warning(f"Volume diff: {volume_diff}, target_volume: {target_volume}, cur_volume: {cur_volume}, cur_side: {cur_side}")
-        #     # self._create_orders(side=Side.reverse(side), volume=abs(target_volume), time_id=time_id)
-        #     self._create_orders(side=Side.from_int(volume_diff), volume=abs(volume_diff), time_id=time_id)
-        #     # cur_pos = self.get_current_position()
-        #     open_positions = self.get_open_positions()
-        #     ticker, price, cur_volume, sl, cur_side, date = self._parse_bybit_position(open_positions[0])
-        #     volume_diff = Symbol.round_qty(self.qty_step, target_volume - cur_volume*cur_side.value)
+        if self.handle_trade_errors:
+            open_position = self.get_open_position()
+            if open_position is None and target_volume != 0:
+                sleep(2)
+                logger.warning(f"Get none open position, while target volume is not 0 - double check for open position...")
+                open_position = self.get_open_position()
+        
+            volume_diff = self._compute_volume_diff(self.get_open_position(), target_volume)
+            while volume_diff != 0:
+                logger.warning(f"Volume diff: {volume_diff}, target_volume: {target_volume}")
+                self._create_orders(side=Side.from_int(volume_diff), volume=abs(volume_diff), time_id=time_id)
+                volume_diff = self._compute_volume_diff(self.get_open_position(), target_volume)
 
     def get_rounded_time(self, time: np.datetime64) -> np.datetime64:
         trounded = np.array(time).astype(
