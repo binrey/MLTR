@@ -1,6 +1,6 @@
 import numpy as np
 
-from common.type import Symbols, TimePeriod, Vis
+from common.type import ConfigType, Symbols, TimePeriod, Vis
 from common.utils import FeeRate, update_config
 from experts.core.position_control import *
 from experts.volprof import VolProf
@@ -42,15 +42,16 @@ config = dict(
     save_plots=False,
     vis_events=Vis.ON_DEAL,
     vis_hist_length=512,
-    visualize=False,
+    visualize=True,
     run_model_device=None,
     no_trading_days=set(),
-    close_last_position=True
+    close_last_position=True,
+    handle_trade_errors=False
 )
 
 backtest = update_config(
     config,
-    conftype="backtest",
+    conftype=ConfigType.BACKTEST,
     date_start=np.datetime64("2018-01-01T00:00:00"),
     date_end=np.datetime64("2025-05-05T00:00:00"),
     eval_buyhold=True,
@@ -82,4 +83,5 @@ bybit = update_config(
     clear_logs=False,
     log_trades=True,
     save_backup=True,
+    handle_trade_errors=True,
 )
