@@ -15,7 +15,14 @@ from backtesting.utils import BackTestResults
 from data_processing import PULLERS
 from experts.core import ExpertFormation
 from trade.base import BaseTradeClass, log_get_hist
-from trade.utils import ORDER_TYPE, Order, Position, log_creating_order, log_modify_sl, log_modify_tp
+from trade.utils import (
+    ORDER_TYPE,
+    Order,
+    Position,
+    log_creating_order,
+    log_modify_sl,
+    log_modify_tp,
+)
 
 pd.options.mode.chained_assignment = None
 
@@ -48,6 +55,9 @@ class BackTest(BaseTradeClass):
         return self.session.time
 
     def get_current_position(self) -> Position:
+        return self.session.active_position
+
+    def get_open_position(self):
         return self.session.active_position
 
     def get_wallet(self) -> float:

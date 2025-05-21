@@ -16,7 +16,7 @@ updates = dict(
         lower_levels = 1,
         min_step=0.,
         speed=0.5
-    ),    
+    ),
 )
 
 backtest = update_config(backtest, **updates)

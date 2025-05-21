@@ -77,37 +77,51 @@ class BybitTrading(BaseTradeClass):
             indx=int(pos_dict["updatedTime"])
             )
         logger.debug(f"Closing self.pos.curr: {self.pos.curr}")
+        
+    def get_open_position(self) -> Optional[Position]:
+        open_positions = self.session.get_positions(category="linear", symbol=self.ticker)["result"]["list"]
+        open_positions = [pos for pos in open_positions if pos["size"] != "0"]
+        if len(open_positions) == 0:
+            return None
+        else:
+            ticker, price, volume, sl, side, date = self._parse_bybit_position(open_positions[0])
+            pos = Position(
+                price=float(price),
+                date=date,
+                indx=0,
+                side=side,
+                ticker=ticker,
+                volume=volume,
+                period=self.period,
+                sl=sl,
+            )
+            logger.debug(f"Getting pos from bybit: {pos}...")
+            return pos
 
     def get_current_position(self):
         pos_object: Optional[Position] = None
-        dict2position = None
-        open_positions = self.session.get_positions(category="linear", symbol=self.ticker)["result"]["list"]
-        open_positions = [pos for pos in open_positions if pos["size"] != "0"]
+        open_position = self.get_open_position()
         if self.pos.curr:
-            if len(open_positions) == 0:
+            if open_position is None:
                 self._close_current_pos()
-            elif Side.from_str(open_positions[0]["side"]) != self.pos.curr.side:
+            elif open_position.side != self.pos.curr.side:
                 self._close_current_pos()
-                dict2position = open_positions[0]
+                pos_object = open_position
             else:
-                pos_dict = open_positions[0]
-                ticker, price, volume, sl, side, date = self._parse_bybit_position(pos_dict)
                 pos_object = self.pos.curr
-                if sl is not None:
-                    pos_object.update_sl(sl, self.time.prev)
-                if volume < pos_object.volume:
-                    logger.error(f"Attempt to reduce position volume: {pos_object.volume} -> {volume}")
+                if open_position.sl is not None:
+                    pos_object.update_sl(open_position.sl, self.time.prev)
+                if open_position.volume < pos_object.volume:
+                    logger.error(f"Attempt to reduce position volume: {pos_object.volume} -> {open_position.volume}")
                 else:
-                    pos_object.add_to_position(volume-pos_object.volume, float(price), self.time.prev)
+                    pos_object.add_to_position(open_position.volume - pos_object.volume, float(open_position.price), self.time.prev)
                 # TODO: update tp
                 # pos_object.update_tp(pos["takeProfit"], self.time.prev)
                 return pos_object
 
-        elif len(open_positions):
-            dict2position = open_positions[0]
+        elif len(open_position):
+            pos_object = open_position
 
-        if dict2position is not None:
-            pos_object = self._get_pos_from_message_dict(dict2position)
         return pos_object
 
     def get_wallet(self):
