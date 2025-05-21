@@ -42,7 +42,7 @@ config = dict(
     save_plots=False,
     vis_events=Vis.ON_DEAL,
     vis_hist_length=512,
-    visualize=True,
+    visualize=False,
     run_model_device=None,
     no_trading_days=set(),
     close_last_position=True,
@@ -61,7 +61,7 @@ backtest = update_config(
 
 optimization = update_config(
     config,
-    conftype="optimization",
+    conftype=ConfigType.OPTIMIZE,
     date_start=np.datetime64("2018-01-01T00:00:00"),
     date_end=np.datetime64("2025-05-01T00:00:00"),
     clear_logs=False,
@@ -78,7 +78,7 @@ optimization = update_config(
 
 bybit = update_config(
     config,
-    conftype="bybit",
+    conftype=ConfigType.BYBIT,
     credentials="bybit_volprof",
     clear_logs=False,
     log_trades=True,
