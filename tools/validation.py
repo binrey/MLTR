@@ -90,7 +90,7 @@ def process_logfile(log_file) -> list[Position]:
 
     cfg.update({"date_start": start_time, "date_end": end_time,
                 "eval_buyhold": False, "clear_logs": True, "conftype": ConfigType.BACKTEST,
-                "close_last_position": False, "visualize": False})
+                "close_last_position": False, "visualize": False, "handle_trade_errors": False})
     btest_res = run_backtest(cfg)
 
     return btest_res.positions

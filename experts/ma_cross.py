@@ -67,8 +67,8 @@ class ClsMACross(DecisionMaker):
             raise Exception("Unknown mode")         
 
         if order_side:
-            self.sl_definer[Side.BUY] = h["Low"].min()
-            self.sl_definer[Side.SELL] = h["High"].max()
+            self.sl_definer[Side.BUY] = h["Low"][-self.ma_fast_period:].min()
+            self.sl_definer[Side.SELL] = h["High"][-self.ma_fast_period:].max()
             self.set_draw_objects(h["Date"][-2])
             self.draw_items += self.ma_slow.vis_objects
             self.draw_items += self.ma_fast.vis_objects

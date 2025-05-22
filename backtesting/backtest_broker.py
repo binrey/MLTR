@@ -50,6 +50,7 @@ class Broker:
             self.open_price = self.hist_window["Open"][-1]
 
             closed_position = self.update()
+            # Run expert and update active orders
             callback({"timestamp": self.time})  # TODO remove time
             closed_position_new = self.update(check_sl_tp=False)
             if closed_position is None:

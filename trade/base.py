@@ -287,8 +287,6 @@ class BaseTradeClass(ABC):
                 #     self.my_telebot.send_image(saved_img_path)
 
         if self.pos.deleted() or self.pos.changed_side():
-            logger.debug(
-                f"position closed {self.pos.prev.id} at {self.pos.prev.close_price}, profit: {self.pos.prev.profit_abs} ({self.pos.prev.profit}%)")
             if self.log_trades:
                 self.log_trade(self.pos.prev)
 
