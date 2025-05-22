@@ -80,7 +80,7 @@ class TrailingStop:
 
 class FixRate(TrailingStop):
     def get_stop_loss(self, active_position, hist: np.ndarray) -> float:
-        last_price = hist["Open"][-1]
+        last_price = hist["Close"][-2]
         sl_new = float(active_position.sl + self.rate *
                        (last_price - active_position.sl))
         return sl_new
