@@ -10,6 +10,7 @@ import numpy as np
 from dotenv import load_dotenv
 from loguru import logger
 
+from backtesting.backtest_broker import Broker
 from common.type import ConfigType, Symbols, TimePeriod
 from data_processing import PULLERS
 from run import run_backtest
@@ -42,7 +43,9 @@ def extract_datetimes(line):
     return None
 
 
-def download_logs(log_dir: Path):
+def download_logs(log_dir: Path, cfg: dict):
+    backtest_broker = Broker(cfg, init_moving_window=False)
+
     if not log_dir.exists():
         remote_logs_path = os.getenv('REMOTE_LOGS')
         if not remote_logs_path:
@@ -55,19 +58,23 @@ def download_logs(log_dir: Path):
     positions_dir = log_dir / "positions"
     positions = []
     for file in positions_dir.glob("*.json"):
-        positions.append(Position.from_json_file(file))
-    return positions
+        pos = Position.from_json_file(file)
+        positions.append(pos)
+        backtest_broker.update_profit_curve(pos)
+        
+    return positions, backtest_broker.
 
 
-def process_log_dir(log_dir):
+def process_log_dir(log_dir: Path, cfg: dict):
     log_files = sorted(list((log_dir / "log_records").glob("*.log")))
     positions = []
     for log_file in log_files:
-        positions.extend(process_logfile(log_file))
+        cfg, btest_res = process_logfile(log_file, cfg)
+        positions.extend(btest_res.positions)
     return positions
 
 
-def process_logfile(log_file) -> list[Position]:
+def process_logfile(log_file, cfg: dict) -> list[Position]:
     start_time, end_time = None, None
     with open(log_file, "r", encoding="utf-8") as f:
         lines = f.readlines()
@@ -79,8 +86,7 @@ def process_logfile(log_file) -> list[Position]:
 
     assert start_time is not None, f"No start time found in {log_file}"
     assert end_time is not None, f"No end time found in {log_file}"
-    
-    cfg = pickle.load(open(log_file.parent.parent / "config.pkl", "rb"))
+
     # Take into account history size
     hist_window = cfg["period"].to_timedelta()*cfg["hist_size"]
     date_start_pull = start_time - hist_window
@@ -93,7 +99,7 @@ def process_logfile(log_file) -> list[Position]:
                 "close_last_position": False, "visualize": False, "handle_trade_errors": False})
     btest_res = run_backtest(cfg)
 
-    return btest_res.positions
+    return cfg, btest_res
 
 
 if __name__ == "__main__":
@@ -102,11 +108,14 @@ if __name__ == "__main__":
     EXPERT = args.expert
     SYMBOL = getattr(Symbols, args.symbol)
     PERIOD = getattr(TimePeriod, args.period)
-    TAG = f"{SYMBOL.ticker}-{PERIOD.value}"
+    TAG = f"{SYMBOL.ticker}-{PERIOD.value}"    
     
     log_dir = LOCAL_LOGS_DIR / BROKER / EXPERT / TAG
-    positions_real = download_logs(log_dir)
-    positions_test = process_log_dir(log_dir)
+    
+    cfg = pickle.load(open(log_dir / "config.pkl", "rb"))
+    
+    positions_real = download_logs(log_dir, cfg)
+    positions_test = process_log_dir(log_dir, cfg)
 
     if len(positions_test) == 0:
         logger.warning(f"No positions while testing")
@@ -126,6 +135,7 @@ if __name__ == "__main__":
         logline = f"{date_test} {pos_test.side:<4}"
         found_real = False
         for pos_real in positions_real[ir:]:
+
             date_real = pos_real.open_date.astype("datetime64[m]")
             if date_real == date_test and pos_real.side == pos_test.side:
                 ir += 1

@@ -11,7 +11,7 @@ from trade.utils import ORDER_TYPE, Order, Position
 
 
 class Broker:
-    def __init__(self, cfg: Dict[str, Any]):
+    def __init__(self, cfg: Dict[str, Any], init_moving_window=True):
         self.symbol = cfg["symbol"]
         self.period = cfg["period"]
         self.fee_rate = cfg["fee_rate"]
@@ -28,7 +28,7 @@ class Broker:
         self.open_price = None
         self.cumulative_profit = 0
         self.cumulative_fees = 0
-        self.mw = MovingWindow(cfg)
+        self.mw = MovingWindow(cfg) if init_moving_window else None
 
     @property
     def profits(self):
