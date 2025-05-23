@@ -44,8 +44,6 @@ def extract_datetimes(line):
 
 
 def download_logs(log_dir: Path, cfg: dict):
-    backtest_broker = Broker(cfg, init_moving_window=False)
-
     if not log_dir.exists():
         remote_logs_path = os.getenv('REMOTE_LOGS')
         if not remote_logs_path:
@@ -53,16 +51,6 @@ def download_logs(log_dir: Path, cfg: dict):
 
         # os.makedirs(LOCAL_LOGS_DIR, exist_ok=True)
         subprocess.run(["scp", "-r", remote_logs_path, "./"], check=True)
-
-    # Read positions from positions dir
-    positions_dir = log_dir / "positions"
-    positions = []
-    for file in positions_dir.glob("*.json"):
-        pos = Position.from_json_file(file)
-        positions.append(pos)
-        backtest_broker.update_profit_curve(pos)
-        
-    return positions, backtest_broker.
 
 
 def process_log_dir(log_dir: Path, cfg: dict):
@@ -73,6 +61,16 @@ def process_log_dir(log_dir: Path, cfg: dict):
         positions.extend(btest_res.positions)
     return positions
 
+def process_real_log_dir(log_dir: Path, cfg: dict):
+    backtest_broker = Broker(cfg, init_moving_window=False)
+    # Read positions from positions dir
+    positions_dir = log_dir / "positions"
+    positions = []
+    for file in positions_dir.glob("*.json"):
+        pos = Position.from_json_file(file)
+        positions.append(pos)
+        backtest_broker.update_profit_curve(pos)
+    return positions, backtest_broker
 
 def process_logfile(log_file, cfg: dict) -> list[Position]:
     start_time, end_time = None, None
@@ -112,9 +110,11 @@ if __name__ == "__main__":
     
     log_dir = LOCAL_LOGS_DIR / BROKER / EXPERT / TAG
     
+    download_logs(log_dir, cfg)
     cfg = pickle.load(open(log_dir / "config.pkl", "rb"))
     
-    positions_real = download_logs(log_dir, cfg)
+    positions_real, backtest_broker = process_real_log_dir(log_dir, cfg)
+
     positions_test = process_log_dir(log_dir, cfg)
 
     if len(positions_test) == 0:

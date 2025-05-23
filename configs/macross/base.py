@@ -15,9 +15,8 @@ config = dict(
         min_step=0.25,
     ),
     sl_processor=dict(
-        type=SLFixed,
+        type=SLDynamic,
         active=False,
-        percent_value=0.5,
     ),
     tp_processor=dict(
         type=TPFromSL,
