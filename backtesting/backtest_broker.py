@@ -10,6 +10,37 @@ from data_processing.dataloading import MovingWindow
 from trade.utils import ORDER_TYPE, Order, Position
 
 
+class TradeHistory:
+    def __init__(self, moving_window: MovingWindow, positions: List[Position]):
+        self.mw = moving_window
+        self.mw.size = 1
+        self.profit_hist = {"dates": [], "profit_csum_nofees": [], "fees_csum": []}
+        self.posdict_open: Dict[np.datetime64, Position] = {pos.open_date: pos for pos in positions}
+        self.posdict_closed: Dict[np.datetime64, Position] = {pos.close_date: pos for pos in positions}
+        self.cumulative_profit = 0
+        self.cumulative_fees = 0
+    
+        for self.hist_window, _ in tqdm(self.mw(), desc="Build profit curve", total=self.mw.timesteps_count, disable=True):
+            cur_time = self.hist_window["Date"][-1]
+            closed_position: Optional[Position] = self.posdict_closed.get(cur_time, None)
+            active_position: Optional[Position] = self.posdict_open.get(cur_time, None)
+            last_price = self.hist_window["Open"][-1]
+            
+            if closed_position is not None:
+                self.cumulative_profit += closed_position.profit_abs
+                self.cumulative_fees += closed_position.fees_abs
+
+            active_profit = 0
+            # If an active position exists, add its unrealized profit
+            if active_position is not None:
+                active_profit = active_position.side.value * (last_price - active_position.open_price) * active_position.volume
+
+            # Append current cumulative profit to the profit curve
+            self.profit_hist["dates"].append(cur_time)
+            self.profit_hist["profit_csum_nofees"].append(self.cumulative_profit + active_profit)
+            self.profit_hist["fees_csum"].append(self.cumulative_fees)
+            
+
 class Broker:
     def __init__(self, cfg: Dict[str, Any], init_moving_window=True):
         self.symbol = cfg["symbol"]
@@ -59,41 +90,15 @@ class Broker:
             elif closed_position_new is not None:
                 if self.update(check_sl_tp=False) is not None:
                     raise ValueError("closed positions disagreement!")
-            self.update_profit_curve(closed_position)
 
         if self.active_position is not None and self.close_last_position:
-            self.update_profit_curve(
-                self.close_active_pos(price=self.open_price,
+            closed_position = self.close_active_pos(price=self.open_price,
                                       time=self.time,
                                       hist_id=self.hist_id)
-                )
-        self.profit_hist = pd.DataFrame(self.profit_hist)
-        self.profit_hist["dates"] = to_datetime(self.profit_hist["dates"])
-
-    def update_profit_curve(self, closed_position: Optional[Position] = None):
-        """
-        Update cumulative profit curve from current state and active position.
-        This method computes the cumulative profit from all closed positions and adds
-        the unrealized profit from the active position (if any) using the current open price.
-        It also updates the best profit record if the current cumulative profit exceeds it.
-        """
-        # Cumulative profit and fees from closed positions
-        if closed_position is not None:
-            self.cumulative_profit += closed_position.profit_abs
-            self.cumulative_fees += closed_position.fees_abs
-
-        active_profit = 0
-        # If an active position exists, add its unrealized profit
-        if self.active_position is not None:
-            if self.active_position.side == Side.BUY:
-                active_profit = (self.open_price - self.active_position.open_price) * self.active_position.volume
-            else:
-                active_profit = (self.active_position.open_price - self.open_price) * self.active_position.volume
-
-        # Append current cumulative profit to the profit curve
-        self.profit_hist["dates"].append(self.time)
-        self.profit_hist["profit_csum_nofees"].append(self.cumulative_profit + active_profit)
-        self.profit_hist["fees_csum"].append(self.cumulative_fees)
+            
+        profit_hist = TradeHistory(self.mw, self.positions).profit_hist
+        self.profit_hist = pd.DataFrame(profit_hist)
+        self.profit_hist["dates"] = to_datetime(profit_hist["dates"])
 
     def close_orders(self, hist_id, i=None):
         if i is not None:
