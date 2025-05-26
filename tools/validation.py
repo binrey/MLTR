@@ -65,6 +65,7 @@ def process_log_dir(log_dir: Path, cfg: dict):
         positions_real.extend(positions_real)
     return positions_test, positions_real
 
+
 def process_real_log_dir(log_dir: Path):
     # Read positions from positions dir
     positions_dir = log_dir / "positions"
@@ -73,6 +74,7 @@ def process_real_log_dir(log_dir: Path):
         pos = Position.from_json_file(file)
         positions.append(pos)
     return positions
+
 
 def process_logfile(log_file, cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]]:
     start_time, end_time = None, None

@@ -15,8 +15,11 @@ class TradeHistory:
         self.mw = moving_window
         self.mw.size = 1
         self.profit_hist = {"dates": [], "profit_csum_nofees": [], "fees_csum": []}
-        self.posdict_open: Dict[np.datetime64, Position] = {pos.open_date: pos for pos in positions}
-        self.posdict_closed: Dict[np.datetime64, Position] = {pos.close_date: pos for pos in positions}
+
+        # period = self.mw.period.minutes
+        
+        self.posdict_open: Dict[np.datetime64, Position] = {pos.open_date.astype("datetime64[m]"): pos for pos in positions}
+        self.posdict_closed: Dict[np.datetime64, Position] = {pos.close_date.astype("datetime64[m]"): pos for pos in positions}
         self.cumulative_profit = 0
         self.cumulative_fees = 0
         self.active_position = None

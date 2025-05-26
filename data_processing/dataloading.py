@@ -9,7 +9,7 @@ from easydict import EasyDict
 from loguru import logger
 from tqdm import tqdm
 
-from common.type import to_datetime
+from common.type import TimePeriod, to_datetime
 
 # Define the dtype for the structured array
 DTYPE = [('Date', np.dtype('<M8[m]')), 
@@ -243,6 +243,7 @@ class MovingWindow():
         self.date_end = np.datetime64(cfg["date_end"])
         self.size = cfg["hist_size"]
         self.ticker = cfg["symbol"].ticker
+        self.period: TimePeriod = cfg["period"]
 
         self.id2start = self.find_nearest_date_indx(
             self.hist["Date"], self.date_start)
