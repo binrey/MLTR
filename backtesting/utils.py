@@ -13,6 +13,7 @@ from loguru import logger
 
 from backtesting.backtest_broker import Broker
 from common.type import to_datetime
+from trade.utils import Position
 
 
 class BackTestResults:
@@ -48,12 +49,15 @@ class BackTestResults:
         self.eval_daily_metrics()
 
     def add(self, bktest_broker: Broker):
-        self.ndeals += len(bktest_broker.positions)
-        self.wallet += bktest_broker.wallet
-        self.tickers.update([pos.ticker for pos in bktest_broker.positions])
-        self.positions.extend(bktest_broker.positions)
+        self._add(bktest_broker.positions, bktest_broker.profit_hist, bktest_broker.wallet)
+
+    def _add(self, positions: list[Position], profit_hist: pd.DataFrame, wallet: float):
+        self.ndeals += len(positions)
+        self.wallet += wallet
+        self.tickers.update([pos.ticker for pos in positions])
+        self.positions.extend(positions)
         
-        daily_hist, monthly_hist = self.process_profit_hist(bktest_broker.profit_hist)
+        daily_hist, monthly_hist = self.process_profit_hist(profit_hist)
         
         if self.daily_hist.empty:
             self.daily_hist = daily_hist
@@ -163,7 +167,7 @@ class BackTestResults:
     def add_profit_curve(self, days: pd.Index, values: pd.Series, name: str, color: str, linewidth: float, alpha: float):
         self.fig.axes[0].plot(days, values, linewidth=linewidth, color=color, alpha=alpha)
         self.legend_ax1.append(name)
-        
+
     def add_from_other_results(self, btest_results: "BackTestResults", color: str, linewidth: float = 1, alpha: float = 0.5):
         self.add_profit_curve(btest_results.daily_hist.index, btest_results.relative2deposit(btest_results.daily_hist["profit_csum"]), 
                               btest_results.tickers_set, color, linewidth, alpha)
@@ -193,6 +197,8 @@ class BackTestResults:
             
         ax1.set_ylabel("fin result, %")
 
+        assert "deposit" in self.daily_hist.columns, "deposit column must be in daily_hist, do eval_daily_metrics before plotting"
+
         ax2.plot(
             self.daily_hist.index,
             self.relative2deposit(self.daily_hist["deposit"]),
@@ -212,7 +218,7 @@ class BackTestResults:
         ax3.set_ylabel("monthly profit, %")
 
         plt.tight_layout()
-        
+
     def save_fig(self, save_path: Optional[str] = "_last_backtest.png"):
         self.fig.axes[0].legend(self.legend_ax1)
         if self.fig is not None:

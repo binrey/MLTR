@@ -5,15 +5,18 @@ import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict
 
 import numpy as np
 from dotenv import load_dotenv
 from loguru import logger
 
-from backtesting.backtest_broker import Broker
+from backtesting.backtest_broker import Broker, TradeHistory
+from backtesting.utils import BackTestResults
 from common.type import ConfigType, Symbols, TimePeriod
 from data_processing import PULLERS
 from run import run_backtest
+from trade.backtest import BackTest
 from trade.utils import Position
 
 load_dotenv()
@@ -43,7 +46,7 @@ def extract_datetimes(line):
     return None
 
 
-def download_logs(log_dir: Path, cfg: dict):
+def download_logs(log_dir: Path):
     if not log_dir.exists():
         remote_logs_path = os.getenv('REMOTE_LOGS')
         if not remote_logs_path:
@@ -55,24 +58,23 @@ def download_logs(log_dir: Path, cfg: dict):
 
 def process_log_dir(log_dir: Path, cfg: dict):
     log_files = sorted(list((log_dir / "log_records").glob("*.log")))
-    positions = []
+    positions_test, positions_real = [], []
     for log_file in log_files:
-        cfg, btest_res = process_logfile(log_file, cfg)
-        positions.extend(btest_res.positions)
-    return positions
+        positions_test, positions_real = process_logfile(log_file, cfg)
+        positions_test.extend(positions_test)
+        positions_real.extend(positions_real)
+    return positions_test, positions_real
 
-def process_real_log_dir(log_dir: Path, cfg: dict):
-    backtest_broker = Broker(cfg, init_moving_window=False)
+def process_real_log_dir(log_dir: Path):
     # Read positions from positions dir
     positions_dir = log_dir / "positions"
     positions = []
     for file in positions_dir.glob("*.json"):
         pos = Position.from_json_file(file)
         positions.append(pos)
-        backtest_broker.update_profit_curve(pos)
-    return positions, backtest_broker
+    return positions
 
-def process_logfile(log_file, cfg: dict) -> list[Position]:
+def process_logfile(log_file, cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]]:
     start_time, end_time = None, None
     with open(log_file, "r", encoding="utf-8") as f:
         lines = f.readlines()
@@ -95,9 +97,25 @@ def process_logfile(log_file, cfg: dict) -> list[Position]:
     cfg.update({"date_start": start_time, "date_end": end_time,
                 "eval_buyhold": False, "clear_logs": True, "conftype": ConfigType.BACKTEST,
                 "close_last_position": False, "visualize": False, "handle_trade_errors": False})
-    btest_res = run_backtest(cfg)
+    
+    # TODO replace bybit with placeholder
+    PULLERS["bybit"](**cfg)
+    backtest_trading = BackTest(cfg)
+    backtest_trading.initialize()
+    backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
+    
+    val_res = BackTestResults()
+    val_res.add(backtest_trading.session)
+    # bt_res = backtest_trading.postprocess()
+    
+    positions_real = process_real_log_dir(log_dir)
+    profit_hist_real = TradeHistory(backtest_trading.session.mw, positions_real).profit_hist_as_df()
+    val_res.eval_daily_metrics()
+    val_res.plot_results(plot_profit_without_fees=True)
+    val_res.add_profit_curve(profit_hist_real["dates"], profit_hist_real["profit_csum_nofees"], f"{cfg['symbol'].ticker} real", "b", 3, 0.5)
 
-    return cfg, btest_res
+    val_res.save_fig()
+    return backtest_trading.session.positions, positions_real
 
 
 if __name__ == "__main__":
@@ -110,12 +128,9 @@ if __name__ == "__main__":
     
     log_dir = LOCAL_LOGS_DIR / BROKER / EXPERT / TAG
     
-    download_logs(log_dir, cfg)
+    download_logs(log_dir)
     cfg = pickle.load(open(log_dir / "config.pkl", "rb"))
-    
-    positions_real, backtest_broker = process_real_log_dir(log_dir, cfg)
-
-    positions_test = process_log_dir(log_dir, cfg)
+    positions_test, positions_real = process_log_dir(log_dir, cfg)
 
     if len(positions_test) == 0:
         logger.warning(f"No positions while testing")
@@ -135,7 +150,6 @@ if __name__ == "__main__":
         logline = f"{date_test} {pos_test.side:<4}"
         found_real = False
         for pos_real in positions_real[ir:]:
-
             date_real = pos_real.open_date.astype("datetime64[m]")
             if date_real == date_test and pos_real.side == pos_test.side:
                 ir += 1
