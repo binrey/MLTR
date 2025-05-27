@@ -56,16 +56,6 @@ def download_logs(log_dir: Path):
         subprocess.run(["scp", "-r", remote_logs_path, "./"], check=True)
 
 
-def process_log_dir(log_dir: Path):
-    log_files = sorted(list((log_dir).glob("*.pkl")))
-    positions_test, positions_real = [], []
-    for log_file in log_files:
-        positions_test_, positions_real_ = process_logfile(log_file, )
-        positions_test.extend(positions_test_)
-        positions_real.extend(positions_real_)
-    return positions_test, positions_real
-
-
 def process_real_log_dir(log_dir: Path):
     # Read positions from positions dir
     positions_dir = log_dir / "positions"
@@ -76,26 +66,35 @@ def process_real_log_dir(log_dir: Path):
     return positions
 
 
-def process_logfile(cfg: Dict[str, Any], date_end: Optional[np.datetime64] = None) -> tuple[list[Position], list[Position]]:
+def process_log_dir(log_dir: Path):
+    cfg_files = sorted(list((log_dir).glob("*.pkl")))
+    positions_test, positions_real, cfg2process = [], [], None
+    for cfg_file in cfg_files + [None]:
+        if cfg_file is None:
+            cfg_new = {"date_start": np.datetime64("now")}
+        else:
+            cfg_new = pickle.load(open(cfg_file, "rb"))
+        if cfg2process is not None:
+            cfg2process["date_end"] = cfg_new["date_start"]
+            positions_test_, positions_real_ = process_logfile(cfg2process)
+            positions_test.extend(positions_test_)
+            positions_real.extend(positions_real_)
 
+        cfg2process = cfg_new
+    return positions_test, positions_real
+
+
+def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]]:
     date_start = cfg["date_start"]
-    end_time = np.datetime64(extract_datetimes(line), "[m]")
-
-    if date_start is None:
-        logger.warning(f"No start time found in {log_file}")
-        return [], []
-    if end_time is None:
-        logger.warning(f"No end time found in {log_file}")
-        return [], []
-
+    date_end = cfg["date_end"]
     # Take into account history size
     hist_window = cfg["period"].to_timedelta()*cfg["hist_size"]
     date_start_pull = date_start - hist_window
     logger.info(
-        f"Pulling data for {SYMBOL.ticker} from {date_start_pull} ({date_start} - {hist_window}) to {end_time}")
-    PULLERS[BROKER](SYMBOL, PERIOD, date_start_pull, end_time)
+        f"Pulling data for {SYMBOL.ticker} from {date_start_pull} ({date_start} - {hist_window}) to {date_end}")
+    PULLERS[BROKER](SYMBOL, PERIOD, date_start_pull, date_end)
 
-    cfg.update({"date_start": date_start, "date_end": end_time,
+    cfg.update({"date_start": date_start, "date_end": date_end,
                 "eval_buyhold": False, "clear_logs": True, "conftype": ConfigType.BACKTEST,
                 "close_last_position": False, "visualize": False, "handle_trade_errors": False})
     
@@ -111,6 +110,7 @@ def process_logfile(cfg: Dict[str, Any], date_end: Optional[np.datetime64] = Non
     
     positions_real = process_real_log_dir(log_dir)
     profit_hist_real = TradeHistory(backtest_trading.session.mw, positions_real).profit_hist_as_df()
+    assert profit_hist_real.shape[0] > 0, "No real deals in history found"
     val_res.eval_daily_metrics()
     val_res.plot_results(plot_profit_without_fees=True)
     val_res.add_profit_curve(profit_hist_real["dates"], profit_hist_real["profit_csum_nofees"], f"{cfg['symbol'].ticker} real", "g", 3, 0.5)

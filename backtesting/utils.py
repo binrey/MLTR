@@ -95,6 +95,8 @@ class BackTestResults:
 
     def process_profit_hist(self, profit_hist: pd.DataFrame):
         assert "dates" in profit_hist.columns, "profit_hist must have 'dates' column"
+        if profit_hist.shape[0] == 0:
+            return pd.DataFrame(), pd.DataFrame()
         profit_hist.set_index("dates", inplace=True)
         daily_hist = self.resample_hist(profit_hist, "D", func="last")
         daily_hist["profit_csum"] = daily_hist["profit_csum_nofees"] - daily_hist["fees_csum"]

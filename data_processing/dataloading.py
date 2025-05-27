@@ -238,12 +238,15 @@ def collect_train_data2(dir, fsize=64, nparams=4):
 
 class MovingWindow():
     def __init__(self, cfg):
-        self.hist = DataParser(cfg).load()
+        assert "date_start" in cfg and "date_end" in cfg, "date_start and date_end must be in cfg"
+        assert cfg["date_start"] is not None and cfg["date_end"] is not None, "date_start and date_end must be not None"
         self.date_start = np.datetime64(cfg["date_start"])
         self.date_end = np.datetime64(cfg["date_end"])
         self.size = cfg["hist_size"]
         self.ticker = cfg["symbol"].ticker
-        self.period: TimePeriod = cfg["period"]
+        self.period: TimePeriod = cfg["period"]        
+        self.hist = DataParser(cfg).load()
+
 
         self.id2start = self.find_nearest_date_indx(
             self.hist["Date"], self.date_start)

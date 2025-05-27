@@ -36,7 +36,7 @@ class BackTest(BaseTradeClass):
     def __init__(self, cfg) -> None:
         self.session = Broker(cfg)
         self.eval_buyhold = cfg["eval_buyhold"]
-        super().__init__(cfg=cfg, 
+        super().__init__(cfg=cfg,
                          expert=ExpertFormation(cfg=cfg,
                                                 create_orders_func=self.create_orders,
                                                 modify_sl_func=self.modify_sl,

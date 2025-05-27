@@ -61,7 +61,7 @@ class BybitDownloader:
 
     def get_history(self, date_start: Optional[pd.Timestamp] = None, date_end: Optional[pd.Timestamp] = None):
         date_start = pd.to_datetime(date_start)
-        date_end = pd.to_datetime(date_end) if date_end is not None else None
+        date_end = pd.to_datetime(date_end) if date_end is not None else pd.Timestamp.now()
         
         logger.info(
             f"Pulling data for {self.symbol} from {date_start} to {date_end}")
