@@ -4,6 +4,7 @@ import pickle
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from shutil import rmtree
 from time import sleep
@@ -102,6 +103,7 @@ class BaseTradeClass(ABC):
         self.nmin = self.period.minutes
         self.time = StepData()
         self.exp_update = self.exp.update
+        self.config_path = self.save_path / f"config_{date2str(np.datetime64(datetime.now()), 's')}.pkl"
         self.log_config(cfg)
 
     @abstractmethod
@@ -179,21 +181,31 @@ class BaseTradeClass(ABC):
             "datetime64[m]").astype(int)//self.nmin
         return np.datetime64(int(trounded*self.nmin), "m")
 
+    def log_config(self, cfg):
+        try:
+            with open(self.config_path, 'rb') as f:
+                existing_config = pickle.load(f)
+        except (FileNotFoundError, EOFError):
+            existing_config = {}
+        
+        # Update existing config with new values
+        existing_config.update(cfg)
+        
+        with open(self.config_path, 'wb') as f:
+            pickle.dump(existing_config, f)
+        logger.debug(f"Config updated at {self.config_path}")
+
     def handle_trade_message(self, message):
         logger.debug("---------------------------")
         server_time = self.get_server_time()
         self.time.update(self.get_rounded_time(server_time))
-        if self.time.prev is None:
-            logger.info(f"START: {date2str(server_time, 'ms')}")
-        else:
-            logger.debug(f"server time: {date2str(server_time, 'ms')}")
-
+        logger.debug(f"server time: {date2str(server_time, 'ms')}")
+        
         if self.time.changed(no_none=True):
             self.update()
+
             msg = f"{self.ticker}-{self.period.value}: {str(self.pos.curr) if self.pos.curr is not None else 'None'}"
             logger.debug(msg)
-            if logger._core.min_level == 10:
-                print()
             if self.my_telebot is not None:
                 # process = multiprocessing.Process(target=self.my_telebot.send_text,
                 #                                   args=[msg])
@@ -201,7 +213,10 @@ class BaseTradeClass(ABC):
                 self.my_telebot.send_text(msg)
         # else:
         #     print ("\033[A\033[A")
-
+        
+        if self.time.prev is None:
+            self.log_config({"date_start": self.time.curr, "date_end": None})
+            
     def clear_log_dir(self):
         if self.save_plots:
             if self.save_path.exists():
@@ -245,13 +260,6 @@ class BaseTradeClass(ABC):
     def vis(self):
         # return self.visualizer([self.pos.prev, self.pos.curr], self.exp)
         return self.visualizer(self.get_pos_history() + [self.pos.curr], self.exp)
-
-    def log_config(self, cfg):
-        config_file = self.save_path / "config.pkl"
-        # with open(config_file, 'w') as f:
-        #     json.dump(self.cfg, f, indent=2)
-        pickle.dump(cfg, open(config_file, "wb"))
-        logger.debug(f"Config saved to {config_file}")
 
     def log_trade(self, position: Position):
         """Log trade information to a separate JSON file.

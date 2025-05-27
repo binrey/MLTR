@@ -22,7 +22,9 @@ def log_creating_order(func: Callable[..., Any]) -> Callable[..., Any]:
 
 def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, sl: Optional[float]):
-        logger.debug(f"Modifying sl: {self.get_current_position().sl} -> {sl}")
+        current_pos = self.get_current_position()
+        if current_pos is not None:
+            logger.debug(f"Modifying sl: {current_pos.sl} -> {sl}")
         result = func(self, sl)
         return result
     return wrapper
@@ -30,7 +32,9 @@ def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
 
 def log_modify_tp(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, tp: Optional[float]):
-        logger.debug(f"Modifying tp: {self.get_current_position().tp} -> {tp}")
+        current_pos = self.get_current_position()
+        if current_pos is not None:
+            logger.debug(f"Modifying tp: {current_pos.tp} -> {tp}")
         result = func(self, tp)
         return result
     return wrapper

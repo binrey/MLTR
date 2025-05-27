@@ -5,7 +5,7 @@ import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 from dotenv import load_dotenv
@@ -56,13 +56,13 @@ def download_logs(log_dir: Path):
         subprocess.run(["scp", "-r", remote_logs_path, "./"], check=True)
 
 
-def process_log_dir(log_dir: Path, cfg: dict):
-    log_files = sorted(list((log_dir / "log_records").glob("*.log")))
+def process_log_dir(log_dir: Path):
+    log_files = sorted(list((log_dir).glob("*.pkl")))
     positions_test, positions_real = [], []
     for log_file in log_files:
-        positions_test, positions_real = process_logfile(log_file, cfg)
-        positions_test.extend(positions_test)
-        positions_real.extend(positions_real)
+        positions_test_, positions_real_ = process_logfile(log_file, )
+        positions_test.extend(positions_test_)
+        positions_real.extend(positions_real_)
     return positions_test, positions_real
 
 
@@ -76,27 +76,26 @@ def process_real_log_dir(log_dir: Path):
     return positions
 
 
-def process_logfile(log_file, cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]]:
-    start_time, end_time = None, None
-    with open(log_file, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-        for line in lines:
-            if "START" in line:
-                start_time = np.datetime64(extract_datetimes(line), "[m]")
-            if "server time" in line:
-                end_time = np.datetime64(extract_datetimes(line), "[m]")
+def process_logfile(cfg: Dict[str, Any], date_end: Optional[np.datetime64] = None) -> tuple[list[Position], list[Position]]:
 
-    assert start_time is not None, f"No start time found in {log_file}"
-    assert end_time is not None, f"No end time found in {log_file}"
+    date_start = cfg["date_start"]
+    end_time = np.datetime64(extract_datetimes(line), "[m]")
+
+    if date_start is None:
+        logger.warning(f"No start time found in {log_file}")
+        return [], []
+    if end_time is None:
+        logger.warning(f"No end time found in {log_file}")
+        return [], []
 
     # Take into account history size
     hist_window = cfg["period"].to_timedelta()*cfg["hist_size"]
-    date_start_pull = start_time - hist_window
+    date_start_pull = date_start - hist_window
     logger.info(
-        f"Pulling data for {SYMBOL.ticker} from {date_start_pull} ({start_time} - {hist_window}) to {end_time}")
+        f"Pulling data for {SYMBOL.ticker} from {date_start_pull} ({date_start} - {hist_window}) to {end_time}")
     PULLERS[BROKER](SYMBOL, PERIOD, date_start_pull, end_time)
 
-    cfg.update({"date_start": start_time, "date_end": end_time,
+    cfg.update({"date_start": date_start, "date_end": end_time,
                 "eval_buyhold": False, "clear_logs": True, "conftype": ConfigType.BACKTEST,
                 "close_last_position": False, "visualize": False, "handle_trade_errors": False})
     
@@ -114,7 +113,8 @@ def process_logfile(log_file, cfg: Dict[str, Any]) -> tuple[list[Position], list
     profit_hist_real = TradeHistory(backtest_trading.session.mw, positions_real).profit_hist_as_df()
     val_res.eval_daily_metrics()
     val_res.plot_results(plot_profit_without_fees=True)
-    val_res.add_profit_curve(profit_hist_real["dates"], profit_hist_real["profit_csum_nofees"], f"{cfg['symbol'].ticker} real", "b", 3, 0.5)
+    val_res.add_profit_curve(profit_hist_real["dates"], profit_hist_real["profit_csum_nofees"], f"{cfg['symbol'].ticker} real", "g", 3, 0.5)
+    val_res.add_profit_curve(profit_hist_real["dates"], backtest_trading.session.profit_hist["profit_csum_nofees"], f"{cfg['symbol'].ticker} test", "r", 1, 0.5)
 
     val_res.save_fig()
     return backtest_trading.session.positions, positions_real
@@ -131,8 +131,7 @@ if __name__ == "__main__":
     log_dir = LOCAL_LOGS_DIR / BROKER / EXPERT / TAG
     
     download_logs(log_dir)
-    cfg = pickle.load(open(log_dir / "config.pkl", "rb"))
-    positions_test, positions_real = process_log_dir(log_dir, cfg)
+    positions_test, positions_real = process_log_dir(log_dir)
 
     if len(positions_test) == 0:
         logger.warning(f"No positions while testing")
