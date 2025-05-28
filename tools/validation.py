@@ -111,8 +111,7 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
     positions_real = process_real_log_dir(log_dir)
     profit_hist_real = TradeHistory(backtest_trading.session.mw, positions_real).profit_hist_as_df()
     assert profit_hist_real.shape[0] > 0, "No real deals in history found"
-    val_res.eval_daily_metrics()
-    val_res.plot_results(plot_profit_without_fees=True)
+    val_res.plot_validation()
     val_res.add_profit_curve(profit_hist_real["dates"], profit_hist_real["profit_csum_nofees"], f"{cfg['symbol'].ticker} real", "g", 3, 0.5)
     val_res.add_profit_curve(profit_hist_real["dates"], backtest_trading.session.profit_hist["profit_csum_nofees"], f"{cfg['symbol'].ticker} test", "r", 1, 0.5)
 

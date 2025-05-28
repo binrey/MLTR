@@ -44,7 +44,7 @@ config = dict(
     save_plots=False,
     vis_events=Vis.ON_DEAL,
     vis_hist_length=512,
-    visualize=True,
+    visualize=False,
     run_model_device=None,
     no_trading_days=set(),
     close_last_position=True,
@@ -54,7 +54,7 @@ config = dict(
 backtest = update_config(
     config,
     conftype=ConfigType.BACKTEST,
-    date_start=np.datetime64("2025-05-01T00:00:00"),
+    date_start=np.datetime64("2020-05-01T00:00:00"),
     date_end=np.datetime64("2025-05-21T00:00:00"),
     eval_buyhold=True,
     clear_logs=True,

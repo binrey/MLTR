@@ -174,6 +174,17 @@ class BackTestResults:
         self.add_profit_curve(btest_results.daily_hist.index, btest_results.relative2deposit(btest_results.daily_hist["profit_csum"]), 
                               btest_results.tickers_set, color, linewidth, alpha)
 
+    def plot_validation(self, title: Optional[str] = None, plot_profit_without_fees: bool = True):
+        self.fig, ax1 = plt.subplots(1, 1, figsize=(10, 5))
+
+        if title:
+            self.fig.suptitle(title, fontsize=16)
+            self.fig.subplots_adjust(top=0.9)
+
+        ax1.set_ylabel("fin result, %")
+        plt.tight_layout()
+
+
     def plot_results(self, title: Optional[str] = None, plot_profit_without_fees: bool = True):
         self.fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 8), gridspec_kw={'height_ratios': [3, 1, 1]})
         
@@ -181,6 +192,13 @@ class BackTestResults:
             self.fig.suptitle(title, fontsize=16)
             self.fig.subplots_adjust(top=0.9)
         
+        ax1.set_ylabel("fin result, %")
+        ax2.set_ylabel("deposit, %")
+        ax3.set_ylabel("monthly profit, %")
+
+        plt.tight_layout()
+        # -------------------------------------------
+
         self.add_profit_curve(self.daily_hist.index, self.relative2deposit(self.daily_hist["profit_csum"]), 
                               self.tickers_set, color="b", linewidth=3, alpha=0.5)
         if plot_profit_without_fees:
@@ -197,8 +215,6 @@ class BackTestResults:
             )
             self.legend_ax1.append("buy & hold")
             
-        ax1.set_ylabel("fin result, %")
-
         assert "deposit" in self.daily_hist.columns, "deposit column must be in daily_hist, do eval_daily_metrics before plotting"
 
         ax2.plot(
@@ -208,7 +224,6 @@ class BackTestResults:
             linewidth=3,
             alpha=0.3,
         )
-        ax2.set_ylabel("deposit, %")
 
         ax3.bar(
             self.monthly_hist.index,
@@ -217,9 +232,6 @@ class BackTestResults:
             color="g",
             alpha=0.6,
         )
-        ax3.set_ylabel("monthly profit, %")
-
-        plt.tight_layout()
 
     def save_fig(self, save_path: Optional[str] = "_last_backtest.png"):
         self.fig.axes[0].legend(self.legend_ax1)

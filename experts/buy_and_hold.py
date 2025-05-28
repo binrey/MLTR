@@ -22,8 +22,6 @@ class BuyAndHold(DecisionMaker):
         pass
 
     def look_around(self, h) -> DecisionMaker.Response:
-
-
         return DecisionMaker.Response(side=Side.BUY, target_volume_fraction=1)
 
     def update_inner_state(self, h):
