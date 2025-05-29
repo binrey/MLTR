@@ -156,7 +156,11 @@ class ExpertFormation(ExpertBase):
         if target_state.target_volume_fraction is not None:
             target_volume = target_state.target_volume_fraction
             if self.active_position:
-                side_relative = target_state.side.value * self.active_position.side.value
+                if target_state.side.value == 0:
+                    target_state.side = Side.reverse(self.active_position.side)
+                    side_relative = target_state.side.value
+                else: 
+                    side_relative = target_state.side.value * self.active_position.side.value
                 target_volume *= side_relative
         else:
             if target_state.increment_volume_fraction is not None:
