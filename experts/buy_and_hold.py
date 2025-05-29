@@ -22,7 +22,10 @@ class BuyAndHold(DecisionMaker):
         pass
 
     def look_around(self, h) -> DecisionMaker.Response:
+        if h["Date"][-1].astype("datetime64[M]") != h["Date"][-2].astype("datetime64[M]"):
+            return DecisionMaker.Response(side=Side.NONE, target_volume_fraction=0)
         return DecisionMaker.Response(side=Side.BUY, target_volume_fraction=1)
+
 
     def update_inner_state(self, h):
         return None
