@@ -54,9 +54,9 @@ backtest = update_config(
     conftype=ConfigType.BACKTEST,
     date_start=np.datetime64("2022-01-01T00:00:00"),
     date_end=np.datetime64("2025-05-05T00:00:00"),
-    eval_buyhold=True,
+    eval_buyhold=False,
     clear_logs=True,
-    log_trades=True,
+    log_trades=False,
 )
 
 optimization = update_config(
