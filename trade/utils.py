@@ -5,6 +5,7 @@ from typing import Any, Callable, List, Optional
 import numpy as np
 import pandas as pd
 from loguru import logger
+from fractions import Fraction
 
 from common.type import Line, Point, Side, to_datetime
 from common.utils import FeeConst, FeeModel
@@ -15,7 +16,7 @@ def log_creating_order(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, side: Side, volume: float, time_id: Optional[int] = None):
         logger.debug(f"Creating order {side} {volume}...")
         result = func(self, side, volume, time_id)
-        logger.debug(f"Order created: {result}")
+        logger.debug(f"Orders created: {' '.join(map(str, result))}")
         return result
     return wrapper
 
@@ -96,12 +97,14 @@ class Position:
         indx: int,
         ticker: str = "NoName",
         volume: int = 1,
+        qty_step: float = 1,
         period: str = "M5",
         sl: Optional[float] = None,
         tp: Optional[float] = None,
         fee_rate: Optional[FeeModel] = None,
     ):
-        self.volume = float(volume)
+        self.vol_round = int(1/qty_step)
+        self.volume: Fraction = self.set_volume(volume)
         assert self.volume > 0
         self.ticker = ticker
         self.period = period
@@ -135,10 +138,10 @@ class Position:
         
         self.enter_points_hist.append((to_datetime(self.open_date), self.open_price))
         self.enter_price_hist.append((to_datetime(self.open_date), self.open_price))
-        self.volume_hist.append((to_datetime(self.open_date), self.volume))
+        self.volume_hist.append((to_datetime(self.open_date), float(self.volume)))
 
     def __str__(self):
-        name = f"pos {self.ticker} {self.side} {self.volume}: {self.open_price}"
+        name = f"pos {self.ticker} {self.side} {float(self.volume)}: {self.open_price}"
         if self.close_price is not None:
             name += f" -> {self.close_price}"
         if self.sl is not None:
@@ -146,6 +149,9 @@ class Position:
         if self.tp is not None:
             name += f" | tp:{self.tp}"
         return name
+
+    def set_volume(self, volume: float) -> Fraction:
+        return Fraction(int(round(volume*self.vol_round, 0)), self.vol_round)
 
     def update_sl(self, sl: float, time: np.datetime64):
         assert not (self.sl is not None and sl is None), "Set sl to None is not allowed"
@@ -183,7 +189,7 @@ class Position:
 
     @property
     def id(self):
-        return f"{self.open_indx}-{self.str_dir}-{self.open_price:.2f}-{self.volume:.2f} sl:{self.sl}"
+        return f"{self.open_indx}-{self.str_dir}-{self.open_price:.2f}-{float(self.volume.real):.2f} sl:{self.sl}"
 
     def close(self, price, date, indx):
         self.close_price = abs(price)
@@ -207,7 +213,7 @@ class Position:
         return self.enter_points_hist
 
     def add_to_position(self, 
-                        additional_volume: int, 
+                        additional_volume: float, 
                         price: float, 
                         time: np.datetime64):
         """
@@ -221,13 +227,13 @@ class Position:
         if additional_volume <= 0:
             return
         self.open_price = self.open_price * self.volume + price * additional_volume
-        self.volume += additional_volume
+        self.volume += self.set_volume(additional_volume)
         self.open_price /= self.volume
         self._update_fees(price, additional_volume)
         
         self.enter_points_hist.append((to_datetime(time), price))
         self.enter_price_hist.append((to_datetime(time), self.open_price))
-        self.volume_hist.append((to_datetime(self.open_date), self.volume))
+        self.volume_hist.append((to_datetime(time), float(self.volume)))
         logger.debug(f"Added {additional_volume} to position {self.id} at price {price}")
 
     def trim_position(self, 
@@ -242,6 +248,7 @@ class Position:
             price (float): The execution price for the trimmed volume.
             time (np.datetime64): The timestamp of the trim event.
         """
+        trim_volume = self.set_volume(trim_volume)
         assert trim_volume < self.volume, "Cannot trim more or equal than current position"
 
         self._update_profit_abs(price, trim_volume)
@@ -249,7 +256,7 @@ class Position:
         self.volume -= trim_volume
         self.enter_points_hist.append((to_datetime(time), price))
         self.enter_price_hist.append((to_datetime(time), self.open_price))
-        self.volume_hist.append((to_datetime(time), self.volume))
+        self.volume_hist.append((to_datetime(time), float(self.volume)))
         logger.debug(f"Remove {trim_volume} from position {self.id} at price {price}")
         
     def get_drawitem(self):
@@ -314,6 +321,7 @@ class Position:
             indx=open_indx,
             ticker=data['ticker'],
             volume=data['volume'],
+            qty_step=0.001,#data['qty_step'],
             period=data['period'],
             sl=data['stop_loss'],
             tp=data['take_profit'],

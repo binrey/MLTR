@@ -77,6 +77,7 @@ class BybitTrading(BaseTradeClass):
                 side=side,
                 ticker=ticker,
                 volume=volume,
+                qty_step=self.qty_step,
                 period=self.period,
                 sl=sl,
             )

@@ -5,7 +5,7 @@ import pandas as pd
 from loguru import logger
 from tqdm import tqdm
 
-from common.type import Side, to_datetime
+from common.type import Side, Symbol, to_datetime
 from data_processing.dataloading import MovingWindow
 from trade.utils import ORDER_TYPE, Order, Position
 
@@ -53,7 +53,7 @@ class TradeHistory:
 
 class Broker:
     def __init__(self, cfg: Dict[str, Any], init_moving_window=True):
-        self.symbol = cfg["symbol"]
+        self.symbol:Symbol = cfg["symbol"]
         self.period = cfg["period"]
         self.fee_rate = cfg["fee_rate"]
         self.close_last_position = cfg["close_last_position"]
@@ -212,7 +212,7 @@ class Broker:
                 self.close_orders(triggered_id, i)
                 if self.active_position is not None:
                     if self.active_position.side.value * triggered_side.value < 0:
-                        if triggered_vol >= self.active_position.volume:
+                        if self.active_position.set_volume(triggered_vol) >= self.active_position.volume:
                             # If triggered volume is greater or equal to position volume,
                             # close entire position and reduce triggered volume
                             closed_position = self.close_active_pos(triggered_price, triggered_date, triggered_id)
@@ -244,6 +244,7 @@ class Broker:
                         indx=triggered_id,
                         ticker=self.symbol.ticker,
                         volume=triggered_vol,
+                        qty_step=self.symbol.qty_step,
                         period=self.period,
                         fee_rate=self.fee_rate,
                         sl=sl,
