@@ -29,6 +29,7 @@ class BackTestResults:
         self.fig = None
         self.legend_ax1 = []
         self.metrics = {}
+        self.pos_size_hist = pd.DataFrame()
         
     @property
     def date_start(self):
@@ -92,6 +93,8 @@ class BackTestResults:
             
             # Add the DataFrames
             self.monthly_hist = self_monthly_reindexed.add(monthly_hist_reindexed, fill_value=0)
+            
+        self.pos_size_hist = profit_hist["pos_size"]
 
     def process_profit_hist(self, profit_hist: pd.DataFrame):
         assert "dates" in profit_hist.columns, "profit_hist must have 'dates' column"
@@ -217,11 +220,19 @@ class BackTestResults:
             
         assert "deposit" in self.daily_hist.columns, "deposit column must be in daily_hist, do eval_daily_metrics before plotting"
 
+        # ax2.plot(
+        #     self.daily_hist.index,
+        #     self.relative2deposit(self.daily_hist["deposit"]),
+        #     "-",
+        #     linewidth=3,
+        #     alpha=0.3,
+        # )
+        
         ax2.plot(
-            self.daily_hist.index,
-            self.relative2deposit(self.daily_hist["deposit"]),
+            self.pos_size_hist.index,
+            self.pos_size_hist.values,
             "-",
-            linewidth=3,
+            linewidth=1,
             alpha=0.3,
         )
 
