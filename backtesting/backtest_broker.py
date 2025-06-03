@@ -11,10 +11,10 @@ from trade.utils import ORDER_TYPE, Order, Position
 
 
 class TradeHistory:
-    def __init__(self, moving_window: MovingWindow, positions: List[Position]):
+    def __init__(self, moving_window: MovingWindow, positions: List[Position], ):
         self.mw = moving_window
         self.mw.size = 1
-        self.profit_hist = {"dates": [], "profit_csum_nofees": [], "fees_csum": [], "pos_size": []}
+        self.profit_hist = {"dates": [], "profit_csum_nofees": [], "fees_csum": [], "pos_size": [], "pos_cost": []}
 
         self.posdict_open: Dict[np.datetime64, Position] = {pos.open_date.astype("datetime64[m]"): pos for pos in positions}
         self.posdict_closed: Dict[np.datetime64, Position] = {pos.close_date.astype("datetime64[m]"): pos for pos in positions}
@@ -34,16 +34,19 @@ class TradeHistory:
                 self.cumulative_fees += closed_position.fees_abs
                 self.active_position = None
 
-            active_profit = 0
+            active_profit, active_volume, active_cost = 0, 0, 0
             # If an active position exists, add its unrealized profit
             if self.active_position is not None:
                 active_profit = self.active_position.side.value * (last_price - self.active_position.open_price) * self.active_position.volume
+                active_volume = float(self.active_position.volume)
+                active_cost = self.active_position.open_price * active_volume
 
             # Append current cumulative profit to the profit curve
             self.profit_hist["dates"].append(cur_time)
             self.profit_hist["profit_csum_nofees"].append(self.cumulative_profit + active_profit)
             self.profit_hist["fees_csum"].append(self.cumulative_fees)
-            self.profit_hist["pos_size"].append(float(self.active_position.volume) if self.active_position is not None else 0)
+            self.profit_hist["pos_size"].append(active_volume)
+            self.profit_hist["pos_cost"].append(active_cost)
 
     def profit_hist_as_df(self):
         profit_hist_df = pd.DataFrame(self.profit_hist)
@@ -69,6 +72,7 @@ class Broker:
         self.cumulative_profit = 0
         self.cumulative_fees = 0
         self.mw = MovingWindow(cfg) if init_moving_window else None
+        self.deposit = self.wallet
 
     @property
     def profits(self):
@@ -133,6 +137,7 @@ class Broker:
     def close_active_pos(self, price, time, hist_id):
         self.active_position.close(price, time, hist_id)
         closed_position = self.active_position
+        self.deposit = min(self.wallet, self.deposit + closed_position.profit_abs)
         self.active_position = None
         self.positions.append(closed_position)
         return closed_position

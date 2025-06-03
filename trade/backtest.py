@@ -60,8 +60,8 @@ class BackTest(BaseTradeClass):
     def get_open_position(self):
         return self.session.active_position
 
-    def get_wallet(self) -> float:
-        return self.session.wallet
+    def get_deposit(self) -> float:
+        return self.session.deposit
 
     @log_get_hist
     def get_hist(self):
@@ -112,6 +112,8 @@ def launch(cfg) -> BackTestResults:
     bt_res.print_results(cfg, backtest_trading.exp)
     bt_res.plot_results()
     bt_res.save_fig()
+    bt_res.plot_results_by_period()
+    bt_res.save_fig(save_path="_last_backtest_by_period.png")
 
     return bt_res
 

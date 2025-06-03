@@ -95,6 +95,7 @@ class BackTestResults:
             self.monthly_hist = self_monthly_reindexed.add(monthly_hist_reindexed, fill_value=0)
             
         self.pos_size_hist = profit_hist["pos_size"]
+        self.profit_hist = profit_hist
 
     def process_profit_hist(self, profit_hist: pd.DataFrame):
         assert "dates" in profit_hist.columns, "profit_hist must have 'dates' column"
@@ -202,16 +203,24 @@ class BackTestResults:
         plt.tight_layout()
         # -------------------------------------------
 
-        self.add_profit_curve(self.daily_hist.index, self.relative2deposit(self.daily_hist["profit_csum"]), 
-                              self.tickers_set, color="b", linewidth=3, alpha=0.5)
+        self.add_profit_curve(self.daily_hist.index, 
+                              self.daily_hist["profit_csum"], #self.relative2deposit(self.daily_hist["profit_csum"]), 
+                              self.tickers_set, 
+                              color="b", 
+                              linewidth=3, 
+                              alpha=0.5)
         if plot_profit_without_fees:
-            self.add_profit_curve(self.daily_hist.index, self.relative2deposit(self.daily_hist["profit_csum_nofees"]), 
-                                  f"{self.tickers_set } without fees", color="b", linewidth=1, alpha=0.5)
+            self.add_profit_curve(self.daily_hist.index, 
+                                  self.daily_hist["profit_csum_nofees"], #self.relative2deposit(self.daily_hist["profit_csum_nofees"]),
+                                  f"{self.tickers_set } without fees",
+                                  color="b",
+                                  linewidth=1,
+                                  alpha=0.5)
 
         if "buy_and_hold" in self.daily_hist.columns:
             ax1.plot(
                 self.daily_hist.index,
-                self.relative2wallet(self.daily_hist["buy_and_hold"]),
+                self.daily_hist["buy_and_hold"],#self.relative2wallet(self.daily_hist["buy_and_hold"]),
                 linewidth=2,
                 color="g",
                 alpha=0.6,
@@ -220,19 +229,11 @@ class BackTestResults:
             
         assert "deposit" in self.daily_hist.columns, "deposit column must be in daily_hist, do eval_daily_metrics before plotting"
 
-        # ax2.plot(
-        #     self.daily_hist.index,
-        #     self.relative2deposit(self.daily_hist["deposit"]),
-        #     "-",
-        #     linewidth=3,
-        #     alpha=0.3,
-        # )
-        
         ax2.plot(
-            self.pos_size_hist.index,
-            self.pos_size_hist.values,
+            self.daily_hist.index,
+            self.daily_hist["deposit"],#self.relative2deposit(self.daily_hist["deposit"]),
             "-",
-            linewidth=1,
+            linewidth=3,
             alpha=0.3,
         )
 
@@ -242,6 +243,44 @@ class BackTestResults:
             width=20,
             color="g",
             alpha=0.6,
+        )
+
+
+    def plot_results_by_period(self, title: Optional[str] = None, plot_profit_without_fees: bool = True):
+        self.fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8), gridspec_kw={'height_ratios': [3, 1]})
+        
+        if title:
+            self.fig.suptitle(title, fontsize=16)
+            self.fig.subplots_adjust(top=0.9)
+        
+        ax1.set_ylabel("fin result")
+        ax2.set_ylabel("deposit")
+
+        plt.tight_layout()
+        # -------------------------------------------
+
+        self.add_profit_curve(self.profit_hist.index, 
+                              self.profit_hist["profit_csum_nofees"] - self.profit_hist["fees_csum"], #self.relative2deposit(self.daily_hist["profit_csum"]), 
+                              self.tickers_set, 
+                              color="b", 
+                              linewidth=3, 
+                              alpha=0.5)
+        if plot_profit_without_fees:
+            self.add_profit_curve(self.profit_hist.index, 
+                                  self.profit_hist["profit_csum_nofees"], #self.relative2deposit(self.daily_hist["profit_csum_nofees"]),
+                                  f"{self.tickers_set } without fees",
+                                  color="b",
+                                  linewidth=1,
+                                  alpha=0.5)
+            
+        assert "deposit" in self.daily_hist.columns, "deposit column must be in daily_hist, do eval_daily_metrics before plotting"
+
+        ax2.plot(
+            self.profit_hist.index,
+            self.profit_hist["pos_cost"],#self.relative2deposit(self.daily_hist["deposit"]),
+            "-",
+            linewidth=3,
+            alpha=0.3,
         )
 
     def save_fig(self, save_path: Optional[str] = "_last_backtest.png"):

@@ -52,6 +52,7 @@ class ExpertBase(ABC):
 
         self.orders = []
         self.active_position = None
+        self.deposit = self.wallet
 
     def __str__(self):
         return f"{str(self.decision_maker)} sl: {str(self.sl_processor)}  tp: {str(self.tp_processor)}"
@@ -60,8 +61,9 @@ class ExpertBase(ABC):
     def get_body(self, h) -> None:
         pass
 
-    def update(self, h, active_position: Position):
+    def update(self, h, active_position: Position, deposit: float):
         self.active_position = active_position
+        self.deposit = deposit
         self.get_body(h)
 
     def _reset_state(self):
@@ -91,9 +93,11 @@ class ExpertFormation(ExpertBase):
         #     self.model.to(self.cfg["run_model_device"])
 
     def estimate_volume(self, h):
-        volume = self.wallet/h["Open"][-1]*self.leverage
+        # volume = self.wallet/h["Open"][-1]*self.leverage
+        volume = self.deposit/h["Open"][-1]*self.leverage
         volume = self.symbol.round_qty(self.symbol.qty_step, volume)
         logger.debug(f"estimated lot: {volume}")
+        print(self.deposit, volume*h["Open"][-1])
         return volume
 
     def create_or_update_sl(self, h):
@@ -182,6 +186,7 @@ class ExpertFormation(ExpertBase):
 
         target_volume *= max_volume
 
+        order_volume = 0
         if self.active_position is None:
             # Open new position
             order_volume = target_volume
@@ -192,8 +197,9 @@ class ExpertFormation(ExpertBase):
                 # if order_volume < self.active_position.volume:
                 #     return
             else:
-                order_volume = max(0, target_volume -
-                                   self.active_position.volume)
+                # Add to position
+                if target_volume == 0:
+                    order_volume = max(0, target_volume - self.active_position.volume)
 
         if order_volume > 0:
             self.create_orders(side=target_state.side,

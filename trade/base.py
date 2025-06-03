@@ -127,7 +127,7 @@ class BaseTradeClass(ABC):
         pass
 
     @abstractmethod
-    def get_wallet(self) -> float:
+    def get_deposit(self) -> float:
         pass
 
     @abstractmethod
@@ -250,11 +250,11 @@ class BaseTradeClass(ABC):
         else:
             self.clear_log_dir()
 
-        logger.info(f"Market wallet: {self.get_wallet()}")
+        logger.info(f"Market wallet: {self.get_deposit()}")
 
     def update_market_state(self) -> None:
-        cur_pos = self.get_current_position()
-        self.pos.update(cur_pos)
+        self.deposit = self.get_deposit()
+        self.pos.update(self.get_current_position())
         logger.debug(f"update_market_state: current position: {self.pos.curr}")
 
     def vis(self):
@@ -301,6 +301,6 @@ class BaseTradeClass(ABC):
         if self.vis_events == Vis.ON_STEP:
             self.vis()
 
-        self.exp_update(self.h, self.pos.curr)
+        self.exp_update(self.h, self.pos.curr, self.deposit)
         if self.should_save_backup:
             self.save_backup()
