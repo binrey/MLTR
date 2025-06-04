@@ -14,32 +14,35 @@ class TradeHistory:
     def __init__(self, moving_window: MovingWindow, positions: List[Position]):
         self.mw = moving_window
         self.mw.size = 1
-        self.profit_hist = {"dates": [], "profit_csum_nofees": [], "fees_csum": [], "pos_size": [], "pos_cost": []}
+        self.profit_hist = {"dates": [], "profit_csum_nofees": [], "fees_csum": [], "pos_size": [], "pos_cost": [], "loss": []}
 
         self.posdict_open: Dict[np.datetime64, Position] = {pos.open_date.astype("datetime64[m]"): pos for pos in positions}
         self.posdict_closed: Dict[np.datetime64, Position] = {pos.close_date.astype("datetime64[m]"): pos for pos in positions}
         self.cumulative_profit = 0
         self.cumulative_fees = 0
-        self.active_position = None
+        active_position, max_profit = None, 0
+
 
         for self.hist_window, _ in tqdm(self.mw(), desc="Build profit curve", total=self.mw.timesteps_count, disable=True):
             cur_time = self.hist_window["Date"][-1]
             closed_position: Optional[Position] = self.posdict_closed.get(cur_time, None)
             if self.posdict_open.get(cur_time, None) is not None:
-                self.active_position = self.posdict_open[cur_time]
+                active_position = self.posdict_open[cur_time]
             last_price = self.hist_window["Open"][-1]
 
             if closed_position is not None:
                 self.cumulative_profit += closed_position.profit_abs
                 self.cumulative_fees += closed_position.fees_abs
-                self.active_position = None
+                active_position = None
 
             active_profit, active_volume, active_cost = 0, 0, 0
             # If an active position exists, add its unrealized profit
-            if self.active_position is not None:
-                active_profit = self.active_position.side.value * (last_price - self.active_position.open_price) * self.active_position.volume
-                active_volume = float(self.active_position.volume)
-                active_cost = self.active_position.open_price * active_volume
+            if active_position is not None:
+                active_profit = active_position.side.value * (last_price - active_position.open_price) * active_position.volume
+                active_volume = float(active_position.volume)
+                active_cost = active_position.open_price * active_volume
+
+            max_profit = max(max_profit, self.cumulative_profit + active_profit - self.cumulative_fees)
 
             # Append current cumulative profit to the profit curve
             self.profit_hist["dates"].append(cur_time)
@@ -47,7 +50,7 @@ class TradeHistory:
             self.profit_hist["fees_csum"].append(self.cumulative_fees)
             self.profit_hist["pos_size"].append(active_volume)
             self.profit_hist["pos_cost"].append(active_cost)
-            self.profit_hist["deposit"].append(self.deposit)
+            self.profit_hist["loss"].append(self.cumulative_profit + active_profit - self.cumulative_fees - max_profit)
 
     def profit_hist_as_df(self):
         profit_hist_df = pd.DataFrame(self.profit_hist)

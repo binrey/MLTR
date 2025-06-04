@@ -247,15 +247,15 @@ class BackTestResults:
 
 
     def plot_results_by_period(self, title: Optional[str] = None, plot_profit_without_fees: bool = True):
-        self.fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8), gridspec_kw={'height_ratios': [3, 1]})
+        self.fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 8), gridspec_kw={'height_ratios': [3, 1, 1]})
         
         if title:
             self.fig.suptitle(title, fontsize=16)
             self.fig.subplots_adjust(top=0.9)
         
         ax1.set_ylabel("fin result")
-        ax2.set_ylabel("deposit")
-
+        ax2.set_ylabel("pos_cost")
+        ax3.set_ylabel("loss")
         plt.tight_layout()
         # -------------------------------------------
 
@@ -272,12 +272,18 @@ class BackTestResults:
                                   color="b",
                                   linewidth=1,
                                   alpha=0.5)
-            
-        assert "deposit" in self.daily_hist.columns, "deposit column must be in daily_hist, do eval_daily_metrics before plotting"
 
         ax2.plot(
             self.profit_hist.index,
             self.profit_hist["pos_cost"],#self.relative2deposit(self.daily_hist["deposit"]),
+            "-",
+            linewidth=3,
+            alpha=0.3,
+        )
+        
+        ax3.plot(
+            self.profit_hist.index,
+            self.profit_hist["loss"],#self.relative2deposit(self.daily_hist["deposit"]),
             "-",
             linewidth=3,
             alpha=0.3,
