@@ -72,7 +72,7 @@ class TimePeriod(Enum):
     @property
     def minutes(self):
         return int(self.value[1:])
-        
+
 class RunType(Enum):
     BACKTEST = "backtest"
     OPTIMIZE = "optimization"
@@ -86,11 +86,11 @@ class RunType(Enum):
             return cls[label.upper()]
         else:
             raise ValueError(f"Unknown run type: {label}")
-            
-if __name__ == "__main__":
-    tp = TimePeriod.M60
-    print(tp.to_timedelta())
 
+@dataclass
+class VolEstimRule(Enum):
+    FIXED_POS_COST = "fixed_pos_cost"
+    DEPOSIT_BASED = "deposit_based"
 
 Point = Tuple[np.datetime64, float]
 Bar = Tuple[float, float]

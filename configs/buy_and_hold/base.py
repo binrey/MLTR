@@ -1,9 +1,9 @@
 import numpy as np
 
-from common.type import ConfigType, Symbols, TimePeriod, Vis
+from common.type import ConfigType, Symbols, TimePeriod, Vis, VolEstimRule
 from common.utils import FeeRate, update_config
 from experts.buy_and_hold import BuyAndHold
-from experts.core.position_control import *
+from experts.core.position_control import FixRate, SLFixed, TPFromSL
 
 config = dict(
     decision_maker=dict(
@@ -28,6 +28,7 @@ config = dict(
     conftype=None,
     wallet=1000,
     leverage=1,
+    vol_estimation_rule=VolEstimRule.FIXED_POS_COST,
     close_only_by_stops=False,
     hist_size=2,
     tstart=0,
@@ -51,7 +52,7 @@ backtest = update_config(
     conftype=ConfigType.BACKTEST,
     date_start=np.datetime64("2020-01-01T00:00:00"),
     date_end=np.datetime64("2025-05-21T00:00:00"),
-    eval_buyhold=True,
+    eval_buyhold=False,
     clear_logs=True,
     log_trades=False,
     close_last_position=True,

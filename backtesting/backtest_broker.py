@@ -11,7 +11,7 @@ from trade.utils import ORDER_TYPE, Order, Position
 
 
 class TradeHistory:
-    def __init__(self, moving_window: MovingWindow, positions: List[Position], ):
+    def __init__(self, moving_window: MovingWindow, positions: List[Position]):
         self.mw = moving_window
         self.mw.size = 1
         self.profit_hist = {"dates": [], "profit_csum_nofees": [], "fees_csum": [], "pos_size": [], "pos_cost": []}
@@ -47,6 +47,7 @@ class TradeHistory:
             self.profit_hist["fees_csum"].append(self.cumulative_fees)
             self.profit_hist["pos_size"].append(active_volume)
             self.profit_hist["pos_cost"].append(active_cost)
+            self.profit_hist["deposit"].append(self.deposit)
 
     def profit_hist_as_df(self):
         profit_hist_df = pd.DataFrame(self.profit_hist)
