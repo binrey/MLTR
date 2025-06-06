@@ -87,7 +87,7 @@ class RunType(Enum):
         else:
             raise ValueError(f"Unknown run type: {label}")
 
-@dataclass
+
 class VolEstimRule(Enum):
     FIXED_POS_COST = "fixed_pos_cost"
     DEPOSIT_BASED = "deposit_based"
