@@ -186,7 +186,6 @@ class BackTestResults:
             self.fig.subplots_adjust(top=0.9)
 
         ax1.set_ylabel("fin result, %")
-        plt.tight_layout()
 
 
     def plot_results(self, title: Optional[str] = None, plot_profit_without_fees: bool = True):
@@ -200,7 +199,6 @@ class BackTestResults:
         ax2.set_ylabel("deposit, %")
         ax3.set_ylabel("monthly profit, %")
 
-        plt.tight_layout()
         # -------------------------------------------
 
         self.add_profit_curve(self.daily_hist.index, 
@@ -291,6 +289,7 @@ class BackTestResults:
 
     def save_fig(self, save_path: Optional[str] = "_last_backtest.png"):
         self.fig.axes[0].legend(self.legend_ax1)
+        plt.tight_layout()
         if self.fig is not None:
             self.fig.savefig(save_path)
 
