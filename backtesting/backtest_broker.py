@@ -17,6 +17,7 @@ class TradeHistory:
         self.mw = moving_window
         self.mw.size = 1
         self.profit_hist = defaultdict(list)
+        self.leverage = 1
 
         self.posdict_open: Dict[np.datetime64, Position] = {pos.open_date.astype("datetime64[m]"): pos for pos in positions}
         self.posdict_closed: Dict[np.datetime64, Position] = {pos.close_date.astype("datetime64[m]"): pos for pos in positions}
@@ -60,7 +61,8 @@ class TradeHistory:
             self.profit_hist["dates"] = to_datetime(self.profit_hist["dates"])
             self.profit_hist["profit_csum"] = self.profit_hist["profit_csum_nofees"] - self.profit_hist["fees_csum"]
 
-    def define_deposit(self, wallet: float, vol_estimation_rule: VolEstimRule):
+    def add_info(self, wallet: float, vol_estimation_rule: VolEstimRule, leverage: float):
+        self.leverage = leverage
         self.max_loss = max(self.profit_hist["loss"].abs())
         self.deposit = max(wallet, self.max_loss) if vol_estimation_rule == VolEstimRule.DEPOSIT_BASED else wallet + self.max_loss
 
@@ -74,6 +76,7 @@ class Broker:
         self.symbol:Symbol = cfg["symbol"]
         self.period = cfg["period"]
         self.fee_rate = cfg["fee_rate"]
+        self.leverage = cfg["leverage"]
         self.close_last_position = cfg["close_last_position"]
         self.wallet = cfg["wallet"]
         self.vol_estimation_rule = cfg["vol_estimation_rule"]
@@ -126,7 +129,7 @@ class Broker:
                                       hist_id=self.hist_id)
             
         self.profit_hist = TradeHistory(self.mw, self.positions)
-        self.profit_hist.define_deposit(self.wallet, self.vol_estimation_rule)
+        self.profit_hist.add_info(self.wallet, self.vol_estimation_rule, self.leverage)
 
     def close_orders(self, hist_id, i=None):
         if i is not None:

@@ -32,7 +32,7 @@ config = dict(
     wallet=1000,
     lot=0.08,
     leverage=1,
-    vol_estimation_rule=VolEstimRule.DEPOSIT_BASED,
+    vol_estimation_rule=VolEstimRule.FIXED_POS_COST,
     close_only_by_stops=False,
     hist_size=256,
     tstart=0,
@@ -55,7 +55,7 @@ config = dict(
 backtest = update_config(
     config,
     conftype=ConfigType.BACKTEST,
-    date_start=np.datetime64("2024-01-01T00:00:00"),
+    date_start=np.datetime64("2018-01-01T00:00:00"),
     date_end=np.datetime64("2025-06-01T00:00:00"),
     eval_buyhold=True,
     clear_logs=True,

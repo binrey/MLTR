@@ -61,7 +61,7 @@ class BackTestResults:
     def __init__(self):
         self.daily_hist = pd.DataFrame()
         self.monthly_hist = pd.DataFrame()
-        self.buy_and_hold = None
+        self.leverage = 1
         self.tickers = set()
         self.deposit = None
         self.vol_estim_rule: Optional[VolEstimRule] = None
@@ -91,18 +91,20 @@ class BackTestResults:
         self.eval_daily_metrics()
 
     def add(self, bktest_broker: Broker):
-        self._add(bktest_broker.positions, bktest_broker.profit_hist, bktest_broker.profit_hist.deposit)
+        positions = bktest_broker.positions
+        self.ndeals += len(positions) 
+        self.tickers.update([pos.ticker for pos in positions])
+        self.positions.extend(positions)
 
-    def _add(self, positions: list[Position], trade_history: TradeHistory, deposit: float):
-        self.ndeals += len(positions)
+        deposit = bktest_broker.profit_hist.deposit
         if self.deposit is None:
             self.deposit = deposit
         else:
             self.deposit += deposit
-        self.tickers.update([pos.ticker for pos in positions])
-        self.positions.extend(positions)
 
-        daily_hist, monthly_hist = self.process_profit_hist(trade_history.df)
+        self.leverage = bktest_broker.profit_hist.leverage
+
+        daily_hist, monthly_hist = self.process_profit_hist(bktest_broker.profit_hist.df)
         
         if self.daily_hist.empty:
             self.daily_hist = daily_hist
@@ -161,8 +163,6 @@ class BackTestResults:
                    .agg(agg_method)
                    .reindex(target_dates, method=fill_method if func == "last" else None,
                           fill_value=fill_method if func == "sum" else None))
-        hist_resampled["pos_cost"].iloc[-1] = hist_resampled["pos_cost"].iloc[-2]
-        hist_resampled["pos_size"].iloc[-1] = hist_resampled["pos_size"].iloc[-2]
         return hist_resampled
 
     def eval_daily_metrics(self):
@@ -260,7 +260,7 @@ class BackTestResults:
             linewidth=3,
             alpha=0.3,
         )
-        ax2.set_ylim(0, 100)
+        ax2.set_ylim(0, 100*self.leverage)
 
         assert "deposit" in self.daily_hist.columns, "deposit column must be in daily_hist, do eval_daily_metrics before plotting"
         ax3.plot(
