@@ -3,7 +3,8 @@ from common.utils import update_config
 from configs.volprof.BTCUSDT import backtest, bybit
 
 updates = dict(
-    wallet=1000,
+    decision_maker = {"sharpness": 0},
+    wallet=500,
     period=TimePeriod.M1,
 )
 

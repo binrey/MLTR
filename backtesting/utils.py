@@ -211,9 +211,6 @@ class BackTestResults:
             self.fig.suptitle(title, fontsize=16)
             self.fig.subplots_adjust(top=0.9)
         
-        # Adjust spacing between subplots
-        self.fig.subplots_adjust(hspace=0.1)  # Reduce vertical space between subplots
-        
         ax1.set_ylabel("fin result, %")
         ax2.set_ylabel("position cost, %")
         ax3.set_ylabel("deposit, %")
@@ -226,6 +223,7 @@ class BackTestResults:
         # Hide x-axis tick labels for all axes except ax1
         for ax in [ax1, ax2, ax3]:
             ax.set_xticklabels([])
+            ax.tick_params(axis='x', which='both', bottom=False, top=False)
 
         # -------------------------------------------
 
@@ -322,40 +320,6 @@ class BackTestResults:
         npos_by_bins, bin_edges = np.histogram(positions_finresults)
         finres_by_bins = (bin_edges[:-1] + bin_edges[1:]) / 2
         return npos_by_bins, finres_by_bins
-    
-    def normalized_profits_entropy(self, positions_finresults):
-        """
-        Вычисляет нормированную энтропию распределения прибылей.
-        
-        Аргументы:
-            profits (list или np.array): массив значений прибылей по сделкам.
-            
-        Возвращает:
-            Нормированная энтропия в диапазоне [0, 1], 
-            где 1 соответствует равномерному распределению, 0 — концентрации прибыли в одном элементе.
-        """
-        profits = positions_finresults[positions_finresults > 0].values
-        
-        # Если суммарная прибыль равна 0, энтропия неопределена
-        total_profit = np.sum(profits)
-        if total_profit == 0:
-            raise ValueError("Суммарная прибыль равна 0, энтропия не может быть вычислена.")
-        
-        # Вычисляем доли (веса) каждой сделки
-        weights = profits / total_profit
-        
-        # Для вычисления логарифма учитываем только ненулевые веса, чтобы избежать ошибки log(0)
-        nonzero_weights = weights[weights > 0]
-        
-        # Вычисляем энтропию: H = -sum(w_i * ln(w_i))
-        H = -np.sum(nonzero_weights * np.log(nonzero_weights))
-        
-        # Нормируем энтропию относительно максимума ln(N), где N - число сделок
-        N = len(profits)
-        H_max = np.log(N)
-        normalized_H = H / H_max if H_max > 0 else 1.0
-        
-        return normalized_H
 
     @property
     def fees(self) -> float:
