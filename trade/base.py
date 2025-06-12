@@ -19,8 +19,7 @@ from common.type import Side, Symbol, Vis
 from common.utils import Telebot, date2str
 from common.visualization import Visualizer
 from experts.core.expert import ExpertBase
-from trade.utils import Position, log_creating_order
-
+from trade.utils import Position
 pd.options.mode.chained_assignment = None
 
 
@@ -255,7 +254,7 @@ class BaseTradeClass(ABC):
     def update_market_state(self) -> None:
         self.deposit = self.get_deposit()
         self.pos.update(self.get_current_position())
-        logger.debug(f"update_market_state: current position: {self.pos.curr}")
+        logger.debug(f"update_market_state: {self.pos.curr}")
 
     def vis(self):
         # return self.visualizer([self.pos.prev, self.pos.curr], self.exp)

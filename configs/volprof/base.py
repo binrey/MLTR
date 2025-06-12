@@ -1,6 +1,6 @@
 import numpy as np
 
-from common.type import ConfigType, Symbols, TimePeriod, Vis
+from common.type import ConfigType, Symbols, TimePeriod, Vis, VolEstimRule
 from common.utils import FeeRate, update_config
 from experts.core.position_control import *
 from experts.volprof import VolProf
@@ -30,6 +30,7 @@ config = dict(
     conftype=None,
     wallet=100,
     leverage=1,
+    vol_estimation_rule=VolEstimRule.FIXED_POS_COST,
     close_only_by_stops=False,
     hist_size=64,
     tstart=0,
@@ -52,8 +53,8 @@ config = dict(
 backtest = update_config(
     config,
     conftype=ConfigType.BACKTEST,
-    date_start=np.datetime64("2022-01-01T00:00:00"),
-    date_end=np.datetime64("2025-05-05T00:00:00"),
+    date_start=np.datetime64("2017-10-01T00:00:00"),
+    date_end=np.datetime64("2025-06-01T00:00:00"),
     eval_buyhold=False,
     clear_logs=True,
     log_trades=False,

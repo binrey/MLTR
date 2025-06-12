@@ -72,6 +72,13 @@ class TimePeriod(Enum):
     @property
     def minutes(self):
         return int(self.value[1:])
+    
+    @property
+    def hours(self):
+        return int(self.value[1:])/60
+    
+    def to_days(self, value: float):
+        return value/self.hours/24
 
 class RunType(Enum):
     BACKTEST = "backtest"

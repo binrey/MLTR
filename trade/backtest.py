@@ -2,7 +2,7 @@ import random
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
-from typing import Any, Callable, Optional
+from typing import Optional
 
 import matplotlib.colors as mcolors
 import numpy as np
@@ -35,7 +35,6 @@ stackprinter.set_excepthook(style='color')
 class BackTest(BaseTradeClass):
     def __init__(self, cfg) -> None:
         self.session = Broker(cfg)
-        self.eval_buyhold = cfg["eval_buyhold"]
         super().__init__(cfg=cfg,
                          expert=ExpertFormation(cfg=cfg,
                                                 create_orders_func=self.create_orders,
@@ -94,11 +93,6 @@ class BackTest(BaseTradeClass):
         if bt_res.ndeals == 0:
             logger.warning("No trades!")
             return bt_res
-        
-        if self.eval_buyhold:
-            dates = self.session.mw.hist["Date"][self.session.mw.id2start: self.session.mw.id2end]
-            closes = self.session.mw.hist["Close"][self.session.mw.id2start: self.session.mw.id2end]
-            bt_res.compute_buy_and_hold(dates=dates, closes=closes)
         return bt_res
 
 def launch(cfg) -> BackTestResults:
@@ -112,8 +106,6 @@ def launch(cfg) -> BackTestResults:
     bt_res.print_results(cfg, backtest_trading.exp)
     bt_res.plot_results()
     bt_res.save_fig()
-    bt_res.plot_results_by_period()
-    bt_res.save_fig(save_path="_last_backtest_by_period.png")
 
     return bt_res
 

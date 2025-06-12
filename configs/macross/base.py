@@ -1,6 +1,6 @@
 import numpy as np
 
-from common.type import ConfigType, Symbols, TimePeriod, Vis
+from common.type import ConfigType, Symbols, TimePeriod, Vis, VolEstimRule
 from common.utils import FeeRate, update_config
 from experts.core.position_control import *
 from experts.ma_cross import ClsMACross
@@ -11,7 +11,7 @@ config = dict(
         mode = "contrtrend",
         ma_fast_period=16,
         upper_levels = 3,
-        lower_levels = 60,
+        lower_levels = 10,
         min_step=0.25,
     ),
     sl_processor=dict(
@@ -32,6 +32,7 @@ config = dict(
     wallet=1000,
     lot=0.08,
     leverage=1,
+    vol_estimation_rule=VolEstimRule.DEPOSIT_BASED,
     close_only_by_stops=False,
     hist_size=256,
     tstart=0,
@@ -54,8 +55,8 @@ config = dict(
 backtest = update_config(
     config,
     conftype=ConfigType.BACKTEST,
-    date_start=np.datetime64("2018-01-01T00:00:00"),
-    date_end=np.datetime64("2025-05-21T00:00:00"),
+    date_start=np.datetime64("2024-01-01T00:00:00"),
+    date_end=np.datetime64("2025-06-01T00:00:00"),
     eval_buyhold=True,
     clear_logs=True,
     log_trades=True,

@@ -18,7 +18,7 @@ from loguru import logger
 from matplotlib import pyplot as plt
 from tabulate import tabulate
 
-from backtesting.utils import BackTestResults
+from backtesting.utils import BackTestResults, Metrics
 from common.type import Symbol
 from common.utils import date2str
 from trade.backtest import launch as backtest_launch
@@ -352,8 +352,7 @@ class Optimizer:
                 f"optimization/{symbol}.{period.value}.top_{self.sortby}_sorted.csv", index=False)
 
         profit_av = (sum_daily_profit / len(top_runs_ids)).values
-        APR_av, maxwait_av = self.btests[top_runs_ids[-1]
-                                         ].metrics_from_profit(profit_av)
+        APR_av, maxwait_av = self.btests[top_runs_ids[-1]].metrics_from_profit(profit_av)
         logger.info(
             f"\nAverage of top runs ({', '.join([f'{i}' for i in top_runs_ids])}): APR={APR_av:.2f}, maxwait={maxwait_av:.0f}\n")
         plot_daily_balances_with_av(
@@ -390,10 +389,9 @@ class Optimizer:
             for test_id in test_ids:
                 sum_daily_profit += self.btests[test_id].daily_hist["profit_csum"]
             profit_av = sum_daily_profit/len(test_ids)
-            bstair_av, metrics = BackTestResults._calc_metrics(
-                profit_av.values)
-            recovery.append(metrics["recovery"])
-            maxwait.append(metrics["maxwait"])
+            metrics = Metrics(self.btests[0].daily_hist.index, profit_av.values)
+            recovery.append(metrics.recovery_factorery)
+            maxwait.append(metrics.max_period)
             opt_res["final_balance"].iloc[i] = profit_av.values[-1]
             balances_av[opt_res.index[i]] = profit_av
         opt_res["recovery"] = recovery

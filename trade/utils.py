@@ -141,7 +141,7 @@ class Position:
         self.volume_hist.append((to_datetime(self.open_date), float(self.volume)))
 
     def __str__(self):
-        name = f"pos {self.ticker} {self.side} {float(self.volume)}: {self.open_price}"
+        name = f"pos {self.ticker} {self.side} vol{float(self.volume)} p{self.open_price} cost{self.cost}"
         if self.close_price is not None:
             name += f" -> {self.close_price}"
         if self.sl is not None:
@@ -152,6 +152,10 @@ class Position:
 
     def set_volume(self, volume: float) -> Fraction:
         return Fraction(int(round(volume*self.vol_round, 0)), self.vol_round)
+    
+    @property
+    def cost(self):
+        return self.open_price * self.volume
 
     def update_sl(self, sl: float, time: np.datetime64):
         assert not (self.sl is not None and sl is None), "Set sl to None is not allowed"

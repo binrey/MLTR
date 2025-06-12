@@ -11,9 +11,50 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from backtesting.backtest_broker import Broker
-from common.type import to_datetime
+from backtesting.backtest_broker import Broker, TradeHistory
+from common.type import VolEstimRule, to_datetime
 from trade.utils import Position
+
+
+class Metrics:
+    def __init__(self, dates, profit_curve):
+        # Calculate running maximum (all-time high) of profit_curve
+        self.ath_curve = np.maximum.accumulate(profit_curve)
+        
+        max_period, price_at_max_period = 0, 0
+        max_period_start = dates[0]
+        max_period_end = dates[0]
+        
+        curr_period = 0
+        curr_start = dates[0]
+        
+        for i in range(1, len(self.ath_curve)):
+            if self.ath_curve[i] <= self.ath_curve[i-1]:
+                curr_period += 1
+            else:
+                if curr_period > max_period:
+                    max_period = curr_period
+                    price_at_max_period = self.ath_curve[i-1]
+                    max_period_start = curr_start
+                    max_period_end = dates[i-1]
+                curr_period = 0
+                curr_start = dates[i]
+
+        # Check final period
+        if curr_period > max_period:
+            max_period = curr_period
+            price_at_max_period = self.ath_curve[-1]
+            max_period_start = curr_start
+            max_period_end = dates[-1]
+        
+        self.max_period = max_period
+        self.price_at_max_period = price_at_max_period
+        self.max_period_start = max_period_start
+        self.max_period_end = max_period_end
+        
+        self.drawdown_curve = self.ath_curve - profit_curve
+        self.max_drawdown = np.max(self.drawdown_curve)
+        self.recovery_factor = profit_curve[-1] / self.max_drawdown if self.max_drawdown > 0 else -1
 
 
 class BackTestResults:
@@ -22,14 +63,13 @@ class BackTestResults:
         self.monthly_hist = pd.DataFrame()
         self.buy_and_hold = None
         self.tickers = set()
-        self.wallet = 0
-        self.deposit = 0
+        self.deposit = None
+        self.vol_estim_rule: Optional[VolEstimRule] = None
         self.ndeals = 0
         self.positions = []
         self.fig = None
         self.legend_ax1 = []
         self.metrics = {}
-        self.pos_size_hist = pd.DataFrame()
         
     @property
     def date_start(self):
@@ -42,23 +82,27 @@ class BackTestResults:
     @property
     def num_years_on_trade(self):
         return (self.date_end - self.date_start).days / 365
+    
     @property
     def tickers_set(self) -> str:
         return "+".join(self.tickers)
-    
+
     def process(self):
         self.eval_daily_metrics()
 
     def add(self, bktest_broker: Broker):
-        self._add(bktest_broker.positions, bktest_broker.profit_hist, bktest_broker.wallet)
+        self._add(bktest_broker.positions, bktest_broker.profit_hist, bktest_broker.profit_hist.deposit)
 
-    def _add(self, positions: list[Position], profit_hist: pd.DataFrame, wallet: float):
+    def _add(self, positions: list[Position], trade_history: TradeHistory, deposit: float):
         self.ndeals += len(positions)
-        self.wallet += wallet
+        if self.deposit is None:
+            self.deposit = deposit
+        else:
+            self.deposit += deposit
         self.tickers.update([pos.ticker for pos in positions])
         self.positions.extend(positions)
-        
-        daily_hist, monthly_hist = self.process_profit_hist(profit_hist)
+
+        daily_hist, monthly_hist = self.process_profit_hist(trade_history.df)
         
         if self.daily_hist.empty:
             self.daily_hist = daily_hist
@@ -71,8 +115,8 @@ class BackTestResults:
             daily_hist_reindexed = daily_hist.reindex(all_dates)
             
             # Fill NaNs with the last value for each DataFrame
-            self_reindexed.fillna(method='ffill', inplace=True)
-            daily_hist_reindexed.fillna(method='ffill', inplace=True)
+            self_reindexed.ffill(inplace=True)
+            daily_hist_reindexed.ffill(inplace=True)
             
             # Add the DataFrames
             self.daily_hist = self_reindexed.add(daily_hist_reindexed, fill_value=0)
@@ -92,10 +136,7 @@ class BackTestResults:
             monthly_hist_reindexed.fillna(0, inplace=True)
             
             # Add the DataFrames
-            self.monthly_hist = self_monthly_reindexed.add(monthly_hist_reindexed, fill_value=0)
-            
-        self.pos_size_hist = profit_hist["pos_size"]
-        self.profit_hist = profit_hist
+            self.monthly_hist = self_monthly_reindexed.add(monthly_hist_reindexed, fill_value=0)            
 
     def process_profit_hist(self, profit_hist: pd.DataFrame):
         assert "dates" in profit_hist.columns, "profit_hist must have 'dates' column"
@@ -116,42 +157,20 @@ class BackTestResults:
         agg_method = "sum" if func == "sum" else "last"
         fill_method = {"sum": 0, "last": "ffill"}[func]
         
-        return (hist.resample(period)
+        hist_resampled = (hist.resample(period)
                    .agg(agg_method)
                    .reindex(target_dates, method=fill_method if func == "last" else None,
                           fill_value=fill_method if func == "sum" else None))
-
-
-
-    def compute_buy_and_hold(self, dates: np.ndarray, closes: np.ndarray):
-        """
-        Compute buy and hold strategy for the given dates and closes prices. Use self.resample_hist method to resample data to monthly frequency.
-        
-        Output pandas DataFrame with index "dates" and columns: "profits", "buy_and_hold", "buy_and_hold_reinvest".
-        dates - dates of first day of every month.
-        profits - profits from the strategy on every month.
-        buy_and_hold - Buy at the first day and sell on the last. 
-        """
-        t0 = perf_counter()
-        # create datafreame from closes and dates as index
-        df = pd.DataFrame({"price": closes}, index=dates)
-        close_prices = df.resample("D").last()["price"]
-        self.daily_hist["buy_and_hold"] = (close_prices - close_prices[0]) * self.wallet/close_prices[0]
-        if self.daily_hist.shape[0] > 1:
-            self.daily_hist["buy_and_hold"].iloc[-1] = self.daily_hist["buy_and_hold"].iloc[-2]
-
-        self.daily_hist["unrealized_profit"] = -self.daily_hist["buy_and_hold"].diff() * np.sign(self.daily_hist["profit_csum_nofees"])
-        return perf_counter() - t0
+        hist_resampled["pos_cost"].iloc[-1] = hist_resampled["pos_cost"].iloc[-2]
+        hist_resampled["pos_size"].iloc[-1] = hist_resampled["pos_size"].iloc[-2]
+        return hist_resampled
 
     def eval_daily_metrics(self):
-        profit_stair, self.metrics = self._calc_metrics(
+        self.metrics = Metrics(
+            self.daily_hist.index,
             self.daily_hist["profit_csum"].values
         )
-        self.deposit = self.wallet + self.metrics["loss_max"]
-        self.daily_hist["deposit"] = self.deposit - (
-            profit_stair - self.daily_hist["profit_csum"].values
-        )
-        self.metrics["loss_max_rel"] = self.metrics["loss_max"] / self.deposit * 100
+        self.daily_hist["deposit"] = self.deposit - self.metrics.drawdown_curve
 
     def update_monthly_profit(self):
         # Create a temporary DataFrame with a DatetimeIndex for resampling
@@ -163,9 +182,6 @@ class BackTestResults:
         self.monthly_hist = temp_df['profit'].resample('M').sum()
         self.monthly_hist = self.monthly_hist.reset_index()
         self.monthly_hist.columns = ["days", "profit"]
-
-    def relative2wallet(self, data: pd.Series):
-        return data/self.wallet*100
 
     def relative2deposit(self, data: pd.Series):
         return data/self.deposit*100
@@ -189,102 +205,78 @@ class BackTestResults:
 
 
     def plot_results(self, title: Optional[str] = None, plot_profit_without_fees: bool = True):
-        self.fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 8), gridspec_kw={'height_ratios': [3, 1, 1]})
+        self.fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(8, 8), gridspec_kw={'height_ratios': [3, 1, 1, 1]})
         
         if title:
             self.fig.suptitle(title, fontsize=16)
             self.fig.subplots_adjust(top=0.9)
         
+        # Adjust spacing between subplots
+        self.fig.subplots_adjust(hspace=0.1)  # Reduce vertical space between subplots
+        
         ax1.set_ylabel("fin result, %")
-        ax2.set_ylabel("deposit, %")
-        ax3.set_ylabel("monthly profit, %")
+        ax2.set_ylabel("position cost, %")
+        ax3.set_ylabel("deposit, %")
+        ax4.set_ylabel("monthly profit, %")
+
+        # Add vertical grid lines to all subplots
+        for ax in [ax1, ax2, ax3, ax4]:
+            ax.grid(True, axis='x', linestyle='--', alpha=0.3)
+
+        # Hide x-axis tick labels for all axes except ax1
+        for ax in [ax1, ax2, ax3]:
+            ax.set_xticklabels([])
 
         # -------------------------------------------
 
         self.add_profit_curve(self.daily_hist.index, 
-                              self.daily_hist["profit_csum"], #self.relative2deposit(self.daily_hist["profit_csum"]), 
+                              self.relative2deposit(self.daily_hist["profit_csum"]), 
                               self.tickers_set, 
                               color="b", 
                               linewidth=3, 
                               alpha=0.5)
         if plot_profit_without_fees:
             self.add_profit_curve(self.daily_hist.index, 
-                                  self.daily_hist["profit_csum_nofees"], #self.relative2deposit(self.daily_hist["profit_csum_nofees"]),
+                                  self.relative2deposit(self.daily_hist["profit_csum_nofees"]),
                                   f"{self.tickers_set } without fees",
                                   color="b",
                                   linewidth=1,
                                   alpha=0.5)
 
-        if "buy_and_hold" in self.daily_hist.columns:
-            ax1.plot(
-                self.daily_hist.index,
-                self.daily_hist["buy_and_hold"],#self.relative2wallet(self.daily_hist["buy_and_hold"]),
-                linewidth=2,
-                color="g",
-                alpha=0.6,
-            )
-            self.legend_ax1.append("buy & hold")
-            
-        assert "deposit" in self.daily_hist.columns, "deposit column must be in daily_hist, do eval_daily_metrics before plotting"
+        # Plot max ATH period
+        ax1.plot([self.metrics.max_period_start, self.metrics.max_period_end], 
+                 [self.relative2deposit(self.metrics.price_at_max_period)]*2, 
+                 color="r", linewidth=2, alpha=0.5, linestyle="--")
+        ax1.text(self.metrics.max_period_start, 
+                 self.relative2deposit(self.metrics.price_at_max_period + self.fig.axes[0].get_ylim()[1] * 0.01), 
+                 f"{self.metrics.max_period:.0f} days",
+                 color="r", 
+                 fontsize=12)
 
         ax2.plot(
             self.daily_hist.index,
-            self.daily_hist["deposit"],#self.relative2deposit(self.daily_hist["deposit"]),
+            self.relative2deposit(self.daily_hist["pos_cost"]),
+            "-",
+            linewidth=3,
+            alpha=0.3,
+        )
+        ax2.set_ylim(0, 100)
+
+        assert "deposit" in self.daily_hist.columns, "deposit column must be in daily_hist, do eval_daily_metrics before plotting"
+        ax3.plot(
+            self.daily_hist.index,
+            self.relative2deposit(self.daily_hist["deposit"]),
             "-",
             linewidth=3,
             alpha=0.3,
         )
 
-        ax3.bar(
+        ax4.bar(
             self.monthly_hist.index,
             self.relative2deposit(self.monthly_hist["finres"]),
             width=20,
             color="g",
             alpha=0.6,
-        )
-
-
-    def plot_results_by_period(self, title: Optional[str] = None, plot_profit_without_fees: bool = True):
-        self.fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 8), gridspec_kw={'height_ratios': [3, 1, 1]})
-        
-        if title:
-            self.fig.suptitle(title, fontsize=16)
-            self.fig.subplots_adjust(top=0.9)
-        
-        ax1.set_ylabel("fin result")
-        ax2.set_ylabel("pos_cost")
-        ax3.set_ylabel("loss")
-        plt.tight_layout()
-        # -------------------------------------------
-
-        self.add_profit_curve(self.profit_hist.index, 
-                              self.profit_hist["profit_csum_nofees"] - self.profit_hist["fees_csum"], #self.relative2deposit(self.daily_hist["profit_csum"]), 
-                              self.tickers_set, 
-                              color="b", 
-                              linewidth=3, 
-                              alpha=0.5)
-        if plot_profit_without_fees:
-            self.add_profit_curve(self.profit_hist.index, 
-                                  self.profit_hist["profit_csum_nofees"], #self.relative2deposit(self.daily_hist["profit_csum_nofees"]),
-                                  f"{self.tickers_set } without fees",
-                                  color="b",
-                                  linewidth=1,
-                                  alpha=0.5)
-
-        ax2.plot(
-            self.profit_hist.index,
-            self.profit_hist["pos_cost"],#self.relative2deposit(self.daily_hist["deposit"]),
-            "-",
-            linewidth=3,
-            alpha=0.3,
-        )
-        
-        ax3.plot(
-            self.profit_hist.index,
-            self.profit_hist["loss"],#self.relative2deposit(self.daily_hist["deposit"]),
-            "-",
-            linewidth=3,
-            alpha=0.3,
         )
 
     def save_fig(self, save_path: Optional[str] = "_last_backtest.png"):
@@ -317,35 +309,6 @@ class BackTestResults:
     @property
     def ndeals_per_month(self):
         return self.ndeals / max(1, self.num_years_on_trade) / 12
-
-    @staticmethod
-    def _calc_metrics(ts):
-        ymax = ts[0]
-        twait = 0
-        twaits = []
-        h = np.zeros(len(ts))
-        for i, y in enumerate(ts):
-            if y >= ymax:
-                ymax = y
-                if twait > 0:
-                    # print(t, twait ,ymax)
-                    twaits.append(twait)
-                    twait = 0
-            else:
-                twait += 1
-            h[i] = ymax
-        max_loss = (h - ts).max()
-        twaits.append(twait)
-        twaits = np.array(twaits) if len(twaits) else np.array([len(ts)])
-        twaits.sort()
-        # lin_err = sum(np.abs(ts - np.arange(0, ts[-1], ts[-1]/len(ts))[:len(ts)]))
-        # lin_err /= len(ts)*ts[-1]
-        metrics = {
-            "maxwait": twaits.max(),  # [-5:].mean(),
-            "recovery": ts[-1] / max_loss if max_loss else -1,
-            "loss_max": max_loss,
-        }
-        return h, metrics
 
     def metrics_from_profit(self, profit_curve):
         loss_max, wait_max = [
@@ -408,23 +371,23 @@ class BackTestResults:
 
         print()
         if cfg is not None and expert_name is not None:
-            logger.info(f"{cfg['symbol'].ticker}-{cfg['period']}-{cfg['hist_size']}: {expert_name}")
+            print(f"{cfg['symbol'].ticker}-{cfg['period']}-{cfg['hist_size']}: {expert_name}")
 
-        logger.info("-" * 40)
-        logger.info(sformat(0).format("APR", self.APR) + f" %")
-        logger.info(
+        print("-" * 40)
+        print(sformat(0).format("APR", self.APR) + f" %")
+        print(
             sformat(0).format("FINAL PROFIT", self.final_profit_rel)
             + f" %"
-            + f" ({self.fees/(self.final_profit*100 + 1e-6):.1f}% fees)"
+            + f" ({self.fees/(self.final_profit + 1e-6)*100:.1f}% fees)"
         )
-        logger.info(
+        print(
             sformat(1).format("DEALS/MONTH", self.ndeals_per_month)
             + f"   ({self.ndeals} total)"
         )
-        logger.info(sformat(0).format(
-            "MAXLOSS", self.metrics["loss_max_rel"]) + " %")
-        logger.info(sformat(0).format(
-            "RECOVRY FACTOR", self.metrics["recovery"]))
-        logger.info(sformat(0).format(
-            "MAXWAIT", self.metrics["maxwait"]) + " days")
+        print(sformat(0).format(
+            "MAXLOSS", self.relative2deposit(self.metrics.max_drawdown)) + " %")
+        print(sformat(0).format(
+            "RECOVRY FACTOR", self.metrics.recovery_factor))
+        print(sformat(0).format(
+            "MAXWAIT", self.metrics.max_period) + " days")
 

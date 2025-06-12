@@ -1,3 +1,5 @@
+from collections import defaultdict
+from functools import cached_property
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -5,7 +7,7 @@ import pandas as pd
 from loguru import logger
 from tqdm import tqdm
 
-from common.type import Side, Symbol, to_datetime
+from common.type import Side, Symbol, VolEstimRule, to_datetime
 from data_processing.dataloading import MovingWindow
 from trade.utils import ORDER_TYPE, Order, Position
 
@@ -14,14 +16,14 @@ class TradeHistory:
     def __init__(self, moving_window: MovingWindow, positions: List[Position]):
         self.mw = moving_window
         self.mw.size = 1
-        self.profit_hist = {"dates": [], "profit_csum_nofees": [], "fees_csum": [], "pos_size": [], "pos_cost": [], "loss": []}
+        self.profit_hist = defaultdict(list)
 
         self.posdict_open: Dict[np.datetime64, Position] = {pos.open_date.astype("datetime64[m]"): pos for pos in positions}
         self.posdict_closed: Dict[np.datetime64, Position] = {pos.close_date.astype("datetime64[m]"): pos for pos in positions}
         self.cumulative_profit = 0
         self.cumulative_fees = 0
         active_position, max_profit = None, 0
-
+        self.deposit, self.max_loss = None, None
 
         for self.hist_window, _ in tqdm(self.mw(), desc="Build profit curve", total=self.mw.timesteps_count, disable=True):
             cur_time = self.hist_window["Date"][-1]
@@ -35,8 +37,8 @@ class TradeHistory:
                 self.cumulative_fees += closed_position.fees_abs
                 active_position = None
 
-            active_profit, active_volume, active_cost = 0, 0, 0
             # If an active position exists, add its unrealized profit
+            active_profit, active_volume, active_cost = 0, 0, 0
             if active_position is not None:
                 active_profit = active_position.side.value * (last_price - active_position.open_price) * active_position.volume
                 active_volume = float(active_position.volume)
@@ -50,12 +52,22 @@ class TradeHistory:
             self.profit_hist["fees_csum"].append(self.cumulative_fees)
             self.profit_hist["pos_size"].append(active_volume)
             self.profit_hist["pos_cost"].append(active_cost)
+            self.profit_hist["max_profit"].append(max_profit)
             self.profit_hist["loss"].append(self.cumulative_profit + active_profit - self.cumulative_fees - max_profit)
 
-    def profit_hist_as_df(self):
-        profit_hist_df = pd.DataFrame(self.profit_hist)
-        profit_hist_df["dates"] = to_datetime(profit_hist_df["dates"])
-        return profit_hist_df
+        self.profit_hist = pd.DataFrame(self.profit_hist)
+        if not self.profit_hist.empty:
+            self.profit_hist["dates"] = to_datetime(self.profit_hist["dates"])
+            self.profit_hist["profit_csum"] = self.profit_hist["profit_csum_nofees"] - self.profit_hist["fees_csum"]
+
+    def define_deposit(self, wallet: float, vol_estimation_rule: VolEstimRule):
+        self.max_loss = max(self.profit_hist["loss"].abs())
+        self.deposit = max(wallet, self.max_loss) if vol_estimation_rule == VolEstimRule.DEPOSIT_BASED else wallet + self.max_loss
+
+    @cached_property
+    def df(self):
+        return self.profit_hist
+
 
 class Broker:
     def __init__(self, cfg: Dict[str, Any], init_moving_window=True):
@@ -64,19 +76,19 @@ class Broker:
         self.fee_rate = cfg["fee_rate"]
         self.close_last_position = cfg["close_last_position"]
         self.wallet = cfg["wallet"]
+        self.vol_estimation_rule = cfg["vol_estimation_rule"]
         self.active_orders: List[Order] = []
         self.active_position: Position = None
         self.positions: List[Position] = []
         self.orders = []
-        self.profit_hist = {"dates": [], "profit_csum_nofees": [], "fees_csum": []}
-
+        self.profit_hist: TradeHistory = None
         self.time = None
         self.hist_id = None
         self.open_price = None
         self.cumulative_profit = 0
         self.cumulative_fees = 0
         self.mw = MovingWindow(cfg) if init_moving_window else None
-        self.deposit = self.wallet
+        self.deposit = self.wallet if self.vol_estimation_rule == VolEstimRule.DEPOSIT_BASED else 0
 
     @property
     def profits(self):
@@ -113,7 +125,8 @@ class Broker:
                                       time=self.time,
                                       hist_id=self.hist_id)
             
-        self.profit_hist = TradeHistory(self.mw, self.positions).profit_hist_as_df()
+        self.profit_hist = TradeHistory(self.mw, self.positions)
+        self.profit_hist.define_deposit(self.wallet, self.vol_estimation_rule)
 
     def close_orders(self, hist_id, i=None):
         if i is not None:

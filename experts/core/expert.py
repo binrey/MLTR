@@ -95,14 +95,14 @@ class ExpertFormation(ExpertBase):
 
     def estimate_volume(self, h):
         if self.vol_estimation_rule == VolEstimRule.FIXED_POS_COST:
-            volume = self.wallet/h["Open"][-1]*self.leverage
+            base = self.wallet
         elif self.vol_estimation_rule == VolEstimRule.DEPOSIT_BASED:
-            volume = self.deposit/h["Open"][-1]*self.leverage
+            base = self.deposit
         else:
             raise ValueError(f"Unknown volume estimation rule: {self.vol_estimation_rule}")
-        volume = self.symbol.round_qty(self.symbol.qty_step, volume)
-        logger.debug(f"estimated lot: {volume}")
-        print(self.deposit, volume*h["Open"][-1])
+        
+        volume = self.symbol.round_qty(self.symbol.qty_step, base/h["Open"][-1]*self.leverage)
+        logger.debug(f"estimated lot: {volume} ({base:.2f}$ / price: {h['Open'][-1]} * leverage: {self.leverage}), cost: {volume*h['Open'][-1]:.2f}")
         return volume
 
     def create_or_update_sl(self, h):
@@ -174,8 +174,10 @@ class ExpertFormation(ExpertBase):
         else:
             if target_state.increment_volume_fraction is not None:
                 addition = target_state.increment_volume_fraction
-            else:
+            elif target_state.increment_by_num_lots is not None:
                 addition = target_state.increment_by_num_lots * self.lot
+            else:
+                raise ValueError(target_state)
 
             target_volume = addition
             if self.active_position:
@@ -189,6 +191,9 @@ class ExpertFormation(ExpertBase):
                     # Do not trim position:
                     target_volume = -addition
 
+        if target_volume > 1:
+            target_volume = 1
+            logger.warning("try to set up target volume more than max value...set to one")
         target_volume *= max_volume
 
         order_volume = 0
