@@ -79,7 +79,7 @@ class VolProf(DecisionMaker):
 
         if self.indicator.vol_hist[max_vol_id] / self.indicator.vol_hist.mean() > self.sharpness:
             if self.strategy == self.Levels.MANUAL:
-                self.lprice, self.sprice = self._find_prices_manual_levels(h, max_vol_id)
+                self.lprice, self.sprice = self._find_prices_manual_levels(max_vol_id)
             else:  # AUTO_LEVELS
                 self.lprice, self.sprice = self._find_prices_auto_levels(h)
 
