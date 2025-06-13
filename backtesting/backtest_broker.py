@@ -7,7 +7,7 @@ import pandas as pd
 from loguru import logger
 from tqdm import tqdm
 
-from common.type import Side, Symbol, VolEstimRule, to_datetime
+from common.type import Side, Symbol, VolEstimRule, VolumeControl, to_datetime
 from data_processing.dataloading import MovingWindow
 from trade.utils import ORDER_TYPE, Order, Position
 
@@ -61,10 +61,10 @@ class TradeHistory:
             self.profit_hist["dates"] = to_datetime(self.profit_hist["dates"])
             self.profit_hist["profit_csum"] = self.profit_hist["profit_csum_nofees"] - self.profit_hist["fees_csum"]
 
-    def add_info(self, wallet: float, vol_estimation_rule: VolEstimRule, leverage: float):
+    def add_info(self, wallet: float, volume_control: VolumeControl, leverage: float):
         self.leverage = leverage
         self.max_loss = max(self.profit_hist["loss"].abs())
-        self.deposit = max(wallet, self.max_loss) if vol_estimation_rule == VolEstimRule.DEPOSIT_BASED else wallet + self.max_loss
+        self.deposit = max(wallet, self.max_loss) if volume_control.rule == VolEstimRule.DEPOSIT_BASED else wallet + self.max_loss
 
     @cached_property
     def df(self):
@@ -79,7 +79,7 @@ class Broker:
         self.leverage = cfg["leverage"]
         self.close_last_position = cfg["close_last_position"]
         self.wallet = cfg["wallet"]
-        self.vol_estimation_rule = cfg["vol_estimation_rule"]
+        self.volume_control: VolumeControl = cfg["volume_control"]
         self.active_orders: List[Order] = []
         self.active_position: Position = None
         self.positions: List[Position] = []
@@ -91,7 +91,7 @@ class Broker:
         self.cumulative_profit = 0
         self.cumulative_fees = 0
         self.mw = MovingWindow(cfg) if init_moving_window else None
-        self.deposit = self.wallet if self.vol_estimation_rule == VolEstimRule.DEPOSIT_BASED else 0
+        self.deposit = self.wallet if self.volume_control.rule == VolEstimRule.DEPOSIT_BASED else 0
 
     @property
     def profits(self):
@@ -129,7 +129,7 @@ class Broker:
                                       hist_id=self.hist_id)
             
         self.profit_hist = TradeHistory(self.mw, self.positions)
-        self.profit_hist.add_info(self.wallet, self.vol_estimation_rule, self.leverage)
+        self.profit_hist.add_info(self.wallet, self.volume_control, self.leverage)
 
     def close_orders(self, hist_id, i=None):
         if i is not None:

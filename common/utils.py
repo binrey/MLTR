@@ -42,20 +42,35 @@ def set_indicator_cache_dir(symbol, period, window):
     return expert_cache_dir
 
 
+def init_target_from_cfg(cfg):
+    cfg = deepcopy(cfg)
+    Target = cfg.pop("type")
+    return Target(**cfg)
+
+def init_modules(cfg):
+    for name, submodule in cfg.items():
+        if not isinstance(submodule, dict):
+            continue
+        if "type" in submodule.keys():
+            if name in ["volume_control"]:
+                cfg[name] = init_target_from_cfg(submodule)
+    return cfg
+
+
 class PyConfig():
     def __init__(self, config_file) -> None:
         spec = importlib.util.spec_from_file_location("config", config_file)
         config_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(config_module)
         self.base_config = config_module
+
         self.optimization, self.backetest, self.bybit = None, None, None
         if hasattr(self.base_config, "backtest"):
-            self.backetest = self.base_config.backtest
+            self.backetest = init_modules(self.base_config.backtest)
         if hasattr(self.base_config, "bybit"):
-            self.bybit = self.base_config.bybit
-
+            self.bybit = init_modules(self.base_config.bybit)
         if hasattr(self.base_config, "optimization"):
-            self.optimization = self.base_config.optimization
+            self.optimization = init_modules(self.base_config.optimization)
 
     def _get_inference(self, cfg):
         cfg_compiled = deepcopy(cfg)

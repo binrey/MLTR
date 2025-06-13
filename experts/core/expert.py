@@ -6,7 +6,7 @@ from loguru import logger
 
 # import torch
 from backtesting.backtest_broker import Position
-from common.type import Side, Symbol, VolEstimRule
+from common.type import Side, Symbol, VolEstimRule, VolumeControl
 from experts.core.decision_maker import DecisionMaker
 from experts.core.position_control import StopsController, TrailingStop
 
@@ -29,7 +29,7 @@ class ExpertBase(ABC):
         self.wallet = cfg["wallet"]
         self.leverage = cfg["leverage"]
         self.lot = cfg.get("lot", None)
-        self.vol_estimation_rule: VolEstimRule = cfg["vol_estimation_rule"]
+        self.volume_control: VolEstimRule = cfg["volume_control"]
         
         decision_maker_cfg = cfg["decision_maker"].copy()
         decision_maker_cfg.update(
@@ -94,12 +94,12 @@ class ExpertFormation(ExpertBase):
         #     self.model.to(self.cfg["run_model_device"])
 
     def estimate_volume(self, h):
-        if self.vol_estimation_rule == VolEstimRule.FIXED_POS_COST:
-            base = self.wallet
-        elif self.vol_estimation_rule == VolEstimRule.DEPOSIT_BASED:
-            base = self.deposit
+        if self.volume_control.rule == VolEstimRule.FIXED_POS_COST:
+            base = self.volume_control.define(self.wallet)
+        elif self.volume_control.rule == VolEstimRule.DEPOSIT_BASED:
+            base = self.volume_control.define(self.deposit)
         else:
-            raise ValueError(f"Unknown volume estimation rule: {self.vol_estimation_rule}")
+            raise ValueError(f"Unknown volume estimation rule: {self.volume_control.rule}")
         
         volume = self.symbol.round_qty(self.symbol.qty_step, base/h["Open"][-1]*self.leverage)
         logger.debug(f"estimated lot: {volume} ({base:.2f}$ / price: {h['Open'][-1]} * leverage: {self.leverage}), cost: {volume*h['Open'][-1]:.2f}")

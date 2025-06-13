@@ -94,10 +94,18 @@ class RunType(Enum):
         else:
             raise ValueError(f"Unknown run type: {label}")
 
-
+@dataclass
 class VolEstimRule(Enum):
     FIXED_POS_COST = "fixed_pos_cost"
     DEPOSIT_BASED = "deposit_based"
+
+@dataclass
+class VolumeControl:
+    rule: VolEstimRule
+    deposit_fraction: float = 1
+
+    def define(self, deposit: float) -> float:
+        return deposit*self.deposit_fraction if self.rule == VolEstimRule.DEPOSIT_BASED else deposit
 
 Point = Tuple[np.datetime64, float]
 Bar = Tuple[float, float]

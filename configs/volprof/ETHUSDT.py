@@ -3,7 +3,7 @@ from common.utils import update_config
 from configs.volprof.base import backtest, bybit
 
 updates = dict(
-    wallet=1000,
+    volume_control = {"deposit_fraction": 0.5},
     symbol = Symbols.ETHUSDT,
     period=TimePeriod.M60,
     hist_size = 128,

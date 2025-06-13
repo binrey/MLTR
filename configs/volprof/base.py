@@ -1,6 +1,13 @@
 import numpy as np
 
-from common.type import ConfigType, Symbols, TimePeriod, Vis, VolEstimRule
+from common.type import (
+    ConfigType,
+    Symbols,
+    TimePeriod,
+    Vis,
+    VolEstimRule,
+    VolumeControl,
+)
 from common.utils import FeeRate, update_config
 from experts.core.position_control import *
 from experts.volprof import VolProf
@@ -29,8 +36,12 @@ config = dict(
     name="volprof",
     conftype=None,
     wallet=100,
-    leverage=2,
-    vol_estimation_rule=VolEstimRule.DEPOSIT_BASED,
+    volume_control=dict(
+        type=VolumeControl,
+        rule=VolEstimRule.DEPOSIT_BASED,
+        deposit_fraction=1,
+    ),
+    leverage=1,
     close_only_by_stops=False,
     hist_size=64,
     tstart=0,
@@ -85,4 +96,5 @@ bybit = update_config(
     log_trades=True,
     save_backup=True,
     handle_trade_errors=True,
+
 )
