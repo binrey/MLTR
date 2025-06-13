@@ -16,7 +16,9 @@ def log_creating_order(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, side: Side, volume: float, time_id: Optional[int] = None):
         logger.debug(f"Creating order {side} {volume}...")
         result = func(self, side, volume, time_id)
-        logger.debug(f"Orders created: {' '.join(map(str, result))}")
+        if isinstance(result, list):
+            result = " ".join(map(str, result))
+        logger.debug(f"Orders created: {result}")
         return result
     return wrapper
 
