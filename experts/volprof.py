@@ -33,14 +33,16 @@ class VolProf(DecisionMaker):
         self.indicator = VolDistribution(cache_dir=self.cache_dir)
         return [self.indicator]
 
-    def _find_prices_manual_levels(self, h, max_vol_id):
+    def _find_prices_manual_levels(self, max_vol_id):
         """Manual levels strategy: Uses volume distribution bins directly"""
+        lprice, sprice = None, None
         if self.short_bin <= max_vol_id < len(self.indicator.vol_hist) - self.long_bin:
             lprice = self.indicator.price_bins[max_vol_id + self.long_bin]
             lprice += self.indicator.bin_size/2
             sprice = self.indicator.price_bins[max_vol_id - self.short_bin]
             sprice += self.indicator.bin_size/2
-            return lprice, sprice
+        if lprice and sprice:
+            logger.debug(f"NEW entry points: long: {lprice:.2f}, short: {sprice:.2f}")
         return None, None
 
     def _find_prices_auto_levels(self, h):
