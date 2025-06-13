@@ -90,6 +90,7 @@ optimization = update_config(
 
 bybit = update_config(
     config,
+    leverage=2,
     conftype=ConfigType.BYBIT,
     credentials="bybit_volprof",
     clear_logs=False,
