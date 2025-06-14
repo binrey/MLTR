@@ -4,7 +4,7 @@ from configs.volprof.ETHUSDT import backtest, bybit
 
 updates = dict(
     volume_control = {"deposit_fraction": 0.5},
-    decision_maker = {"sharpness": 0},
+    decision_maker = {"sharpness": 1},
     period=TimePeriod.M1,
 )
 
