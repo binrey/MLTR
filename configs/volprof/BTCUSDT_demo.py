@@ -4,7 +4,7 @@ from configs.volprof.BTCUSDT import backtest, bybit
 
 updates = dict(
     volume_control = {"deposit_fraction": 0.5},
-    decision_maker = {"sharpness": 0},
+    decision_maker = {"sharpness": 2},
     period=TimePeriod.M1,
 )
 

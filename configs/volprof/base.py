@@ -16,7 +16,7 @@ config = dict(
     decision_maker=dict(
         type=VolProf,
         sharpness=0,
-        strategy=VolProf.Levels.MANUAL
+        demo=False
     ),
     sl_processor=dict(
         type=SLDynamic,
@@ -35,7 +35,7 @@ config = dict(
 
     name="volprof",
     conftype=None,
-    wallet=100,
+    wallet=1000,
     volume_control=dict(
         type=VolumeControl,
         rule=VolEstimRule.DEPOSIT_BASED,
@@ -64,8 +64,8 @@ config = dict(
 backtest = update_config(
     config,
     conftype=ConfigType.BACKTEST,
-    date_start=np.datetime64("2017-10-01T00:00:00"),
-    date_end=np.datetime64("2025-06-01T00:00:00"),
+    date_start=np.datetime64("2025-06-13T00:00:00"),
+    date_end=np.datetime64("2025-06-14T00:00:00"),
     eval_buyhold=False,
     clear_logs=True,
     log_trades=False,

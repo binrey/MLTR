@@ -102,7 +102,11 @@ class ExpertFormation(ExpertBase):
             raise ValueError(f"Unknown volume estimation rule: {self.volume_control.rule}")
         
         volume = self.symbol.round_qty(self.symbol.qty_step, base/h["Open"][-1]*self.leverage)
-        logger.debug(f"estimated lot: {volume} ({base:.2f}$ / price: {h['Open'][-1]} * leverage: {self.leverage}), cost: {volume*h['Open'][-1]:.2f}")
+        message = f"estimated lot: {volume} ({base:.2f}$ / price: {h['Open'][-1]} * leverage: {self.leverage}), cost: {volume*h['Open'][-1]:.2f}"
+        if volume == 0:
+            logger.warning(message)
+        else:
+            logger.debug(message)
         return volume
 
     def create_or_update_sl(self, h):

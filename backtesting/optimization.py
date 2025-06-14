@@ -319,9 +319,9 @@ class Optimizer:
             opt_summary["APR"].append(btest.APR)
             opt_summary["final_profit"].append(btest.final_profit)
             opt_summary["ndeals_per_month"].append(btest.ndeals_per_month)
-            opt_summary["loss_max_rel"].append(btest.metrics["loss_max_rel"])
-            opt_summary["recovery"].append(btest.metrics["recovery"])
-            opt_summary["maxwait"].append(btest.metrics["maxwait"])
+            opt_summary["loss_max_rel"].append(btest.relative2deposit(btest.metrics.max_drawdown))
+            opt_summary["recovery"].append(btest.metrics.recovery_factor)
+            opt_summary["maxwait"].append(btest.metrics.max_period)
 
         # Convert to DataFrame and clean up
         opt_summary = pd.DataFrame(opt_summary)
@@ -348,7 +348,7 @@ class Optimizer:
             sum_daily_profit += self.btests[top_runs_ids[-1]
                                             ].daily_hist["profit_csum"]
             logger.info(f"\n{opt_summary_for_ticker.head(10)}\n")
-            pd.DataFrame(self.btests[top_runs_ids[-1]].daily_hist.profit_csum).to_csv(
+            pd.DataFrame(self.btests[top_runs_ids[-1]].daily_hist["profit_csum"]).to_csv(
                 f"optimization/{symbol}.{period.value}.top_{self.sortby}_sorted.csv", index=False)
 
         profit_av = (sum_daily_profit / len(top_runs_ids)).values
