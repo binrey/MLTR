@@ -157,7 +157,7 @@ class Symbol:
     
     @classmethod
     def round_qty(cls, qty_step: float, qty: float):
-        return math.floor(qty / qty_step) * qty_step
+        return round(math.floor(qty / qty_step) * qty_step, cls.qty_digits(qty_step))
     
 class Symbols:
     BTCUSDT = Symbol(ticker="BTCUSDT", tick_size=0.001, qty_step=0.001)
