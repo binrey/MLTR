@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Tuple
@@ -156,7 +157,7 @@ class Symbol:
     
     @classmethod
     def round_qty(cls, qty_step: float, qty: float):
-        return round(qty, cls.qty_digits(qty_step))
+        return math.floor(qty / qty_step) * qty_step
     
 class Symbols:
     BTCUSDT = Symbol(ticker="BTCUSDT", tick_size=0.001, qty_step=0.001)
