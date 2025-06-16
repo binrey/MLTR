@@ -72,6 +72,23 @@ class ExpertBase(ABC):
         self.active_position = None
         self.orders = []
 
+    def estimate_volume(self, h):
+        if self.volume_control.rule is VolEstimRule.FIXED_POS_COST:
+            base = self.volume_control.define(self.wallet)
+        elif self.volume_control.rule is VolEstimRule.DEPOSIT_BASED:
+            base = self.volume_control.define(self.deposit)
+        else:
+            raise ValueError(f"Unknown volume estimation rule: {self.volume_control.rule}")
+        
+        volume = base / h["Open"][-1] * self.leverage
+        volume_norm = self.symbol.round_qty(volume, self.symbol.qty_step)
+        message = f"Estimated lot: {volume_norm} <- {volume} <- ({base:.2f}$ / price: {h['Open'][-1]} * leverage: {self.leverage}). Cost: {volume*h['Open'][-1]:.2f}"
+        if volume == 0:
+            logger.warning(message)
+        else:
+            logger.debug(message)
+        return volume
+
 
 class ExpertFormation(ExpertBase):
     def __init__(self,
@@ -92,22 +109,6 @@ class ExpertFormation(ExpertBase):
         #     # self.model.set_threshold(0.6)
         #     self.model.eval()
         #     self.model.to(self.cfg["run_model_device"])
-
-    def estimate_volume(self, h):
-        if self.volume_control.rule == VolEstimRule.FIXED_POS_COST:
-            base = self.volume_control.define(self.wallet)
-        elif self.volume_control.rule == VolEstimRule.DEPOSIT_BASED:
-            base = self.volume_control.define(self.deposit)
-        else:
-            raise ValueError(f"Unknown volume estimation rule: {self.volume_control.rule}")
-        
-        volume = self.symbol.round_qty(self.symbol.qty_step, base/h["Open"][-1]*self.leverage)
-        message = f"estimated lot: {volume} ({base:.2f}$ / price: {h['Open'][-1]} * leverage: {self.leverage}), cost: {volume*h['Open'][-1]:.2f}"
-        if volume == 0:
-            logger.warning(message)
-        else:
-            logger.debug(message)
-        return volume
 
     def create_or_update_sl(self, h):
         if self.active_position is not None:
