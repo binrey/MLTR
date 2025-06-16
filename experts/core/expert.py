@@ -6,7 +6,7 @@ from loguru import logger
 
 # import torch
 from backtesting.backtest_broker import Position
-from common.type import Side, Symbol, VolEstimRule, VolumeControl
+from common.type import Side, Symbol, VolEstimRule
 from experts.core.decision_maker import DecisionMaker
 from experts.core.position_control import StopsController, TrailingStop
 
