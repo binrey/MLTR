@@ -139,6 +139,16 @@ class BaseTradeClass(ABC):
 
     def modify_sl(self, sl: Optional[float]):
         self._modify_sl(sl)
+        sl_from_broker, n_attempts = None, 0
+        while sl_from_broker != sl:
+            sl_from_broker = self.get_open_position().sl
+            if self.handle_trade_errors:
+                sleep(1)
+            self.pos.curr.update_sl(sl_from_broker, self.time.prev)
+            n_attempts += 1
+            if n_attempts > 10:
+                logger.error(f"Failed to verify SL after {n_attempts} attempts: {sl_from_broker} -> {sl}")
+                break
 
     @abstractmethod
     def _modify_tp(self, tp: Optional[float]):

@@ -38,7 +38,7 @@ class BackTest(BaseTradeClass):
         super().__init__(cfg=cfg,
                          expert=Expert(cfg=cfg,
                                       create_orders_func=self.create_orders,
-                                      modify_sl_func=self._modify_sl,
+                                      modify_sl_func=self.modify_sl,
                                       modify_tp_func=self.modify_tp),
                          telebot=None)
         self.init_save_path()
