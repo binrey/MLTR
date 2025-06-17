@@ -12,7 +12,7 @@ from matplotlib import pyplot as plt
 
 from common.type import Line, Side, TimePeriod, TimeVolumeProfile, to_datetime
 from common.utils import date2str
-from experts.core.expert import ExpertBase
+from experts.core.expert import Expert
 from trade.utils import Position
 
 matplotlib.use('agg')
@@ -49,7 +49,7 @@ class Visualizer:
             # if self.hist2plot.shape[0] > self.vis_hist_length:
             self.hist2plot = self.hist2plot.iloc[-self.vis_hist_length:]
 
-    def __call__(self, pos_list: List[Position], expert2draw: Optional[ExpertBase] = None):
+    def __call__(self, pos_list: List[Position], expert2draw: Optional[Expert] = None):
         if not self.show and not self.save_plots:
             return
         drawitems4pos: List[Line] = []

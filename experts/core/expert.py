@@ -19,8 +19,12 @@ def init_target_from_cfg(cfg):
     return Target(cfg)
 
 
-class ExpertBase(ABC):
-    def __init__(self, cfg):
+class Expert:
+    def __init__(self,
+                 cfg: dict[str, Any],
+                 create_orders_func: Callable[[Side, float, int], None],
+                 modify_sl_func: Callable[[float], None],
+                 modify_tp_func: Callable[[float], None]):
         self.symbol: Symbol = cfg["symbol"]
         self.close_only_by_stops = cfg["close_only_by_stops"]
         self.no_trading_days = cfg["no_trading_days"]
@@ -54,13 +58,14 @@ class ExpertBase(ABC):
         self.orders = []
         self.active_position = None
         self.deposit = self.wallet
+        
+        self.traid_stops_min_size_multiplier = 3
+        self.create_orders = create_orders_func
+        self.modify_sl = modify_sl_func
+        self.modify_tp = modify_tp_func
 
     def __str__(self):
         return f"{str(self.decision_maker)} sl: {str(self.sl_processor)}  tp: {str(self.tp_processor)}"
-
-    @abstractmethod
-    def get_body(self, h) -> None:
-        pass
 
     def update(self, h, active_position: Position, deposit: float):
         self.active_position = active_position
@@ -88,27 +93,6 @@ class ExpertBase(ABC):
         else:
             logger.debug(message)
         return volume
-
-
-class ExpertFormation(ExpertBase):
-    def __init__(self,
-                 cfg: dict[str, Any],
-                 create_orders_func: Callable[[Side, float, int], None],
-                 modify_sl_func: Callable[[float], None],
-                 modify_tp_func: Callable[[float], None]):
-        super(ExpertFormation, self).__init__(cfg)
-        self.traid_stops_min_size_multiplier = 3
-        self.create_orders = create_orders_func
-        self.modify_sl = modify_sl_func
-        self.modify_tp = modify_tp_func
-
-        # if self.cfg["run_model_device"] is not None:
-        #     from ml import Net, Net2
-        #     self.model = Net2(4, 32)
-        #     self.model.load_state_dict(torch.load("model.pth"))
-        #     # self.model.set_threshold(0.6)
-        #     self.model.eval()
-        #     self.model.to(self.cfg["run_model_device"])
 
     def create_or_update_sl(self, h):
         if self.active_position is not None:

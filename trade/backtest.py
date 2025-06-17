@@ -13,7 +13,7 @@ from loguru import logger
 from backtesting.backtest_broker import Broker
 from backtesting.utils import BackTestResults
 from data_processing import PULLERS
-from experts.core import ExpertFormation
+from experts.core import Expert
 from trade.base import BaseTradeClass, log_get_hist
 from trade.utils import (
     ORDER_TYPE,
@@ -36,10 +36,10 @@ class BackTest(BaseTradeClass):
     def __init__(self, cfg) -> None:
         self.session = Broker(cfg)
         super().__init__(cfg=cfg,
-                         expert=ExpertFormation(cfg=cfg,
-                                                create_orders_func=self.create_orders,
-                                                modify_sl_func=self.modify_sl,
-                                                modify_tp_func=self.modify_tp),
+                         expert=Expert(cfg=cfg,
+                                      create_orders_func=self.create_orders,
+                                      modify_sl_func=self.modify_sl,
+                                      modify_tp_func=self.modify_tp),
                          telebot=None)
         self.init_save_path()
 

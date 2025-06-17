@@ -18,7 +18,7 @@ from loguru import logger
 from common.type import Side, Symbol, Vis
 from common.utils import Telebot, date2str
 from common.visualization import Visualizer
-from experts.core.expert import ExpertBase
+from experts.core.expert import Expert
 from trade.utils import Position
 pd.options.mode.chained_assignment = None
 
@@ -66,7 +66,7 @@ class StepData:
 
 
 class BaseTradeClass(ABC):
-    def __init__(self, cfg: dict[str, Any], expert: ExpertBase, telebot: Optional[Telebot] = None) -> None:
+    def __init__(self, cfg: dict[str, Any], expert: Expert, telebot: Optional[Telebot] = None) -> None:
 
         self.my_telebot = telebot
         self.exp = expert
@@ -166,7 +166,7 @@ class BaseTradeClass(ABC):
             open_position = self.get_open_position()
             if open_position is None and target_volume != 0:
                 sleep(2)
-                logger.warning(f"Get none open position, while target volume is not 0 - double check for open position...")
+                logger.warning(f"Get none open position, while target volume is {target_volume} - double check for open position...")
                 open_position = self.get_open_position()
         
             volume_diff = self._compute_volume_diff(self.get_open_position(), target_volume)

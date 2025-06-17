@@ -1,11 +1,9 @@
 import sys
-from experts import ExpertFormation, PyConfig
+from experts import PyConfig
 from backtest import backtest
-from pathlib import Path
 from dataloading import get_data, collect_train_data
 import numpy as np
 from loguru import logger
-from tqdm import tqdm
 import torch
 from ml import train
 import matplotlib.pyplot as plt

@@ -22,7 +22,7 @@ import stackprinter
 import yaml
 from pybit.unified_trading import HTTP
 
-from experts.core import ExpertFormation
+from experts.core import Expert
 from trade.base import BaseTradeClass, log_get_hist
 
 stackprinter.set_excepthook(style='color')
@@ -33,7 +33,7 @@ stackprinter.set_excepthook(style='color')
 class BybitTrading(BaseTradeClass):
     def __init__(self, cfg, telebot: Telebot, bybit_session: HTTP) -> None:
         self.session = bybit_session
-        super().__init__(cfg=cfg, expert=ExpertFormation(cfg, self.create_orders, self.modify_sl, self.modify_tp), telebot=telebot)
+        super().__init__(cfg=cfg, expert=Expert(cfg, self.create_orders, self.modify_sl, self.modify_tp), telebot=telebot)
         logger.info(f"Initialized BybitTrading with ticker: {self.ticker}, period: {self.period}")
 
     def get_server_time(self) -> np.datetime64:
