@@ -1,11 +1,11 @@
 import json
 from enum import Enum
+from fractions import Fraction
 from typing import Any, Callable, List, Optional
 
 import numpy as np
 import pandas as pd
 from loguru import logger
-from fractions import Fraction
 
 from common.type import Line, Point, Side, to_datetime
 from common.utils import FeeConst, FeeModel
@@ -143,7 +143,7 @@ class Position:
         self.volume_hist.append((to_datetime(self.open_date), float(self.volume)))
 
     def __str__(self):
-        name = f"pos {self.ticker} {self.side} vol{float(self.volume)} p{self.open_price} cost{self.cost}"
+        name = f"pos {self.ticker} {self.side} vol.{float(self.volume)} p.{self.open_price} cost.{self.cost}"
         if self.close_price is not None:
             name += f" -> {self.close_price}"
         if self.sl is not None:
@@ -162,7 +162,8 @@ class Position:
     def update_sl(self, sl: float, time: np.datetime64):
         assert not (self.sl is not None and sl is None), "Set sl to None is not allowed"
         self.sl = sl
-        self.sl_hist.append((time, sl))
+        if not any(t == time for t, _ in self.sl_hist):
+            self.sl_hist.append((time, sl))
 
     def update_tp(self, tp: float, time: np.datetime64):
         assert not (self.tp is not None and tp is None), "Set tp to None is not allowed"

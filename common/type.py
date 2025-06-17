@@ -150,18 +150,26 @@ class Symbol:
     ticker: str = None
     tick_size: float = None
     qty_step: float = None
-    
+    stops_step: float = None
+
     @classmethod
     def qty_digits(cls, qty_step: float):
         return len(str(qty_step).split(".")[1])
-    
+
     @classmethod
     def round_qty(cls, qty_step: float, qty: float):
         return round(math.floor(qty / qty_step) * qty_step, cls.qty_digits(qty_step))
+
+    @classmethod
+    def round_price(cls, tick_size: float, price: float):
+        return round(math.floor(price / tick_size) * tick_size, cls.qty_digits(tick_size)) # TODO: check if this is correct
+
+    @classmethod
+    def round_stops(cls, stops_step: float, stops: float):
+        return round(math.floor(stops / stops_step) * stops_step, cls.qty_digits(stops_step))
     
 class Symbols:
-    BTCUSDT = Symbol(ticker="BTCUSDT", tick_size=0.001, qty_step=0.001)
-    ETHUSDT = Symbol(ticker="ETHUSDT", tick_size=0.01, qty_step=0.01)
-    XRPUSDT = Symbol(ticker="XRPUSDT", tick_size=0.0001, qty_step=1)
-    SOLUSDT = Symbol(ticker="SOLUSDT", tick_size=0.001, qty_step=0.1)
-
+    BTCUSDT = Symbol(ticker="BTCUSDT", tick_size=0.01, qty_step=0.001, stops_step=0.1)
+    ETHUSDT = Symbol(ticker="ETHUSDT", tick_size=0.01, qty_step=0.01, stops_step=0.01)
+    XRPUSDT = Symbol(ticker="XRPUSDT", tick_size=0.0001, qty_step=1, stops_step=0.1)
+    SOLUSDT = Symbol(ticker="SOLUSDT", tick_size=0.001, qty_step=0.1, stops_step=0.1)

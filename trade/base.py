@@ -20,6 +20,7 @@ from common.utils import Telebot, date2str
 from common.visualization import Visualizer
 from experts.core.expert import Expert
 from trade.utils import Position
+
 pd.options.mode.chained_assignment = None
 
 
@@ -76,6 +77,8 @@ class BaseTradeClass(ABC):
         self.runtime_type = cfg["conftype"]
         self.ticker = cfg["symbol"].ticker
         self.qty_step = cfg["symbol"].qty_step
+        self.tick_size = cfg["symbol"].tick_size
+        self.stops_step = cfg["symbol"].stops_step
         self.period = cfg['period']
         self.visualize = cfg['visualize']
         self.save_plots = cfg['save_plots']
@@ -138,17 +141,20 @@ class BaseTradeClass(ABC):
         pass
 
     def modify_sl(self, sl: Optional[float]):
+        sl = Symbol.round_stops(self.stops_step, sl)
         self._modify_sl(sl)
-        sl_from_broker, n_attempts = None, 0
+        open_position = self.get_open_position()
+        if open_position is None:
+            return
+        sl_from_broker, n_attempts = open_position.sl, 0
         while sl_from_broker != sl:
+            sleep(1)
             sl_from_broker = self.get_open_position().sl
-            if self.handle_trade_errors:
-                sleep(1)
-            self.pos.curr.update_sl(sl_from_broker, self.time.prev)
             n_attempts += 1
             if n_attempts > 10:
                 logger.error(f"Failed to verify SL after {n_attempts} attempts: {sl_from_broker} -> {sl}")
                 break
+        self.pos.curr.update_sl(sl_from_broker, self.time.curr)
 
     @abstractmethod
     def _modify_tp(self, tp: Optional[float]):
@@ -156,7 +162,7 @@ class BaseTradeClass(ABC):
 
     def modify_tp(self, tp: Optional[float]):
         self._modify_tp(tp)
-    
+
     @abstractmethod
     def get_open_position(self):
         pass
@@ -202,10 +208,10 @@ class BaseTradeClass(ABC):
                 existing_config = pickle.load(f)
         except (FileNotFoundError, EOFError):
             existing_config = {}
-        
+
         # Update existing config with new values
         existing_config.update(cfg)
-        
+
         with open(self.config_path, 'wb') as f:
             pickle.dump(existing_config, f)
         logger.debug(f"Config updated at {self.config_path}")
@@ -215,7 +221,7 @@ class BaseTradeClass(ABC):
         server_time = self.get_server_time()
         self.time.update(self.get_rounded_time(server_time))
         logger.debug(f"server time: {date2str(server_time, 'ms')}")
-        
+
         if self.time.changed(no_none=True):
             self.update()
 
@@ -228,10 +234,10 @@ class BaseTradeClass(ABC):
                 self.my_telebot.send_text(msg)
         # else:
         #     print ("\033[A\033[A")
-        
+
         if self.time.prev is None:
             self.log_config({"date_start": self.time.curr, "date_end": None})
-            
+
     def clear_log_dir(self):
         if self.save_plots:
             if self.save_path.exists():
