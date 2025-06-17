@@ -33,7 +33,7 @@ stackprinter.set_excepthook(style='color')
 class BybitTrading(BaseTradeClass):
     def __init__(self, cfg, telebot: Telebot, bybit_session: HTTP) -> None:
         self.session = bybit_session
-        super().__init__(cfg=cfg, expert=Expert(cfg, self.create_orders, self.modify_sl, self.modify_tp), telebot=telebot)
+        super().__init__(cfg=cfg, expert=Expert(cfg, self.create_orders, self._modify_sl, self._modify_tp), telebot=telebot)
         logger.info(f"Initialized BybitTrading with ticker: {self.ticker}, period: {self.period}")
 
     def get_server_time(self) -> np.datetime64:
@@ -185,7 +185,7 @@ class BybitTrading(BaseTradeClass):
         return resp
 
     @log_modify_sl
-    def modify_sl(self, sl: Optional[float]):
+    def _modify_sl(self, sl: Optional[float]):
         if sl is None:
             return
         try:
@@ -198,7 +198,7 @@ class BybitTrading(BaseTradeClass):
             logger.error(ex)
 
     @log_modify_tp
-    def modify_tp(self, tp: Optional[float]):
+    def _modify_tp(self, tp: Optional[float]):
         if tp is None:
             return
         try:

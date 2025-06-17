@@ -38,7 +38,7 @@ class BackTest(BaseTradeClass):
         super().__init__(cfg=cfg,
                          expert=Expert(cfg=cfg,
                                       create_orders_func=self.create_orders,
-                                      modify_sl_func=self.modify_sl,
+                                      modify_sl_func=self._modify_sl,
                                       modify_tp_func=self.modify_tp),
                          telebot=None)
         self.init_save_path()
@@ -79,11 +79,11 @@ class BackTest(BaseTradeClass):
         return orders
         
     @log_modify_sl
-    def modify_sl(self, sl: Optional[float]):
+    def _modify_sl(self, sl: Optional[float]):
         self.session.update_sl(sl)
 
     @log_modify_tp
-    def modify_tp(self, tp: Optional[float]):
+    def _modify_tp(self, tp: Optional[float]):
         self.session.update_tp(tp)
 
     def postprocess(self) -> BackTestResults:

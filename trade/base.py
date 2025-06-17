@@ -134,12 +134,18 @@ class BaseTradeClass(ABC):
         pass
 
     @abstractmethod
-    def modify_sl(self, sl: Optional[float]):
+    def _modify_sl(self, sl: Optional[float]):
         pass
 
+    def modify_sl(self, sl: Optional[float]):
+        self._modify_sl(sl)
+
     @abstractmethod
-    def modify_tp(self, tp: Optional[float]):
+    def _modify_tp(self, tp: Optional[float]):
         pass
+
+    def modify_tp(self, tp: Optional[float]):
+        self._modify_tp(tp)
     
     @abstractmethod
     def get_open_position(self):
