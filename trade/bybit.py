@@ -56,12 +56,19 @@ class BybitTrading(BaseTradeClass):
 
     def _close_current_pos(self):
         pos_dict = self.get_pos_history(1)[0]
+        logger.debug(f"Closing self.pos.curr: {self.pos.curr}...")
+        logger.debug(f"Last pos from bybit: {pos_dict}")
+        close_price = float(pos_dict["avgExitPrice"])
+        close_date = self.to_datetime(pos_dict["updatedTime"])
+        close_indx = int(pos_dict["updatedTime"])
+        
         self.pos.curr.close(
-            price=float(pos_dict["avgExitPrice"]),
-            date=self.to_datetime(pos_dict["updatedTime"]),
-            indx=int(pos_dict["updatedTime"])
+            price=close_price,
+            date=close_date,
+            indx=close_indx
             )
-        logger.debug(f"Closing self.pos.curr: {self.pos.curr}")
+        logger.debug(f"Closing self.pos.curr: {self.pos.curr}...")
+        
         
     def get_open_position(self) -> Optional[Position]:
         open_positions = self.session.get_positions(category="linear", symbol=self.ticker)["result"]["list"]
