@@ -59,7 +59,6 @@ class Expert:
         self.active_position = None
         self.deposit = self.wallet
         
-        self.traid_stops_min_size_multiplier = 10000
         self.create_orders = create_orders_func
         self.modify_sl = modify_sl_func
         self.modify_tp = modify_tp_func
@@ -97,22 +96,16 @@ class Expert:
     def create_or_update_sl(self, h):
         if self.active_position is not None:
             if self.active_position.sl is None:
-                sl = self.sl_processor.create(hist=h,
+                sl = self.sl_processor.create(open_price=h["Open"][-1],
                                               active_position=self.active_position,
-                                              decision_maker=self.decision_maker)
+                                              decision_maker=self.decision_maker,
+                                              tick_size=self.symbol.tick_size)
             else:
                 sl = self.trailing_stop.get_stop_loss(
                     self.active_position, hist=h)
 
-            if sl is not None:
-                if self.active_position.side == Side.BUY:
-                    sl = min(sl, h["Open"][-1] - self.symbol.tick_size *
-                            self.traid_stops_min_size_multiplier)
-                else:
-                    sl = max(sl, h["Open"][-1] + self.symbol.tick_size *
-                            self.traid_stops_min_size_multiplier)
             if sl != self.active_position.sl:
-                self.modify_sl(sl)
+                self.modify_sl(sl, h["Open"][-1])
 
     def create_or_update_tp(self, h):
         if self.active_position is not None:
