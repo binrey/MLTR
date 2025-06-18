@@ -59,7 +59,7 @@ class Expert:
         self.active_position = None
         self.deposit = self.wallet
         
-        self.traid_stops_min_size_multiplier = 3
+        self.traid_stops_min_size_multiplier = 10000
         self.create_orders = create_orders_func
         self.modify_sl = modify_sl_func
         self.modify_tp = modify_tp_func
