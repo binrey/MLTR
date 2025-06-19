@@ -193,9 +193,9 @@ class FeeConst(FeeModel):
     
 def date2str(date: np.datetime64 | pd.Timestamp, step="s") -> str:
     if isinstance(date, pd.Timestamp):
-        return date.strftime("%Y-%m-%d %H:%M:%S")
+        return date.strftime("%Y-%m-%dT%H:%M:%S")
     elif isinstance(date, np.datetime64):
-        return np.datetime_as_string(date.astype(f"datetime64[{step}]"), unit=step).replace("T", " ")
+        return np.datetime_as_string(date.astype(f"datetime64[{step}]"), unit=step)
     else:
         raise ValueError(f"Invalid date type: {type(date)}")
 
@@ -246,7 +246,7 @@ class Logger:
         logger.add(sys.stderr, level=self.log_level,
                 format=(
                     # "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-                    "<level>{level: <8}</level> | "
+                    # "<level>{level: <8}</level> | "
                     "<level>{message}</level>"
                 ))
         log_file_path = os.path.join(self.log_dir, f"{decision_maker}", f"{symbol}-{period}", "log_records", f"{datetime.now()}.log")

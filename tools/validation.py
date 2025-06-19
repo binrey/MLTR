@@ -9,12 +9,12 @@ from typing import Any, Dict
 
 import numpy as np
 from dotenv import load_dotenv
-from common.utils import Logger
 from loguru import logger
 
 from backtesting.backtest_broker import TradeHistory
 from backtesting.utils import BackTestResults
 from common.type import ConfigType, RunType, Symbols, TimePeriod
+from common.utils import Logger
 from data_processing import PULLERS
 from trade.backtest import BackTest
 from trade.utils import Position
@@ -43,6 +43,28 @@ def extract_datetimes(line):
     if match:
         time = datetime.strptime(match.group(1), '%Y-%m-%d %H:%M:%S')
         return time
+    return None
+
+
+def parse_market_wallet_from_logs(log_dir: Path) -> float:
+    """Extract market wallet value from the most recent log file."""
+    log_records_dir = log_dir / "log_records"
+    if not log_records_dir.exists():
+        return None
+    
+    # Get the most recent log file
+    log_files = sorted(log_records_dir.glob("*.log"), key=lambda x: x.stat().st_mtime, reverse=True)
+    if not log_files:
+        return None
+        
+    # Read the most recent log file
+    with open(log_files[0], 'r') as f:
+        for line in f:
+            if "Market wallet:" in line:
+                try:
+                    return float(line.split("Market wallet:")[-1].strip())
+                except (ValueError, IndexError):
+                    continue
     return None
 
 
@@ -94,9 +116,25 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
         f"Pulling data for {SYMBOL.ticker} from {date_start_pull} ({date_start} - {hist_window}) to {date_end}")
     PULLERS[BROKER](SYMBOL, PERIOD, date_start_pull, date_end)
 
-    cfg.update({"date_start": date_start, "date_end": date_end,
-                "eval_buyhold": False, "clear_logs": True, "conftype": ConfigType.BACKTEST,
-                "close_last_position": False, "visualize": False, "handle_trade_errors": False})
+    # Initialize market wallet from log file if available
+    log_dir = Path(os.getenv("LOG_DIR")) / BROKER / EXPERT / f"{SYMBOL.ticker}-{PERIOD.value}"
+    
+    # Try to get market wallet from logs first
+    market_wallet = parse_market_wallet_from_logs(log_dir)
+    if market_wallet is not None:
+        logger.info(f"Loaded market wallet from logs: {market_wallet}")
+
+    cfg.update({
+        "date_start": date_start, 
+        "date_end": date_end,
+        "eval_buyhold": False, 
+        "clear_logs": True, 
+        "conftype": ConfigType.BACKTEST,
+        "close_last_position": False, 
+        "visualize": False, 
+        "handle_trade_errors": False,
+        "wallet": market_wallet
+    })
 
     logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, cfg["clear_logs"])
 
@@ -105,11 +143,11 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
     backtest_trading = BackTest(cfg)
     backtest_trading.initialize()
     backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
-    
+
     val_res = BackTestResults()
     val_res.add(backtest_trading.session)
     # bt_res = backtest_trading.postprocess()
-    
+
     positions_real = process_real_log_dir(log_dir)
     profit_hist_real = TradeHistory(backtest_trading.session.mw, positions_real).df
     assert profit_hist_real.shape[0] > 0, "No real deals in history found"
