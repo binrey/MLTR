@@ -5,17 +5,17 @@ import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import numpy as np
 from dotenv import load_dotenv
+from common.utils import Logger
 from loguru import logger
 
-from backtesting.backtest_broker import Broker, TradeHistory
+from backtesting.backtest_broker import TradeHistory
 from backtesting.utils import BackTestResults
-from common.type import ConfigType, Symbols, TimePeriod
+from common.type import ConfigType, RunType, Symbols, TimePeriod
 from data_processing import PULLERS
-from run import run_backtest
 from trade.backtest import BackTest
 from trade.utils import Position
 
@@ -97,7 +97,9 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
     cfg.update({"date_start": date_start, "date_end": date_end,
                 "eval_buyhold": False, "clear_logs": True, "conftype": ConfigType.BACKTEST,
                 "close_last_position": False, "visualize": False, "handle_trade_errors": False})
-    
+
+    logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, cfg["clear_logs"])
+
     # TODO replace bybit with placeholder
     PULLERS["bybit"](**cfg)
     backtest_trading = BackTest(cfg)
@@ -127,6 +129,9 @@ if __name__ == "__main__":
     PERIOD = getattr(TimePeriod, args.period)
     TAG = f"{SYMBOL.ticker}-{PERIOD.value}"    
     
+    logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.BACKTEST.value),
+                            log_level=os.getenv("LOGLEVEL"))
+
     log_dir = LOCAL_LOGS_DIR / BROKER / EXPERT / TAG
     
     download_logs(log_dir)

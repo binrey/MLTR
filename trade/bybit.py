@@ -129,13 +129,14 @@ class BybitTrading(BaseTradeClass):
         return float(msg["list"][0]["lotSizeFilter"]["qtyStep"])
 
     def _parse_bybit_position(self, pos: Dict[str, Any]):
-        logger.debug(f"Parsing position: {pos}")
+        # logger.debug(f"Parsing position: {pos}")
         sl = float(pos["stopLoss"]) if "stopLoss" in pos and len(pos["stopLoss"]) else None
         volume = float(pos["closedSize"] if "closedSize" in pos else pos["size"])
         date = self.to_datetime(pos["updatedTime"])
         side = Side.from_str(pos["side"])
         ticker = pos["symbol"]
         price = pos["avgEntryPrice"] if "avgEntryPrice" in pos else pos.get("avgPrice", 0)
+        logger.debug(f"Parsed bybit position: updatedTime.{date} createdTime.{self.to_datetime(pos['createdTime'])} avgEntryPrice|avgPrice.{price} ")
         return ticker, price, volume, sl, side, date
 
     @log_get_hist

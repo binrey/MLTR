@@ -8,7 +8,7 @@ import pandas as pd
 from loguru import logger
 
 from common.type import Line, Point, Side, to_datetime
-from common.utils import FeeConst, FeeModel
+from common.utils import FeeConst, FeeModel, date2str
 from data_processing.dataloading import DTYPE
 
 
@@ -143,13 +143,14 @@ class Position:
         self.volume_hist.append((to_datetime(self.open_date), float(self.volume)))
 
     def __str__(self):
-        name = f"pos {self.ticker} {self.side} vol.{float(self.volume)} p.{self.open_price} cost.{self.cost}"
+        name = f"pos {self.ticker} {self.side} opened.{date2str(self.open_date, 'm')} vol.{float(self.volume)} p.{self.open_price}"
         if self.close_price is not None:
             name += f" -> {self.close_price}"
         if self.sl is not None:
-            name += f" | sl:{self.sl}"
+            name += f" sl.{self.sl}"
         if self.tp is not None:
-            name += f" | tp:{self.tp}"
+            name += f" tp.{self.tp}"
+        name += f" | cost.{self.cost:.2f}"
         return name
 
     def set_volume(self, volume: float) -> Fraction:

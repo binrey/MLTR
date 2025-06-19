@@ -245,7 +245,7 @@ class Logger:
         logger.remove()
         logger.add(sys.stderr, level=self.log_level,
                 format=(
-                    "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+                    # "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
                     "<level>{level: <8}</level> | "
                     "<level>{message}</level>"
                 ))

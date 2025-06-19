@@ -9,4 +9,5 @@ updates = dict(
 )
 
 backtest = update_config(backtest, **updates)
+
 bybit = update_config(bybit, **updates)
