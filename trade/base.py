@@ -95,6 +95,7 @@ class BaseTradeClass(ABC):
         self.backup_path.mkdir(parents=True, exist_ok=True)
         self.trades_log_path = self.save_path / "positions"
         self.trades_log_path.mkdir(parents=True, exist_ok=True)
+        self.traid_stops_min_size_multiplier = 1000 # TODO: move to cfg
 
         assert self.qty_step == self.get_qty_step()
 
@@ -140,7 +141,13 @@ class BaseTradeClass(ABC):
     def _modify_sl(self, sl: Optional[float]):
         pass
 
-    def modify_sl(self, sl: Optional[float]):
+    def modify_sl(self, sl: Optional[float], open_price: float):
+        if sl is None:
+            return
+        
+        if abs(sl - open_price) < self.tick_size * self.traid_stops_min_size_multiplier:
+            return
+        
         sl = Symbol.round_stops(self.stops_step, sl)
         self._modify_sl(sl)
         open_position = self.get_open_position()
