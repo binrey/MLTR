@@ -13,9 +13,7 @@ class DecisionMaker(ABC):
     @dataclass
     class Response:
         side: Side | None
-        # Define position volume have to be
         target_volume_fraction: Optional[float] = None
-        # How mutch increase position, target isn't defined
         increment_volume_fraction: Optional[float] = None
         increment_by_num_lots: Optional[int] = None
 

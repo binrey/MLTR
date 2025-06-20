@@ -15,8 +15,8 @@ from experts.random import Random
 config = dict(
     decision_maker=dict(
         type=Random,
-        seed=42,
-        time_to_wait=10
+        seed=19,
+        time_to_wait=5
     ),
     sl_processor=dict(
         type=SLFixed,

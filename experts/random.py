@@ -21,7 +21,7 @@ class Random(DecisionMaker):
         self.seed = cfg["seed"]
         self.time_to_wait = cfg["time_to_wait"]
         np.random.seed(self.seed)
-        self.timer = 0
+        self.timer = self.time_to_wait
 
     def look_around(self, h) -> DecisionMaker.Response:
         order_side, target_volume_fraction = None, 1
