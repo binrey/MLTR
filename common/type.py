@@ -157,7 +157,7 @@ class Symbol:
         return len(str(qty_step).split(".")[1])
 
     @classmethod
-    def round_qty(cls, qty_step: float, qty: float):
+    def round_qty(cls, qty: float, qty_step: float):
         return round(math.floor(qty / qty_step) * qty_step, cls.qty_digits(qty_step))
 
     @classmethod

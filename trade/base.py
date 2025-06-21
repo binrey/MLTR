@@ -179,16 +179,16 @@ class BaseTradeClass(ABC):
         if open_position is not None:
             cur_volume = open_position.volume
             cur_side = open_position.side
-        return Symbol.round_qty(self.qty_step, target_volume - cur_volume*cur_side.value)
+        return Symbol.round_qty(qty=target_volume - cur_volume*cur_side.value, qty_step=self.qty_step)
 
     def create_orders(self, side: Side, volume: float, time_id: Optional[int] = None):
-        volume = Symbol.round_qty(self.qty_step, volume)
+        volume = Symbol.round_qty(qty=volume, qty_step=self.qty_step)
         if not volume:
             return
         if self.pos.curr is None:
             target_volume = volume*side.value
         else:
-            target_volume = Symbol.round_qty(self.qty_step, self.pos.curr.volume*self.pos.curr.side.value + volume*side.value)
+            target_volume = Symbol.round_qty(qty=self.pos.curr.volume*self.pos.curr.side.value + volume*side.value, qty_step=self.qty_step)
         self._create_orders(side, volume, time_id)
 
         if self.handle_trade_errors:

@@ -85,13 +85,13 @@ class Expert:
             raise ValueError(f"Unknown volume estimation rule: {self.volume_control.rule}")
         
         volume = base / h["Open"][-1] * self.leverage
-        volume_norm = self.symbol.round_qty(volume, self.symbol.qty_step)
+        volume_norm = Symbol.round_qty(qty=volume, qty_step=self.symbol.qty_step)
         message = f"Estimated lot: {volume_norm} <- {volume} <- ({base:.2f}$ / price: {h['Open'][-1]} * leverage: {self.leverage}). Cost: {volume*h['Open'][-1]:.2f}"
         if volume == 0:
             logger.warning(message)
         else:
             logger.debug(message)
-        return volume
+        return volume_norm
 
     def create_or_update_sl(self, h):
         if self.active_position is not None:
