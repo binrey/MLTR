@@ -205,10 +205,15 @@ class BaseTradeClass(ABC):
                 open_position = self.get_open_position()
         
             volume_diff = self._compute_volume_diff(self.get_open_position(), target_volume)
+            n_attempts = 0
             while volume_diff != 0:
                 logger.warning(f"Volume diff: {volume_diff}, target_volume: {target_volume}")
                 self._create_orders(side=Side.from_int(volume_diff), volume=abs(volume_diff), time_id=time_id)
                 volume_diff = self._compute_volume_diff(self.get_open_position(), target_volume)
+                n_attempts += 1
+                if n_attempts > 10:
+                    logger.error(f"Failed to create orders after {n_attempts} attempts: {volume_diff} -> {target_volume}")
+                    break
 
     def get_rounded_time(self, time: np.datetime64) -> np.datetime64:
         trounded = np.array(time).astype(

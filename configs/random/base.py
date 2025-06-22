@@ -39,7 +39,7 @@ config = dict(
     volume_control=dict(
         type=VolumeControl,
         rule=VolEstimRule.DEPOSIT_BASED,
-        deposit_fraction=1,
+        deposit_fraction=0.9,
     ),
     leverage=1,
     close_only_by_stops=False,
@@ -97,5 +97,4 @@ bybit = update_config(
     log_trades=True,
     save_backup=True,
     handle_trade_errors=True,
-
 )
