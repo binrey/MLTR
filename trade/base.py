@@ -150,9 +150,15 @@ class BaseTradeClass(ABC):
         
         sl = Symbol.round_stops(self.stops_step, sl)
         self._modify_sl(sl)
-        open_position = self.get_open_position()
+        open_position: Position = self.get_open_position()
         if open_position is None:
             return
+
+        if open_position.side == Side.BUY and sl >= open_price:
+            return
+        if open_position.side == Side.SELL and sl <= open_price:
+            return
+
         sl_from_broker, n_attempts = open_position.sl, 0
         while sl_from_broker != sl:
             sleep(1)

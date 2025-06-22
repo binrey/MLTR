@@ -119,7 +119,7 @@ class BybitTrading(BaseTradeClass):
 
     def get_deposit(self):
         msg = self.session.get_wallet_balance(accountType="UNIFIED")["result"]
-        return float(msg["list"][0]["totalWalletBalance"])
+        return float(msg["list"][0]["totalMarginBalance"])
 
     def get_qty_step(self):
         msg = self.session.get_instruments_info(
