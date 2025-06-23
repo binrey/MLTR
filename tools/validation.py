@@ -88,7 +88,7 @@ def process_real_log_dir(log_dir: Path):
     return positions
 
 
-def process_log_dir(log_dir: Path):
+def process_log_dir(log_dir: Path) -> tuple[list[Position], list[Position]]:
     cfg_files = sorted(list((log_dir).glob("*.pkl")))
     positions_test, positions_real, cfg2process = [], [], None
     for cfg_file in cfg_files + [None]:
@@ -165,13 +165,13 @@ if __name__ == "__main__":
     EXPERT = args.expert
     SYMBOL = getattr(Symbols, args.symbol)
     PERIOD = getattr(TimePeriod, args.period)
-    TAG = f"{SYMBOL.ticker}-{PERIOD.value}"    
-    
+    TAG = f"{SYMBOL.ticker}-{PERIOD.value}"
+
     logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.BACKTEST.value),
                             log_level=os.getenv("LOGLEVEL"))
 
     log_dir = LOCAL_LOGS_DIR / BROKER / EXPERT / TAG
-    
+
     download_logs(log_dir)
     positions_test, positions_real = process_log_dir(log_dir)
 
@@ -201,6 +201,7 @@ if __name__ == "__main__":
                 match_count += 1
                 slippages.append((pos_real.open_price - pos_test.open_price)
                                  * pos_test.side.value / pos_test.open_price)
+                logline += f" {pos_real.close_date} {pos_test.close_date}"
                 logline += f" <- OK: open slip: {slippages[-1]*100:8.4f}%, time lag: {time_lags[-1]:8.2f}s"
                 found_real = True
                 break

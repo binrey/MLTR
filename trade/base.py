@@ -41,10 +41,10 @@ def log_get_hist(func: Callable[..., Any]) -> Callable[..., Any]:
 
 @dataclass
 class StepData:
-    curr: Any = None
-    prev: Any = None
+    curr: Position | np.datetime64 | None = None
+    prev: Position | np.datetime64 | None = None
 
-    def update(self, curr_value: Any):
+    def update(self, curr_value: Position | np.datetime64):
         self.prev = deepcopy(self.curr)
         self.curr = curr_value
 
