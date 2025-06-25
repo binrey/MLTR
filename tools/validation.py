@@ -82,9 +82,20 @@ def process_real_log_dir(log_dir: Path):
     # Read positions from positions dir
     positions_dir = log_dir / "positions"
     positions = []
-    for file in positions_dir.glob("*.json"):
+    for file in sorted(positions_dir.glob("*.json")):
         pos = Position.from_json_file(file)
         positions.append(pos)
+        
+    # Bybit unexpectedly missmatch current close date and price with previous position
+    for ir in range(1, len(positions)):
+        if positions[ir].close_date == positions[ir-1].close_date:
+            pos = positions[ir]
+            close_date, close_indx, close_price = None, None, None
+            if pos.sl_hist is not None and len(pos.sl_hist) > 0:
+                close_date = pos.sl_hist[-1][0] + PERIOD.to_timedelta()
+                close_indx = pos.close_indx
+                close_price = pos.sl_hist[-1][1]
+            pos.close(close_price, close_date, close_indx)
     return positions
 
 
@@ -125,13 +136,13 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
         logger.info(f"Loaded market wallet from logs: {market_wallet}")
 
     cfg.update({
-        "date_start": date_start, 
+        "date_start": date_start,
         "date_end": date_end,
-        "eval_buyhold": False, 
-        "clear_logs": True, 
+        "eval_buyhold": False,
+        "clear_logs": True,
         "conftype": ConfigType.BACKTEST,
-        "close_last_position": False, 
-        "visualize": False, 
+        "close_last_position": False,
+        "visualize": False,
         "handle_trade_errors": False,
         "wallet": market_wallet
     })
@@ -159,6 +170,9 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
     return backtest_trading.session.positions, positions_real
 
 
+
+
+
 if __name__ == "__main__":
     args = parse_args()
     BROKER = args.broker
@@ -181,16 +195,17 @@ if __name__ == "__main__":
     positions_real.sort(key=lambda x: x.open_date)
     positions_test.sort(key=lambda x: x.open_date)
 
-    time_lags, slippages = [], []
+    time_lags, open_slippages, close_slippages = [], [], []
     match_count = 0
 
     logger.info("")
     logger.info(f"Validation for {len(positions_test)} positions")
     logger.info("----------------------------------------")
+    logger.info(f"{'Open Date':<16} {'Side':<11} {'Open Slip':<9} {'Time Lag':<9} {'Close Slip':<9}")
     ir = 0
     for pos_test in positions_test:
         date_test = pos_test.open_date.astype("datetime64[m]")
-        logline = f"{date_test} {pos_test.side:<4}"
+        logline, logline_suffix = f"{date_test} {pos_test.side:<4}", ""
         found_real = False
         for pos_real in positions_real[ir:]:
             date_real = pos_real.open_date.astype("datetime64[m]")
@@ -199,12 +214,29 @@ if __name__ == "__main__":
                 time_lags.append((pos_real.open_date.astype("datetime64[ms]") -
                                   pos_test.open_date.astype("datetime64[ms]")).astype(int)/1000)
                 match_count += 1
-                slippages.append((pos_real.open_price - pos_test.open_price)
-                                 * pos_test.side.value / pos_test.open_price)
-                logline += f" {pos_real.close_date} {pos_test.close_date}"
-                logline += f" <- OK: open slip: {slippages[-1]*100:8.4f}%, time lag: {time_lags[-1]:8.2f}s"
+                
+                # Calculate open slippage
+                open_slip = (pos_real.open_price - pos_test.open_price) * pos_test.side.value / pos_test.open_price
+                open_slippages.append(open_slip)
+                
+                logline += f" <- OK: {open_slip*100:8.4f}% {time_lags[-1]:8.2f}s"
                 found_real = True
-                break
+
+                # Bybit unexpectedly missmatch current close date and price with previous position
+                if pos_real.close_date.astype("datetime64[m]") != pos_test.close_date:
+                    if pos_real.close_date == positions_real[ir-1].close_date:
+                        pos_real.close_date = pos_test.close_date
+                        pos_real.close_price = pos_test.close_price
+                        if pos_real.sl_hist is not None and len(pos_real.sl_hist) > 0:
+                            pos_real.close_price = pos_real.sl_hist[-1][1]
+                        logline_suffix = " (REPAIRED)"
+                    else:
+                        logline += f" CLOSE ERROR: real:{pos_real.close_date} test:{pos_test.close_date}"
+                
+                if pos_real.close_date.astype("datetime64[m]") == pos_test.close_date:
+                    close_slip = (pos_real.close_price - pos_test.close_price) * pos_test.side.value / pos_test.close_price
+                    close_slippages.append(close_slip)
+                    logline += f" {close_slip*100:8.4f}%"
             else:
                 if date_real < date_test:
                     logger.info(f"{date_real.astype('datetime64[m]')} {pos_real.side:<4} -> NO TEST")
@@ -213,9 +245,10 @@ if __name__ == "__main__":
                     break
         if not found_real:
             logline += " <- NO REAL"
-        logger.info(logline)
+        logger.info(logline + logline_suffix)
 
     logger.info("----------------------------------------")
-    logger.info(f"Mean time lag: " + (f"{np.mean(time_lags):.2f}s" if len(positions_test) > 0 else "NO TEST"))
-    logger.info(f"Match rate: " + (f"{match_count / len(positions_test) * 100:.2f}%" if len(positions_test) > 0 else "NO TEST"))
-    logger.info(f"Mean slippage: " + (f"{np.mean(slippages)*100:.4f}%" if len(positions_test) > 0 else "NO TEST"))
+    logger.info(f"Mean time lag:       " + (f"{np.mean(time_lags):.2f}s" if len(positions_test) > 0 else "NO TEST"))
+    logger.info(f"Match rate:          " + (f"{match_count / len(positions_test) * 100:.2f}%" if len(positions_test) > 0 else "NO TEST"))
+    logger.info(f"Mean open slippage:  " + (f"{np.mean(open_slippages)*100:.4f}%" if len(open_slippages) > 0 else "NO TEST"))
+    logger.info(f"Mean close slippage: " + (f"{np.mean(close_slippages)*100:.4f}%" if len(close_slippages) > 0 else "NO TEST"))
