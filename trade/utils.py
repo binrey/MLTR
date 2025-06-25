@@ -104,6 +104,7 @@ class Position:
         sl: Optional[float] = None,
         tp: Optional[float] = None,
         fee_rate: Optional[FeeModel] = None,
+        fee: float = 0,
     ):
         self.vol_round = int(1/qty_step)
         self.volume: Fraction = self.set_volume(volume)
@@ -136,7 +137,7 @@ class Position:
         self.fee_rate = fee_rate if fee_rate is not None else FeeConst(0, 0)
         self.fees = 0
         self.fees_abs = 0
-        self._update_fees(self.open_price, self.volume)
+        self._update_fees(self.open_price, self.volume, fee)
         
         self.enter_points_hist.append((to_datetime(self.open_date), self.open_price))
         self.enter_price_hist.append((to_datetime(self.open_date), self.open_price))
@@ -171,15 +172,17 @@ class Position:
         self.tp = tp
         self.tp_hist.append((time, tp))
 
-    def _update_fees(self, price, volume):
-        self.fees_abs += self.fee_rate.order_execution_fee(price, volume)
-        if self.close_date is not None and self.open_date is not None:
-            self.fees_abs += self.fee_rate.position_suply_fee(
-                self.open_date,
-                self.close_date,
-                (self.open_price + self.close_price) / 2,
-                volume,
-            )
+    def _update_fees(self, price, volume, fee: Optional[float] = None):
+        if fee is None:
+            fee = self.fee_rate.order_execution_fee(price, volume)
+            if self.close_date is not None and self.open_date is not None:
+                fee += self.fee_rate.position_suply_fee(
+                    self.open_date,
+                    self.close_date,
+                    (self.open_price + self.close_price) / 2,
+                    volume,
+                )
+        self.fees_abs += fee
         self.fees = self.fees_abs / self.volume / self.open_price * 100
 
     def _update_profit_abs(self, price, volume):
@@ -199,11 +202,11 @@ class Position:
     def id(self):
         return f"{self.open_indx}-{self.str_dir}-{self.open_price:.2f}-{float(self.volume.real):.2f} sl:{self.sl}"
 
-    def close(self, price, date, indx):
+    def close(self, price, date, indx, fee: Optional[float] = None):
         self.close_price = abs(price)
         self.close_date = np.datetime64(date)
         self.close_indx = indx
-        self._update_fees(self.close_price, self.volume)
+        self._update_fees(self.close_price, self.volume, fee)
         self._update_profit_abs(self.close_price, self.volume)
         self.profit = (self.profit_abs - self.fees_abs) / self.open_price * 100
         self.enter_points_hist.append((self.close_date, self.close_price))
@@ -223,7 +226,8 @@ class Position:
     def add_to_position(self, 
                         additional_volume: float, 
                         price: float, 
-                        time: np.datetime64):
+                        time: np.datetime64,
+                        fee: Optional[float] = None):
         """
         Add to the existing position by increasing the volume and updating fees.
         Also record the event as a price change.
@@ -237,17 +241,18 @@ class Position:
         self.open_price = self.open_price * self.volume + price * additional_volume
         self.volume += self.set_volume(additional_volume)
         self.open_price /= self.volume
-        self._update_fees(price, additional_volume)
+        self._update_fees(price, additional_volume, fee)
         
         self.enter_points_hist.append((to_datetime(time), price))
         self.enter_price_hist.append((to_datetime(time), self.open_price))
         self.volume_hist.append((to_datetime(time), float(self.volume)))
         logger.debug(f"Added {additional_volume} to position {self.id} at price {price}")
 
-    def trim_position(self, 
-                      trim_volume: int, 
-                      price: float, 
-                      time: np.datetime64):
+    def trim_position(self,
+                      trim_volume: int,
+                      price: float,
+                      time: np.datetime64,
+                      fee: Optional[float] = None):
         """
         Trim existing position by decreasing the volume and updating fees and partial profit.
         
@@ -260,7 +265,7 @@ class Position:
         assert trim_volume < self.volume, "Cannot trim more or equal than current position"
 
         self._update_profit_abs(price, trim_volume)
-        self._update_fees(price, trim_volume)
+        self._update_fees(price, trim_volume, fee)
         self.volume -= trim_volume
         self.enter_points_hist.append((to_datetime(time), price))
         self.enter_price_hist.append((to_datetime(time), self.open_price))
@@ -333,15 +338,13 @@ class Position:
             period=data['period'],
             sl=data['stop_loss'],
             tp=data['take_profit'],
-            fee_rate=FeeConst(0, 0)  # Default fee rate, can be updated if needed
+            fee_rate=None,
+            fee=data['fees_abs']
         )
         
         # Set additional attributes if they exist
         if close_date is not None and data['close_price'] is not None:
             position.close(data['close_price'], close_date, close_indx)
-        
-        # Set fee-related attributes
-        position.fees_abs = data['fees_abs']
         
         # Restore history arrays
         position.sl_hist = [(np.datetime64(t), float(p)) for t, p in data['sl_history']]

@@ -55,28 +55,33 @@ class BybitTrading(BaseTradeClass):
         return positions
 
     def _close_current_pos(self):
-        pos_dict = self.get_pos_history(1)[0]
+        pos_dict, pos_dict_prev = self.get_pos_history(2)
         logger.debug(f"Closing self.pos.curr: {self.pos.curr}...")
         logger.debug(f"Last pos from bybit: {pos_dict}")
+        while pos_dict_prev["updatedTime"] == pos_dict["updatedTime"]:
+            pos_dict, pos_dict_prev = self.get_pos_history(2)
+            sleep(5)
         close_price = float(pos_dict["avgExitPrice"])
         close_date = self.to_datetime(pos_dict["updatedTime"])
         close_indx = int(pos_dict["updatedTime"])
-        
+        profit_no_fee = (close_price - self.pos.curr.open_price)*self.pos.curr.side.value*self.pos.curr.volume
+        fee = profit_no_fee - float(pos_dict["closedPnl"]) - self.pos.curr.fees_abs
         self.pos.curr.close(
             price=close_price,
             date=close_date,
-            indx=close_indx
+            indx=close_indx,
+            fee=fee,
             )
         logger.debug(f"Closing self.pos.curr: {self.pos.curr}...")
-        
-        
+
+
     def get_open_position(self) -> Optional[Position]:
         open_positions = self.session.get_positions(category="linear", symbol=self.ticker)["result"]["list"]
         open_positions = [pos for pos in open_positions if pos["size"] != "0"]
         if len(open_positions) == 0:
             return None
         else:
-            ticker, price, volume, sl, side, date = self._parse_bybit_position(open_positions[0])
+            ticker, price, volume, sl, side, date, pnl_realized = self._parse_bybit_position(open_positions[0])
             pos = Position(
                 price=float(price),
                 date=date,
@@ -87,6 +92,7 @@ class BybitTrading(BaseTradeClass):
                 qty_step=self.qty_step,
                 period=self.period,
                 sl=sl,
+                fee=abs(pnl_realized),
             )
             logger.debug(f"Getting pos from bybit: {pos}...")
             return pos
@@ -136,8 +142,9 @@ class BybitTrading(BaseTradeClass):
         side = Side.from_str(pos["side"])
         ticker = pos["symbol"]
         price = pos["avgEntryPrice"] if "avgEntryPrice" in pos else pos.get("avgPrice", 0)
-        logger.debug(f"Parsed bybit position: updatedTime.{date} createdTime.{self.to_datetime(pos['createdTime'])} avgEntryPrice|avgPrice.{price} ")
-        return ticker, price, volume, sl, side, date
+        pnl_realized = float(pos["curRealisedPnl"])
+        logger.debug(f"Parsed bybit position: updatedTime.{date} createdTime.{self.to_datetime(pos['createdTime'])} avgEntryPrice|avgPrice.{price} pnl.{pnl_realized}")
+        return ticker, price, volume, sl, side, date, pnl_realized
 
     @log_get_hist
     def get_hist(self):
