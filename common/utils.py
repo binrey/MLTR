@@ -235,6 +235,8 @@ class Logger:
     def __init__(self, log_dir: str, log_level: str):
         self.log_dir = Path(log_dir)
         self.log_level = log_level
+        # Custom format that adds prefixes only for WARNING and ERROR
+        self.format = "<level>{extra[formatted_message]}</level>"
 
     def initialize(self, decision_maker: str, symbol: str, period: str, clear_logs: bool):
         if clear_logs:
@@ -243,12 +245,19 @@ class Logger:
         if not self.log_dir.exists():
             self.log_dir.mkdir(parents=True, exist_ok=True)
         logger.remove()
+        
+        # Custom filter to format messages with prefixes for WARNING and ERROR
+        def format_message(record):
+            level_name = record["level"].name
+            if level_name in ["WARNING", "ERROR"]:
+                record["extra"]["formatted_message"] = f"{level_name}: {record['message']}"
+            else:
+                record["extra"]["formatted_message"] = record["message"]
+            return True
+        
         logger.add(sys.stderr, level=self.log_level,
-                format=(
-                    # "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-                    # "<level>{level: <8}</level> | "
-                    "<level>{message}</level>"
-                ))
+                format=self.format, filter=format_message)
+        
         log_file_path = os.path.join(self.log_dir, f"{decision_maker}", f"{symbol}-{period}", "log_records", f"{datetime.now()}.log")
         logger.add(log_file_path, level=self.log_level,
-                format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}", rotation="10 MB")
+                format=self.format, rotation="10 MB", filter=format_message)
