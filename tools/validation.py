@@ -201,7 +201,7 @@ if __name__ == "__main__":
     logger.info("")
     logger.info(f"Validation for {len(positions_test)} positions")
     logger.info("----------------------------------------")
-    logger.info(f"{'Open Date':<16} {'Side':<11} {'Open Slip':<9} {'Time Lag':<9} {'Close Slip':<9}")
+    logger.info(f"{'Open Date':<16} {'Side':<11} {'Open Slip,%':>15} {'Time Lag,s':>15} {'Prof.diff,$':>15} {'Close Slip,%':>15}")
     ir, sum_prof_real, sum_prof_test = 0, 0, 0
     for pos_test in positions_test:
         date_test = pos_test.open_date.astype("datetime64[m]")
@@ -216,10 +216,11 @@ if __name__ == "__main__":
                 match_count += 1
                 
                 # Calculate open slippage
-                open_slip = (pos_real.open_price - pos_test.open_price) * pos_test.side.value / pos_test.open_price
+                open_slip = (pos_test.open_price - pos_real.open_price) * pos_test.side.value * pos_test.volume
                 open_slippages.append(open_slip)
+                prof_diff = pos_test.profit_abs - pos_real.profit_abs
                 
-                logline += f" <- OK: {open_slip*100:8.4f}% {time_lags[-1]:8.2f}s"
+                logline += f" <- OK: {open_slip*100:15.2f} {time_lags[-1]:15.2f} {prof_diff:15.2f}"
                 found_real = True
 
                 # Bybit unexpectedly missmatch current close date and price with previous position
@@ -234,9 +235,9 @@ if __name__ == "__main__":
                         logline += f" CLOSE ERROR: real:{pos_real.close_date} test:{pos_test.close_date}"
                 
                 if pos_real.close_date.astype("datetime64[m]") == pos_test.close_date:
-                    close_slip = (pos_real.close_price - pos_test.close_price) * pos_test.side.value / pos_test.close_price
+                    close_slip = -(pos_test.close_price - pos_real.close_price) * pos_test.side.value * pos_test.volume
                     close_slippages.append(close_slip)
-                    logline += f" {close_slip*100:8.4f}%"
+                    logline += f" {close_slip:15.2f}"
                 break
 
             else:
@@ -249,7 +250,7 @@ if __name__ == "__main__":
             logline += " <- NO REAL"
         sum_prof_real += pos_real.profit_abs
         sum_prof_test += pos_test.profit_abs
-        logger.info(logline + logline_suffix + f" {pos_test.profit_abs - pos_real.profit_abs:.4f} {pos_test.fees_abs} {pos_real.fees_abs}")
+        logger.info(logline + logline_suffix + f" {pos_test.fees_abs} {pos_real.fees_abs}")
 
     logger.info("----------------------------------------")
     logger.info(f"Mean time lag:       " + (f"{np.mean(time_lags):.2f}s" if len(positions_test) > 0 else "NO TEST"))
