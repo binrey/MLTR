@@ -104,7 +104,7 @@ class Position:
         sl: Optional[float] = None,
         tp: Optional[float] = None,
         fee_rate: Optional[FeeModel] = None,
-        fee: float = 0,
+        fee: float = None,
     ):
         self.vol_round = int(1/qty_step)
         self.volume: Fraction = self.set_volume(volume)

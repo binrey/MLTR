@@ -194,14 +194,14 @@ class BackTestResults:
         self.add_profit_curve(btest_results.daily_hist.index, btest_results.relative2deposit(btest_results.daily_hist["profit_csum"]), 
                               btest_results.tickers_set, color, linewidth, alpha)
 
-    def plot_validation(self, title: Optional[str] = None, plot_profit_without_fees: bool = True):
+    def plot_validation(self, title: Optional[str] = None, y_label="Fin result, %"):
         self.fig, ax1 = plt.subplots(1, 1, figsize=(10, 5))
 
         if title:
             self.fig.suptitle(title, fontsize=16)
             self.fig.subplots_adjust(top=0.9)
 
-        ax1.set_ylabel("fin result, %")
+        ax1.set_ylabel(y_label)
 
 
     def plot_results(self, title: Optional[str] = None, plot_profit_without_fees: bool = True):

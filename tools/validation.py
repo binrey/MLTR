@@ -162,7 +162,7 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
     positions_real = process_real_log_dir(log_dir)
     profit_hist_real = TradeHistory(backtest_trading.session.mw, positions_real).df
     assert profit_hist_real.shape[0] > 0, "No real deals in history found"
-    val_res.plot_validation()
+    val_res.plot_validation(y_label="Fin result")
     val_res.add_profit_curve(profit_hist_real["dates"], profit_hist_real["profit_csum"], f"{cfg['symbol'].ticker} real", "g", 3, 0.5)
     val_res.add_profit_curve(profit_hist_real["dates"], backtest_trading.session.profit_hist.df["profit_csum"], f"{cfg['symbol'].ticker} test", "r", 1, 0.5)
 
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     logger.info(f"Validation for {len(positions_test)} positions")
     logger.info("----------------------------------------")
     logger.info(f"{'Open Date':<16} {'Side':<11} {'Open Slip':<9} {'Time Lag':<9} {'Close Slip':<9}")
-    ir = 0
+    ir, sum_prof_real, sum_prof_test = 0, 0, 0
     for pos_test in positions_test:
         date_test = pos_test.open_date.astype("datetime64[m]")
         logline, logline_suffix = f"{date_test} {pos_test.side:<4}", ""
@@ -237,6 +237,8 @@ if __name__ == "__main__":
                     close_slip = (pos_real.close_price - pos_test.close_price) * pos_test.side.value / pos_test.close_price
                     close_slippages.append(close_slip)
                     logline += f" {close_slip*100:8.4f}%"
+                break
+
             else:
                 if date_real < date_test:
                     logger.info(f"{date_real.astype('datetime64[m]')} {pos_real.side:<4} -> NO TEST")
@@ -245,10 +247,13 @@ if __name__ == "__main__":
                     break
         if not found_real:
             logline += " <- NO REAL"
-        logger.info(logline + logline_suffix)
+        sum_prof_real += pos_real.profit_abs
+        sum_prof_test += pos_test.profit_abs
+        logger.info(logline + logline_suffix + f" {pos_test.profit_abs - pos_real.profit_abs:.4f} {pos_test.fees_abs} {pos_real.fees_abs}")
 
     logger.info("----------------------------------------")
     logger.info(f"Mean time lag:       " + (f"{np.mean(time_lags):.2f}s" if len(positions_test) > 0 else "NO TEST"))
     logger.info(f"Match rate:          " + (f"{match_count / len(positions_test) * 100:.2f}%" if len(positions_test) > 0 else "NO TEST"))
     logger.info(f"Mean open slippage:  " + (f"{np.mean(open_slippages)*100:.4f}%" if len(open_slippages) > 0 else "NO TEST"))
     logger.info(f"Mean close slippage: " + (f"{np.mean(close_slippages)*100:.4f}%" if len(close_slippages) > 0 else "NO TEST"))
+    logger.info(f"{sum_prof_real} {sum_prof_test}")
