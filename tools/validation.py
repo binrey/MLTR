@@ -196,7 +196,7 @@ if __name__ == "__main__":
     positions_test.sort(key=lambda x: x.open_date)
 
     time_lags, open_slippages, close_slippages = [], [], []
-    match_count = 0
+    match_count, prof_diff_summ = 0, 0
 
     logger.info("")
     logger.info(f"Validation for {len(positions_test)} positions")
@@ -219,8 +219,8 @@ if __name__ == "__main__":
                 open_slip = (pos_test.open_price - pos_real.open_price) * pos_test.side.value * pos_test.volume
                 open_slippages.append(open_slip)
                 prof_diff = pos_test.profit_abs - pos_real.profit_abs
-                
-                logline += f" <- OK: {open_slip*100:15.2f} {time_lags[-1]:15.2f} {prof_diff:15.2f}"
+                prof_diff_summ += prof_diff
+                logline += f" <- OK: {open_slip:15.2f} {time_lags[-1]:15.2f} {prof_diff:15.2f}"
                 found_real = True
 
                 # Bybit unexpectedly missmatch current close date and price with previous position
@@ -248,13 +248,11 @@ if __name__ == "__main__":
                     break
         if not found_real:
             logline += " <- NO REAL"
-        sum_prof_real += pos_real.profit_abs
-        sum_prof_test += pos_test.profit_abs
-        logger.info(logline + logline_suffix + f" {pos_test.fees_abs} {pos_real.fees_abs}")
+        logger.info(logline + logline_suffix)
 
+    logger.info(" "*29 + f"{np.sum(open_slippages):15.2f} {np.mean(time_lags):15.2f} {prof_diff_summ:15.2f} {np.sum(close_slippages):15.2f}")
     logger.info("----------------------------------------")
     logger.info(f"Mean time lag:       " + (f"{np.mean(time_lags):.2f}s" if len(positions_test) > 0 else "NO TEST"))
     logger.info(f"Match rate:          " + (f"{match_count / len(positions_test) * 100:.2f}%" if len(positions_test) > 0 else "NO TEST"))
     logger.info(f"Mean open slippage:  " + (f"{np.mean(open_slippages)*100:.4f}%" if len(open_slippages) > 0 else "NO TEST"))
     logger.info(f"Mean close slippage: " + (f"{np.mean(close_slippages)*100:.4f}%" if len(close_slippages) > 0 else "NO TEST"))
-    logger.info(f"{sum_prof_real} {sum_prof_test}")

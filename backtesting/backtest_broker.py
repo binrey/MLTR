@@ -157,7 +157,7 @@ class Broker:
     def close_active_pos(self, price, time, hist_id):
         self.active_position.close(price, time, hist_id)
         closed_position = self.active_position
-        self.deposit = min(self.wallet, self.deposit + closed_position.profit_abs)
+        self.deposit = min(self.wallet, self.deposit + closed_position.profit_abs - closed_position.fees_abs)
         self.active_position = None
         self.positions.append(closed_position)
         return closed_position
