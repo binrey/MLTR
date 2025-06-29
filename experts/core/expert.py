@@ -98,8 +98,7 @@ class Expert:
             if self.active_position.sl is None:
                 sl = self.sl_processor.create(open_price=h["Close"][-2],
                                               active_position=self.active_position,
-                                              decision_maker=self.decision_maker,
-                                              tick_size=self.symbol.tick_size)
+                                              decision_maker=self.decision_maker)
             else:
                 sl = self.trailing_stop.get_stop_loss(
                     self.active_position, hist=h)

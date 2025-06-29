@@ -24,15 +24,6 @@ class StopsController(ABC):
                hist: Optional[np.ndarray] = None,
                decision_maker: Optional[DecisionMaker] = None) -> float:
         pass
-    
-    def postprocess(self, sl: float, open_price: float, active_position_side: Side, tick_size: float):
-        if active_position_side == Side.BUY:
-            sl = min(sl, open_price - tick_size *
-                    self.traid_stops_min_size_multiplier)
-        else:
-            sl = max(sl, open_price + tick_size *
-                    self.traid_stops_min_size_multiplier)
-        return sl
 
 
 class SLDynamic(StopsController):
@@ -40,33 +31,27 @@ class SLDynamic(StopsController):
         self.active = cfg["active"]
         super(SLDynamic, self).__init__(cfg, name="sl_dyn")
 
-    def create(self, **kwargs):
+    def create(self, active_position: Position, **kwargs):
         decision_maker = kwargs["decision_maker"]
-        active_position = kwargs["active_position"]
-        open_price = kwargs["open_price"]
-        tick_size = kwargs["tick_size"]
         sl = None
         if self.active and active_position is not None:
             sl = decision_maker.setup_sl(active_position.side)
-        sl = self.postprocess(sl, open_price, active_position.side, tick_size)
         return sl
 
 
 class SLFixed(StopsController):
     def __init__(self, cfg):
-        self.cfg = cfg
+        self.active = cfg["active"]
+        self.percent_value = cfg["percent_value"]
         super(SLFixed, self).__init__(cfg, name="sl_fix")
 
-    def create(self, **kwargs):
-        active_position = kwargs["active_position"]
+    def create(self, active_position: Position, **kwargs):
         open_price = kwargs["open_price"]
-        tick_size = kwargs["tick_size"]
         sl = None
-        if self.cfg["active"]:
+        if self.active:
             sl = open_price * \
-                (1 - self.cfg["percent_value"] /
+                (1 - self.percent_value /
                  100 * active_position.side.value)
-        sl = self.postprocess(sl, open_price, active_position.side, tick_size)
         return sl
 
 
