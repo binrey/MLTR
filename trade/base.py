@@ -95,7 +95,7 @@ class BaseTradeClass(ABC):
         self.backup_path.mkdir(parents=True, exist_ok=True)
         self.trades_log_path = self.save_path / "positions"
         self.trades_log_path.mkdir(parents=True, exist_ok=True)
-        self.traid_stops_min_size_multiplier = 1000 # TODO: move to cfg
+        self.traid_stops_min_size = 0.004 # TODO: move to cfg
 
         assert self.qty_step == self.get_qty_step()
 
@@ -141,22 +141,25 @@ class BaseTradeClass(ABC):
     def _modify_sl(self, sl: Optional[float]):
         pass
 
-    def modify_sl(self, sl: Optional[float], open_price: float):
-        if sl is None:
+    def modify_sl(self, sl: Optional[float], price: float):
+        if sl is None or self.pos.curr is None:
             return
-        
-        if abs(sl - open_price) < self.tick_size * self.traid_stops_min_size_multiplier:
-            return
-        
         sl = Symbol.round_stops(self.stops_step, sl)
+
+        if self.pos.curr.side is Side.BUY:
+            min_sl = Symbol.round_stops(self.stops_step, price * (1 - self.traid_stops_min_size))
+            if sl > min_sl:
+                logger.warning(f"SL is too high: {sl} > {min_sl}, setting to {min_sl}")
+                sl = min_sl
+        else:
+            max_sl = Symbol.round_stops(self.stops_step, price * (1 + self.traid_stops_min_size))
+            if sl < max_sl:
+                logger.warning(f"SL is too low: {sl} < {max_sl}, setting to {max_sl}")
+                sl = max_sl
+
         self._modify_sl(sl)
         open_position: Position = self.get_open_position()
         if open_position is None:
-            return
-
-        if open_position.side == Side.BUY and sl >= open_price:
-            return
-        if open_position.side == Side.SELL and sl <= open_price:
             return
 
         sl_from_broker, n_attempts = open_position.sl, 0

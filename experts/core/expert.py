@@ -96,7 +96,7 @@ class Expert:
     def create_or_update_sl(self, h):
         if self.active_position is not None:
             if self.active_position.sl is None:
-                sl = self.sl_processor.create(open_price=h["Open"][-1],
+                sl = self.sl_processor.create(open_price=h["Close"][-2],
                                               active_position=self.active_position,
                                               decision_maker=self.decision_maker,
                                               tick_size=self.symbol.tick_size)
@@ -105,7 +105,7 @@ class Expert:
                     self.active_position, hist=h)
 
             if sl != self.active_position.sl:
-                self.modify_sl(sl, h["Open"][-1])
+                self.modify_sl(sl, h["Close"][-2])
 
     def create_or_update_tp(self, h):
         if self.active_position is not None:
