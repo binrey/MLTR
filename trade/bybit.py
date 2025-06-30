@@ -137,8 +137,16 @@ class BybitTrading(BaseTradeClass):
         return pos_object
 
     def get_deposit(self):
-        msg = self.session.get_wallet_balance(accountType="UNIFIED")["result"]
-        return float(msg["list"][0]["totalMarginBalance"])
+        deposit = None
+        while deposit is None:
+            try:
+                msg = self.session.get_wallet_balance(accountType="UNIFIED")["result"]
+                deposit = float(msg["list"][0]["totalMarginBalance"])
+            except Exception as ex:
+                logger.error(ex)
+                logger.warning("try to get deposit info...")
+                sleep(1)
+        return deposit
 
     def get_qty_step(self):
         msg = self.session.get_instruments_info(
