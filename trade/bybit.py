@@ -65,13 +65,13 @@ class BybitTrading(BaseTradeClass):
 
     def _close_current_pos(self):
         logger.debug(f"Closing self.pos.curr: {self.pos.curr}...")
-        pos_dict, pos_dict_prev = self.get_cur_prev_closed_pos()
+        pos_dict, _ = self.get_cur_prev_closed_pos()
         logger.debug(f"Last pos from bybit: {pos_dict}")
         for n_attempt in range(10):
-            if pos_dict_prev["updatedTime"] == pos_dict["updatedTime"]:
+            if self.to_datetime(pos_dict["updatedTime"]) <= self.pos.curr.open_date:
                 logger.warning(f"Waiting for data base update... {n_attempt+1}/10")
-                sleep(5)
-                pos_dict, pos_dict_prev = self.get_cur_prev_closed_pos()
+                sleep(2)
+                pos_dict, _ = self.get_cur_prev_closed_pos()
             else:
                 break
         close_price = float(pos_dict["avgExitPrice"])
