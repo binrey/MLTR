@@ -2,8 +2,6 @@
 # export QT_QPA_PLATFORM=offscreen
 
 
-from functools import cached_property
-from time import perf_counter
 from typing import Optional
 
 import matplotlib.pyplot as plt
@@ -11,9 +9,8 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from backtesting.backtest_broker import Broker, TradeHistory
+from backtesting.backtest_broker import Broker
 from common.type import VolEstimRule, to_datetime
-from trade.utils import Position
 
 
 class Metrics:

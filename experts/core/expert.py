@@ -196,3 +196,9 @@ class Expert:
             self.create_orders(side=target_state.side,
                                volume=order_volume,
                                time_id=h["Id"][-1])
+
+    def close_current_position(self):
+        if self.active_position is not None:
+            self.create_orders(side=Side.reverse(self.active_position.side),
+                               volume=self.active_position.volume,
+                               time_id=None)

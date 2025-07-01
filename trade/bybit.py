@@ -246,7 +246,7 @@ class BybitTrading(BaseTradeClass):
         except Exception as ex:
             logger.error(ex)
 
-def launch(cfg, demo=False):
+def launch(cfg, demo=False, clear_position=False):
     with open("./api.yaml", "r") as f:
         api = yaml.safe_load(f)
     bybit_creds = api["bybit_demo"] if demo else api[cfg["credentials"]]
@@ -260,7 +260,7 @@ def launch(cfg, demo=False):
     bybit_trading = BybitTrading(cfg=cfg,
                                  telebot=Telebot(bot_token),
                                  bybit_session=bybit_session)
-    bybit_trading.initialize()
+    bybit_trading.initialize(clear_position)
 
     print()
     while True:

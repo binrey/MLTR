@@ -283,13 +283,17 @@ class BaseTradeClass(ABC):
         else:
             logger.debug("no backup found")
 
-    def initialize(self):
+    def initialize(self, close_current_position: bool = False):
         self.update_market_state()
         if self.pos.curr is not None:
             self.exp.active_position = self.pos.curr
-            self.load_backup()
-        else:
-            self.clear_log_dir()
+            if close_current_position:
+                self.exp.close_current_position()
+                sleep(3)
+                self.update_market_state()
+                self.clear_log_dir()
+            else:
+                self.load_backup()
 
         logger.info(f"Market wallet: {self.get_deposit()}")
 

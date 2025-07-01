@@ -44,6 +44,7 @@ config = dict(
     leverage=1,
     close_only_by_stops=False,
     hist_size=32,
+    traid_stops_min_size=0.1,
     tstart=0,
     tend=None,
     period=TimePeriod.M1,

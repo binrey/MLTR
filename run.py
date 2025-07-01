@@ -43,14 +43,14 @@ def run_optimization(cfg: PyConfig, run_backtests):
     logger.info(f"\n{str(results)}")
 
 
-def run_bybit(cfg: PyConfig, demo=False):
+def run_bybit(cfg: PyConfig, demo: bool, clear_position: bool):
     logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.BYBIT.value),
                             log_level=os.getenv("LOGLEVEL"))
     logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, cfg["clear_logs"])
     cfg["save_backup"] = True
     cfg["save_plots"] = False
     cfg["visualize"] = False
-    bybit_launch(cfg, demo)
+    bybit_launch(cfg, demo, clear_position)
 
 
 def run_cross_validation(cfg: PyConfig):
@@ -86,13 +86,15 @@ if __name__ == "__main__":
                         help="Enable demo trading")
     parser.add_argument("--run_backtests", action="store_true",
                         help="Whether to run backtests during optimization.")
+    parser.add_argument("--clear_position", action="store_true",
+                        help="Whether to clear positions before starting trading.")
     args = parser.parse_args()
 
     run_type = RunType.from_str(args.run_type)
     cfgs = [PyConfig(path) for path in args.config_paths]
 
     if run_type == RunType.BYBIT:
-        run_bybit(cfgs[0].get_bybit(), args.demo)
+        run_bybit(cfgs[0].get_bybit(), args.demo, args.clear_position)
     elif run_type == RunType.OPTIMIZE:
         run_optimization(cfgs[0].get_optimization(), args.run_backtests)
     elif run_type == RunType.MULTIRUN:
