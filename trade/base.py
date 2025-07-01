@@ -95,7 +95,7 @@ class BaseTradeClass(ABC):
         self.backup_path.mkdir(parents=True, exist_ok=True)
         self.trades_log_path = self.save_path / "positions"
         self.trades_log_path.mkdir(parents=True, exist_ok=True)
-        self.traid_stops_min_size = 0.004 # TODO: move to cfg
+        self.traid_stops_min_size = cfg["traid_stops_min_size"]
 
         assert self.qty_step == self.get_qty_step()
 
@@ -147,12 +147,12 @@ class BaseTradeClass(ABC):
         sl = Symbol.round_stops(self.stops_step, sl)
 
         if self.pos.curr.side is Side.BUY:
-            min_sl = Symbol.round_stops(self.stops_step, price * (1 - self.traid_stops_min_size))
+            min_sl = Symbol.round_stops(self.stops_step, price * (1 - self.traid_stops_min_size/100))
             if sl > min_sl:
                 logger.warning(f"SL is too high: {sl} > {min_sl}, setting to {min_sl}")
                 sl = min_sl
         else:
-            max_sl = Symbol.round_stops(self.stops_step, price * (1 + self.traid_stops_min_size))
+            max_sl = Symbol.round_stops(self.stops_step, price * (1 + self.traid_stops_min_size/100))
             if sl < max_sl:
                 logger.warning(f"SL is too low: {sl} < {max_sl}, setting to {max_sl}")
                 sl = max_sl
