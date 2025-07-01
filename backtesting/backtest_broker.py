@@ -29,14 +29,15 @@ class TradeHistory:
         for self.hist_window, _ in tqdm(self.mw(), desc="Build profit curve", total=self.mw.timesteps_count, disable=True):
             cur_time = self.hist_window["Date"][-1]
             closed_position: Optional[Position] = self.posdict_closed.get(cur_time, None)
-            if self.posdict_open.get(cur_time, None) is not None:
-                active_position = self.posdict_open[cur_time]
             last_price = self.hist_window["Open"][-1]
 
             if closed_position is not None:
                 self.cumulative_profit += closed_position.profit_abs
                 self.cumulative_fees += closed_position.fees_abs
                 active_position = None
+
+            if self.posdict_open.get(cur_time, None) is not None:
+                active_position = self.posdict_open[cur_time]
 
             # If an active position exists, add its unrealized profit
             active_profit, active_volume, active_cost = 0, 0, 0
