@@ -1,10 +1,10 @@
 from common.type import Symbols
 from common.utils import update_config
-from configs.macross.base import backtest, bybit
+from configs.random.base import backtest, bybit
 
 updates = dict(
     symbol=Symbols.BTCUSDT,
-    volume_control = {"deposit_fraction": 0.45},
+    volume_control={"deposit_fraction": 0.45},
 )
 
 backtest = update_config(backtest, **updates)
