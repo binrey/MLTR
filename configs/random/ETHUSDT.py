@@ -1,6 +1,6 @@
 from common.type import Symbols
 from common.utils import update_config
-from configs.macross.base import backtest, bybit
+from .base import backtest, bybit
 
 updates = dict(
     symbol=Symbols.ETHUSDT,
