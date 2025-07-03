@@ -49,8 +49,7 @@ def extract_datetimes(line):
 def parse_market_wallet_from_logs(log_dir: Path) -> float:
     """Extract market wallet value from the most recent log file."""
     log_records_dir = log_dir / "log_records"
-    if not log_records_dir.exists():
-        return None
+    assert log_records_dir.exists(), f"Log records directory not found: {log_records_dir}"
     
     # Get the most recent log file
     log_files = sorted(log_records_dir.glob("*.log"), key=lambda x: x.stat().st_mtime, reverse=True)
@@ -143,8 +142,10 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
         "conftype": ConfigType.BACKTEST,
         "close_last_position": False,
         "visualize": False,
+        "save_plots": False,
         "handle_trade_errors": False,
-        "wallet": market_wallet
+        "wallet": market_wallet,
+        "vis_hist_length": 128,
     })
 
     logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, cfg["clear_logs"])
@@ -225,14 +226,14 @@ if __name__ == "__main__":
 
                 # Bybit unexpectedly missmatch current close date and price with previous position
                 if pos_real.close_date.astype("datetime64[m]") != pos_test.close_date:
-                    if pos_real.close_date == positions_real[ir-1].close_date:
-                        pos_real.close_date = pos_test.close_date
-                        pos_real.close_price = pos_test.close_price
-                        if pos_real.sl_hist is not None and len(pos_real.sl_hist) > 0:
-                            pos_real.close_price = pos_real.sl_hist[-1][1]
-                        logline_suffix = " (REPAIRED)"
-                    else:
-                        logline += f" CLOSE ERROR: real:{pos_real.close_date} test:{pos_test.close_date}"
+                    # if pos_real.close_date == positions_real[ir-1].close_date:
+                    #     pos_real.close_date = pos_test.close_date
+                    #     pos_real.close_price = pos_test.close_price
+                    #     if pos_real.sl_hist is not None and len(pos_real.sl_hist) > 0:
+                    #         pos_real.close_price = pos_real.sl_hist[-1][1]
+                    #     logline_suffix = " (REPAIRED)"
+                    # else:
+                    logline += f" CLOSE ERROR: real:{pos_real.close_date} test:{pos_test.close_date}"
                 
                 if pos_real.close_date.astype("datetime64[m]") == pos_test.close_date:
                     close_slip = -(pos_test.close_price - pos_real.close_price) * pos_test.side.value * pos_test.volume
