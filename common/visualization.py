@@ -1,6 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import finplot as fplt
 import matplotlib
@@ -167,12 +167,13 @@ class Visualizer:
         # fplt.YScale.set_scale()
         fplt.show()
 
-    def save(self, drawitems4possitions: List[Line], drawitems4sl: List[Line], drawitems4tp: List[Line], side_current: Optional[Side]):
+    def save(self, drawitems4possitions: List[Dict[str, Any]], drawitems4sl: List[Line], drawitems4tp: List[Line], side_current: Optional[Side]):
         try:
             mystyle = mpf.make_mpf_style(base_mpf_style='yahoo', rc={
                                          'axes.labelsize': 'small'})
-            lines = [drawitem.points for drawitem in drawitems4possitions +
-                     drawitems4sl + drawitems4tp]
+            lines = [drawitem["enter_points"].points for drawitem in drawitems4possitions if len(drawitem["enter_points"].points) > 1]
+            lines += [drawitem.points for drawitem in drawitems4sl + drawitems4tp if len(drawitem.points) > 1]
+
             for line in lines:
                 for i, point in enumerate(line):
                     if point[0] < self.hist2plot.index[0]:
@@ -180,8 +181,9 @@ class Visualizer:
                     if point[0] > self.hist2plot.index[-1]:
                         line[i] = (self.hist2plot.index[-1], point[1])
 
-            colors = [drawitem.color for drawitem in drawitems4possitions +
-                      drawitems4sl + drawitems4tp]
+            colors = [drawitem["enter_points"].color for drawitem in drawitems4possitions]
+            colors += [drawitem.color for drawitem in drawitems4sl + drawitems4tp]
+
             kwargs = dict(
                 type='candle',
                 block=False,
@@ -199,7 +201,7 @@ class Visualizer:
 
             if side_current is not None:
                 x, y = self.hist2plot.shape[0] - \
-                    2, drawitems4possitions[-1].points[0][1]
+                    2, drawitems4possitions[-1]["enter_points"].points[0][1]
                 id4scale = min(self.hist2plot.shape[0], 10)
                 arrow_size = (
                     self.hist2plot.iloc[-id4scale:].High - self.hist2plot.iloc[-id4scale:].Low).mean()
