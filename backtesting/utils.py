@@ -89,7 +89,7 @@ class BackTestResults:
 
     def add(self, bktest_broker: Broker):
         positions = bktest_broker.positions
-        self.ndeals += len(positions) 
+        self.ndeals += len(positions)
         self.tickers.update([pos.ticker for pos in positions])
         self.positions.extend(positions)
 
@@ -226,12 +226,12 @@ class BackTestResults:
 
         self.add_profit_curve(self.daily_hist.index, 
                               self.relative2deposit(self.daily_hist["profit_csum"]), 
-                              self.tickers_set, 
-                              color="b", 
-                              linewidth=3, 
+                              self.tickers_set,
+                              color="b",
+                              linewidth=3,
                               alpha=0.5)
         if plot_profit_without_fees:
-            self.add_profit_curve(self.daily_hist.index, 
+            self.add_profit_curve(self.daily_hist.index,
                                   self.relative2deposit(self.daily_hist["profit_csum_nofees"]),
                                   f"{self.tickers_set } without fees",
                                   color="b",
@@ -239,13 +239,13 @@ class BackTestResults:
                                   alpha=0.5)
 
         # Plot max ATH period
-        ax1.plot([self.metrics.max_period_start, self.metrics.max_period_end], 
-                 [self.relative2deposit(self.metrics.price_at_max_period)]*2, 
+        ax1.plot([self.metrics.max_period_start, self.metrics.max_period_end],
+                 [self.relative2deposit(self.metrics.price_at_max_period)]*2,
                  color="r", linewidth=2, alpha=0.5, linestyle="--")
-        ax1.text(self.metrics.max_period_start, 
-                 self.relative2deposit(self.metrics.price_at_max_period + self.fig.axes[0].get_ylim()[1] * 0.01), 
+        ax1.text(self.metrics.max_period_start,
+                 self.relative2deposit(self.metrics.price_at_max_period + self.fig.axes[0].get_ylim()[1] * 0.01),
                  f"{self.metrics.max_period:.0f} days",
-                 color="r", 
+                 color="r",
                  fontsize=12)
 
         ax2.plot(

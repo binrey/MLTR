@@ -250,9 +250,7 @@ class MovingWindow():
 
         self.id2start = self.find_nearest_date_indx(
             self.hist["Date"], self.date_start)
-        if self.id2start == self.hist["Id"][-1]:
-            logger.error(f"Date start {self.date_start} is equal or higher than latest range date {self.hist['Date'][-1]}")
-            raise ValueError()
+        assert self.id2start != self.hist["Id"][-1], f"Date start {self.date_start} is equal or higher than latest range date {self.hist['Date'][-1]}"
 
         if self.id2start < self.size:
             logger.warning(f"Not enough history, shift start id from {self.id2start} to {self.size}")
