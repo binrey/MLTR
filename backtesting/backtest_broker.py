@@ -46,7 +46,7 @@ class TradeHistory:
                 active_volume = float(active_position.volume)
                 active_cost = active_position.open_price * active_volume
 
-            max_profit = max(max_profit, self.cumulative_profit + active_profit - self.cumulative_fees)
+            max_profit = max(max_profit, self.cumulative_profit - self.cumulative_fees)
 
             # Append current cumulative profit to the profit curve
             self.profit_hist["dates"].append(cur_time)
@@ -66,6 +66,9 @@ class TradeHistory:
         self.leverage = leverage
         self.max_loss = max(self.profit_hist["loss"].abs())
         self.deposit = max(wallet, self.max_loss) if volume_control.rule == VolEstimRule.DEPOSIT_BASED else wallet + self.max_loss
+        if self.deposit > wallet:
+            logger.warning(f"deposit was increased: {self.deposit} > {wallet}")
+        logger.info(f"Export backtest results: deposit: {self.deposit}, max_loss: {self.max_loss}, leverage: {self.leverage}")
 
     @cached_property
     def df(self):
@@ -155,10 +158,22 @@ class Broker:
             self.active_orders = new_orders_list
         return "OK"
 
+    @property
+    def available_deposit(self):
+        deposit = self.deposit
+        if self.active_position is not None:
+            deposit += self.active_position.unrealized_pnl(self.open_price)
+        print(deposit)
+        return deposit
+
+    def update_deposit(self):
+        self.deposit = min(self.wallet, self.deposit + self.active_position.profit_abs - self.active_position.fees_abs)
+        assert self.volume_control.rule == VolEstimRule.DEPOSIT_BASED and self.deposit >= 0, "deposit is negative when volume control is deposit based"
+
     def close_active_pos(self, price, time, hist_id):
         self.active_position.close(price, time, hist_id)
         closed_position = self.active_position
-        self.deposit = min(self.wallet, self.deposit + closed_position.profit_abs - closed_position.fees_abs)
+        self.update_deposit()
         self.active_position = None
         self.positions.append(closed_position)
         return closed_position

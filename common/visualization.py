@@ -62,7 +62,7 @@ class Visualizer:
             profit = pos.profit
 
             if profit is None or end_time is None:
-                profit = pos.cur_profit(self.hist2plot["Open"].iloc[-1])
+                profit = pos.unrealized_pnl(self.hist2plot["Open"].iloc[-1])
                 end_time, end_price = self.hist2plot.index[-1], self.hist2plot["Open"].iloc[-1]
             else:
                 end_time = end_time.astype("datetime64[m]")

@@ -44,7 +44,7 @@ config = dict(
     leverage=1,
     close_only_by_stops=False,
     hist_size=64,
-    traid_stops_min_size=0.4,
+    traid_stops_min_size=0.2,
     tstart=0,
     tend=None,
     period=TimePeriod.M60,
@@ -65,7 +65,7 @@ config = dict(
 backtest = update_config(
     config,
     conftype=ConfigType.BACKTEST,
-    date_start=np.datetime64("2018-01-01T00:00:00"),
+    date_start=np.datetime64("2022-01-01T00:00:00"),
     date_end=np.datetime64("2025-07-01T00:00:00"),
     eval_buyhold=False,
     clear_logs=True,
@@ -75,7 +75,7 @@ backtest = update_config(
 optimization = update_config(
     config,
     conftype=ConfigType.OPTIMIZE,
-    date_start=np.datetime64("2018-01-01T00:00:00"),
+    date_start=np.datetime64("2022-01-01T00:00:00"),
     date_end=np.datetime64("2025-05-01T00:00:00"),
     clear_logs=False,
     log_trades=False,

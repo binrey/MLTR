@@ -212,7 +212,7 @@ class Position:
         self.enter_points_hist.append((to_datetime(self.close_date), self.close_price))
         self.enter_price_hist.append((to_datetime(self.close_date), self.open_price))
 
-    def cur_profit(self, price):
+    def unrealized_pnl(self, price):
         return (price - self.open_price) * self.side.value * self.volume
 
     @property

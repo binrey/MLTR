@@ -97,7 +97,7 @@ class BackTestResults:
         if self.deposit is None:
             self.deposit = deposit
         else:
-            self.deposit += deposit
+            assert self.deposit == deposit, "deposit is not the same"
 
         self.leverage = bktest_broker.profit_hist.leverage
 
