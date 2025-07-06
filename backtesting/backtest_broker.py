@@ -67,7 +67,12 @@ class TradeHistory:
     def add_info(self, wallet: float, volume_control: VolumeControl, leverage: float):
         self.leverage = leverage
         self.max_loss = max(self.profit_hist["loss"].abs())
-        self.deposit = max(wallet, self.max_loss) if volume_control.rule == VolEstimRule.DEPOSIT_BASED else wallet + self.max_loss
+        if volume_control.rule == VolEstimRule.DEPOSIT_BASED:
+            self.deposit = max(wallet, self.max_loss)
+        elif volume_control.rule == VolEstimRule.FIXED_POS_COST:
+            self.deposit = wallet + self.max_loss
+        else:
+            raise ValueError(f"Unknown volume control rule: {volume_control.rule}")
         if self.deposit > wallet:
             logger.warning(f"deposit was increased: {self.deposit} > {wallet}")
         logger.info(f"Export backtest results: deposit: {self.deposit}, max_loss: {self.max_loss}, leverage: {self.leverage}")
@@ -169,7 +174,7 @@ class Broker:
 
     def update_deposit(self):
         self.deposit = min(self.wallet, self.deposit + self.active_position.profit_abs - self.active_position.fees_abs)
-        assert self.volume_control.rule == VolEstimRule.DEPOSIT_BASED and self.deposit >= 0, "deposit is negative when volume control is deposit based"
+        assert self.volume_control.rule != VolEstimRule.DEPOSIT_BASED or self.deposit >= 0, "deposit is negative when volume control is deposit based"
 
     def close_active_pos(self, price, time, hist_id):
         self.active_position.close(price, time, hist_id)

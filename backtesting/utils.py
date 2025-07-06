@@ -96,8 +96,8 @@ class BackTestResults:
         deposit = bktest_broker.profit_hist.deposit
         if self.deposit is None:
             self.deposit = deposit
-        else:
-            assert self.deposit == deposit, "deposit is not the same"
+        elif bktest_broker.volume_control.rule == VolEstimRule.FIXED_POS_COST:
+            self.deposit += deposit - bktest_broker.wallet
 
         self.leverage = bktest_broker.profit_hist.leverage
 
