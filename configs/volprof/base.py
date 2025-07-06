@@ -38,7 +38,7 @@ config = dict(
     wallet=1000,
     volume_control=dict(
         type=VolumeControl,
-        rule=VolEstimRule.DEPOSIT_BASED,
+        rule=VolEstimRule.FIXED_POS_COST,
         deposit_fraction=1,
     ),
     leverage=1,
@@ -65,18 +65,18 @@ config = dict(
 backtest = update_config(
     config,
     conftype=ConfigType.BACKTEST,
-    date_start=np.datetime64("2022-01-01T00:00:00"),
-    date_end=np.datetime64("2025-07-01T00:00:00"),
+    date_start=np.datetime64("2025-07-01T00:00:00"),
+    date_end=np.datetime64("2025-07-06T00:00:00"),
     eval_buyhold=False,
     clear_logs=True,
-    log_trades=False,
+    log_trades=True,
 )
 
 optimization = update_config(
     config,
     conftype=ConfigType.OPTIMIZE,
-    date_start=np.datetime64("2022-01-01T00:00:00"),
-    date_end=np.datetime64("2025-05-01T00:00:00"),
+    date_start=np.datetime64("2025-07-01T00:00:00"),
+    date_end=np.datetime64("2025-07-06T00:00:00"),
     clear_logs=False,
     log_trades=False,
     eval_buyhold=False,
@@ -91,7 +91,7 @@ optimization = update_config(
 
 bybit = update_config(
     config,
-    leverage=2,
+    leverage=1,
     conftype=ConfigType.BYBIT,
     credentials="bybit_volprof",
     clear_logs=False,
