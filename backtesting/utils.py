@@ -188,31 +188,41 @@ class BackTestResults:
         self.fig.axes[0].plot(days, values, linewidth=linewidth, color=color, alpha=alpha)
         self.legend_ax1.append(name)
 
-    def add_from_other_results(self, btest_results: "BackTestResults", color: str, linewidth: float = 1, alpha: float = 0.5):
-        self.add_profit_curve(btest_results.daily_hist.index, btest_results.relative2deposit(btest_results.daily_hist["profit_csum"]), 
+    def add_from_other_results(self, btest_results: "BackTestResults", color: str, linewidth: float = 1, alpha: float = 0.5, use_relative: bool = True):
+        data = btest_results.relative2deposit(btest_results.daily_hist["profit_csum"]) if use_relative else btest_results.daily_hist["profit_csum"]
+        self.add_profit_curve(btest_results.daily_hist.index, data, 
                               btest_results.tickers_set, color, linewidth, alpha)
 
-    def plot_validation(self, title: Optional[str] = None, y_label="Fin result, %"):
+    def plot_validation(self, title: Optional[str] = None, y_label="Fin result, %", use_relative: bool = True):
         self.fig, ax1 = plt.subplots(1, 1, figsize=(10, 5))
 
         if title:
             self.fig.suptitle(title, fontsize=16)
             self.fig.subplots_adjust(top=0.9)
 
-        ax1.set_ylabel(y_label)
+        if use_relative and y_label == "Fin result, %":
+            ax1.set_ylabel("Fin result, %")
+        else:
+            ax1.set_ylabel(y_label)
 
 
-    def plot_results(self, title: Optional[str] = None, plot_profit_without_fees: bool = True):
+    def plot_results(self, title: Optional[str] = None, plot_profit_without_fees: bool = True, use_relative: bool = True):
         self.fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(8, 8), gridspec_kw={'height_ratios': [3, 1, 1, 1]})
         
         if title:
             self.fig.suptitle(title, fontsize=16)
             self.fig.subplots_adjust(top=0.9)
         
-        ax1.set_ylabel("fin result, %")
-        ax2.set_ylabel("position cost, %")
-        ax3.set_ylabel("deposit, %")
-        ax4.set_ylabel("monthly profit, %")
+        if use_relative:
+            ax1.set_ylabel("fin result, %")
+            ax2.set_ylabel("position cost, %")
+            ax3.set_ylabel("deposit, %")
+            ax4.set_ylabel("monthly profit, %")
+        else:
+            ax1.set_ylabel("fin result")
+            ax2.set_ylabel("position cost")
+            ax3.set_ylabel("deposit")
+            ax4.set_ylabel("monthly profit")
 
         # Add vertical grid lines to all subplots
         for ax in [ax1, ax2, ax3, ax4]:
@@ -225,21 +235,25 @@ class BackTestResults:
 
         # -------------------------------------------
 
+        # Helper function to apply relative conversion if needed
+        def apply_relative(data):
+            return self.relative2deposit(data) if use_relative else data
+
         self.add_profit_curve(self.daily_hist.index,
-                              self.relative2deposit(self.daily_hist["profit_csum"]), 
+                              apply_relative(self.daily_hist["profit_csum"]),
                               self.tickers_set,
                               color="b",
                               linewidth=3,
                               alpha=0.5)
         self.add_profit_curve(self.daily_hist.index,
-                              self.relative2deposit(self.daily_hist["realized_pnl_withfees"]), 
+                              apply_relative(self.daily_hist["realized_pnl_withfees"]),
                               self.tickers_set,
                               color="r",
                               linewidth=3,
                               alpha=0.5)
         if plot_profit_without_fees:
             self.add_profit_curve(self.daily_hist.index,
-                                  self.relative2deposit(self.daily_hist["profit_csum_nofees"]),
+                                  apply_relative(self.daily_hist["profit_csum_nofees"]),
                                   f"{self.tickers_set } without fees",
                                   color="b",
                                   linewidth=1,
@@ -247,27 +261,28 @@ class BackTestResults:
 
         # Plot max ATH period
         ax1.plot([self.metrics.max_period_start, self.metrics.max_period_end],
-                 [self.relative2deposit(self.metrics.price_at_max_period)]*2,
+                 [apply_relative(self.metrics.price_at_max_period)]*2,
                  color="r", linewidth=2, alpha=0.5, linestyle="--")
         ax1.text(self.metrics.max_period_start,
-                 self.relative2deposit(self.metrics.price_at_max_period + self.fig.axes[0].get_ylim()[1] * 0.01),
+                 apply_relative(self.metrics.price_at_max_period + self.fig.axes[0].get_ylim()[1] * 0.01),
                  f"{self.metrics.max_period:.0f} days",
                  color="r",
                  fontsize=12)
 
         ax2.plot(
             self.daily_hist.index,
-            self.relative2deposit(self.daily_hist["pos_cost"]),
+            apply_relative(self.daily_hist["pos_cost"]),
             "-",
             linewidth=3,
             alpha=0.3,
         )
-        ax2.set_ylim(0, 100*self.leverage)
+        if use_relative:
+            ax2.set_ylim(0, 100*self.leverage)
 
         assert "deposit" in self.daily_hist.columns, "deposit column must be in daily_hist, do eval_daily_metrics before plotting"
         ax3.plot(
             self.daily_hist.index,
-            self.relative2deposit(self.daily_hist["deposit"]),
+            apply_relative(self.daily_hist["deposit"]),
             "-",
             linewidth=3,
             alpha=0.3,
@@ -275,7 +290,7 @@ class BackTestResults:
 
         ax4.bar(
             self.monthly_hist.index,
-            self.relative2deposit(self.monthly_hist["finres"]),
+            apply_relative(self.monthly_hist["finres"]),
             width=20,
             color="g",
             alpha=0.6,
@@ -332,7 +347,7 @@ class BackTestResults:
             return 0.0
         return self.daily_hist["fees_csum"].iloc[-1]
         
-    def print_results(self, cfg: Optional[dict] = None, expert_name: Optional[str] = None) -> None:
+    def print_results(self, cfg: Optional[dict] = None, expert_name: Optional[str] = None, use_relative: bool = True) -> None:
         """Print formatted backtest results to the log."""
         
         def sformat(nd): return "{:>30}: {:>5.@f}".replace("@", str(nd))
@@ -342,10 +357,18 @@ class BackTestResults:
             print(f"{cfg['symbol'].ticker}-{cfg['period']}-{cfg['hist_size']}: {expert_name}")
 
         print("-" * 40)
-        print(sformat(0).format("APR", self.APR) + f" %")
+        
+        # Helper function to apply relative conversion if needed
+        def apply_relative(value):
+            return self.relative2deposit(value) if use_relative else value
+        
+        def get_unit_suffix():
+            return " %" if use_relative else ""
+        
+        print(sformat(0).format("APR", self.APR) + get_unit_suffix())
         print(
-            sformat(0).format("FINAL PROFIT", self.final_profit_rel)
-            + f" %"
+            sformat(0).format("FINAL PROFIT", self.final_profit_rel if use_relative else self.final_profit)
+            + get_unit_suffix()
             + f" ({self.fees/(self.final_profit + 1e-6)*100:.1f}% fees)"
         )
         print(
@@ -353,7 +376,7 @@ class BackTestResults:
             + f"   ({self.ndeals} total)"
         )
         print(sformat(0).format(
-            "MAXLOSS", self.relative2deposit(self.metrics.max_drawdown)) + " %")
+            "MAXLOSS", apply_relative(self.metrics.max_drawdown)) + get_unit_suffix())
         print(sformat(0).format(
             "RECOVRY FACTOR", self.metrics.recovery_factor))
         print(sformat(0).format(
