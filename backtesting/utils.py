@@ -14,9 +14,9 @@ from common.type import VolEstimRule, to_datetime
 
 
 class Metrics:
-    def __init__(self, dates, profit_curve):
+    def __init__(self, dates, profit_curve, realized_pnl_withfees):
         # Calculate running maximum (all-time high) of profit_curve
-        self.ath_curve = np.maximum.accumulate(profit_curve)
+        self.ath_curve = np.maximum.accumulate(realized_pnl_withfees)
         
         max_period, price_at_max_period = 0, 0
         max_period_start = dates[0]
@@ -49,7 +49,7 @@ class Metrics:
         self.max_period_start = max_period_start
         self.max_period_end = max_period_end
         
-        self.drawdown_curve = self.ath_curve - profit_curve
+        self.drawdown_curve = self.ath_curve - np.minimum(profit_curve, realized_pnl_withfees)
         self.max_drawdown = np.max(self.drawdown_curve)
         self.recovery_factor = profit_curve[-1] / self.max_drawdown if self.max_drawdown > 0 else -1
 
@@ -165,7 +165,8 @@ class BackTestResults:
     def eval_daily_metrics(self):
         self.metrics = Metrics(
             self.daily_hist.index,
-            self.daily_hist["profit_csum"].values
+            self.daily_hist["profit_csum"].values,
+            self.daily_hist["realized_pnl_withfees"].values,
         )
         self.daily_hist["deposit"] = self.deposit - self.metrics.drawdown_curve
 
@@ -224,10 +225,16 @@ class BackTestResults:
 
         # -------------------------------------------
 
-        self.add_profit_curve(self.daily_hist.index, 
+        self.add_profit_curve(self.daily_hist.index,
                               self.relative2deposit(self.daily_hist["profit_csum"]), 
                               self.tickers_set,
                               color="b",
+                              linewidth=3,
+                              alpha=0.5)
+        self.add_profit_curve(self.daily_hist.index,
+                              self.relative2deposit(self.daily_hist["realized_pnl_withfees"]), 
+                              self.tickers_set,
+                              color="r",
                               linewidth=3,
                               alpha=0.5)
         if plot_profit_without_fees:

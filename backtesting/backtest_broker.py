@@ -50,17 +50,19 @@ class TradeHistory:
 
             # Append current cumulative profit to the profit curve
             self.profit_hist["dates"].append(cur_time)
+            self.profit_hist["realized_pnl"].append(self.cumulative_profit)
             self.profit_hist["profit_csum_nofees"].append(self.cumulative_profit + active_profit)
             self.profit_hist["fees_csum"].append(self.cumulative_fees)
             self.profit_hist["pos_size"].append(active_volume)
             self.profit_hist["pos_cost"].append(active_cost)
             self.profit_hist["max_profit"].append(max_profit)
-            self.profit_hist["loss"].append(self.cumulative_profit + active_profit - self.cumulative_fees - max_profit)
 
         self.profit_hist = pd.DataFrame(self.profit_hist)
         if not self.profit_hist.empty:
             self.profit_hist["dates"] = to_datetime(self.profit_hist["dates"])
             self.profit_hist["profit_csum"] = self.profit_hist["profit_csum_nofees"] - self.profit_hist["fees_csum"]
+            self.profit_hist["realized_pnl_withfees"] = self.profit_hist["realized_pnl"] - self.profit_hist["fees_csum"]
+            self.profit_hist["loss"] = self.profit_hist["realized_pnl_withfees"] - self.profit_hist["max_profit"]
 
     def add_info(self, wallet: float, volume_control: VolumeControl, leverage: float):
         self.leverage = leverage
@@ -163,7 +165,6 @@ class Broker:
         deposit = self.deposit
         if self.active_position is not None:
             deposit += self.active_position.unrealized_pnl(self.open_price)
-        print(deposit)
         return deposit
 
     def update_deposit(self):
