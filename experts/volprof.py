@@ -1,5 +1,4 @@
 from enum import Enum
-from pathlib import PosixPath
 from typing import Any
 
 import numpy as np
@@ -75,20 +74,18 @@ class VolProf(DecisionMaker):
         max_vol_id = self.indicator.vol_hist.argmax()
 
         if self.indicator.vol_hist[max_vol_id] / self.indicator.vol_hist.mean() > self.sharpness:
-            self.lprice, self.sprice = self._find_prices_manual_levels(max_vol_id)     
+            self.lprice, self.sprice = self._find_prices_manual_levels(max_vol_id)
             if self.lprice is not None and self.sprice is not None:
                 logger.debug(f"NEW entry points: long: {self.lprice:.2f}, short: {self.sprice:.2f}")
                 self.sl_definer[Side.BUY] = self.sprice#min(self.sprice, h["Low"][-2])
                 self.sl_definer[Side.SELL] = self.lprice#max(self.lprice, h["High"][-2])
                 self.set_draw_objects(h["Date"][-2])
                 self.draw_items += self.indicator.vis_objects
+                
         strike = h["Close"][-2] - h["Open"][-2]
         max_body = max(np.maximum(h["Open"][:-2], h["Close"][:-2]) - np.minimum(h["Open"][:-2], h["Close"][:-2]))
         logger.debug(f"check condition curr. body ({abs(strike):.2f}) > max. body ({max_body:.3f})")
         if abs(strike) > max_body:
-       
-
-
             if self.lprice is not None:
                 if strike > 0 and h["Close"][-2] > self.sprice:
                     order_side = Side.BUY

@@ -239,16 +239,16 @@ class BackTestResults:
         def apply_relative(data):
             return self.relative2deposit(data) if use_relative else data
 
-        self.add_profit_curve(self.daily_hist.index,
-                              apply_relative(self.daily_hist["profit_csum"]),
-                              self.tickers_set,
-                              color="b",
-                              linewidth=3,
-                              alpha=0.5)
+        # self.add_profit_curve(self.daily_hist.index,
+        #                       apply_relative(self.daily_hist["profit_csum"]),
+        #                       self.tickers_set,
+        #                       color="b",
+        #                       linewidth=3,
+        #                       alpha=0.5)
         self.add_profit_curve(self.daily_hist.index,
                               apply_relative(self.daily_hist["realized_pnl_withfees"]),
                               self.tickers_set,
-                              color="r",
+                              color="b",
                               linewidth=3,
                               alpha=0.5)
         if plot_profit_without_fees:

@@ -103,8 +103,8 @@ def launch(cfg) -> BackTestResults:
     backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
     bt_res = backtest_trading.postprocess()
 
-    bt_res.print_results(cfg, backtest_trading.exp)
-    bt_res.plot_results()
+    bt_res.print_results(cfg, backtest_trading.exp, use_relative=False)
+    bt_res.plot_results(use_relative=False)
     bt_res.save_fig()
 
     return bt_res
