@@ -182,10 +182,10 @@ class BybitTrading(BaseTradeClass):
                     end=t.astype("datetime64[ms]").astype(int),
                     limit=self.hist_size
                 )
+                data = get_bybit_hist(message["result"])
             except Exception as e:
                 logger.error(f"Error getting history data: {e}")
                 sleep(1)
-            data = get_bybit_hist(message["result"])
         return data
 
     def wait_until_next_update(self, next_update_time):
