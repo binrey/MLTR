@@ -18,28 +18,32 @@ class TradeHistory:
         self.mw.size = 1
         self.profit_hist = defaultdict(list)
         self.leverage = 1
+        self.positions = positions
 
-        self.posdict_open: Dict[np.datetime64, Position] = {pos.open_date.astype("datetime64[m]"): pos for pos in positions}
-        self.posdict_closed: Dict[np.datetime64, Position] = {pos.close_date.astype("datetime64[m]"): pos for pos in positions}
+        self.posdict_open: Dict[np.datetime64, int] = {pos.open_date.astype("datetime64[m]"): i for i, pos in enumerate(positions)}
+        self.posdict_closed: Dict[np.datetime64, int] = {pos.close_date.astype("datetime64[m]"): i for i, pos in enumerate(positions)}
         self.cumulative_profit = 0
         self.cumulative_fees = 0
         active_position, max_profit = None, 0
         self.deposit, self.max_loss = None, None
         self.wallet = 0
         self.volume_control = None
+        self.date_start = self.mw.date_start
+        self.date_end = self.mw.date_end
 
         for self.hist_window, _ in tqdm(self.mw(), desc="Build profit curve", total=self.mw.timesteps_count, disable=True):
             cur_time = self.hist_window["Date"][-1]
-            closed_position: Optional[Position] = self.posdict_closed.get(cur_time, None)
+            closed_position_id: Optional[int] = self.posdict_closed.get(cur_time, None)
             last_price = self.hist_window["Open"][-1]
 
-            if closed_position is not None:
+            if closed_position_id is not None:
+                closed_position = self.positions[closed_position_id]
                 self.cumulative_profit += closed_position.profit_abs
                 self.cumulative_fees += closed_position.fees_abs
                 active_position = None
 
             if self.posdict_open.get(cur_time, None) is not None:
-                active_position = self.posdict_open[cur_time]
+                active_position = self.positions[self.posdict_open[cur_time]]
 
             # If an active position exists, add its unrealized profit
             active_profit, active_volume, active_cost = 0, 0, 0

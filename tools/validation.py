@@ -157,7 +157,7 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
     backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
 
     val_res = BackTestResults()
-    val_res.add(backtest_trading.session.profit_hist, backtest_trading.session.positions)
+    val_res.add(backtest_trading.session.profit_hist)
 
     positions_real = process_real_log_dir(log_dir)
     profit_hist_real = TradeHistory(backtest_trading.session.mw, positions_real).df
@@ -168,9 +168,6 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
 
     val_res.save_fig()
     return backtest_trading.session.positions, positions_real
-
-
-
 
 
 if __name__ == "__main__":

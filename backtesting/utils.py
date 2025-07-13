@@ -2,15 +2,16 @@
 # export QT_QPA_PLATFORM=offscreen
 
 
-from typing import Optional
+from typing import List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from loguru import logger
 
-from backtesting.backtest_broker import Broker
+from backtesting.backtest_broker import Broker, TradeHistory
 from common.type import VolEstimRule, to_datetime
+from trade.utils import Position
 
 
 class Metrics:
@@ -87,21 +88,21 @@ class BackTestResults:
     def process(self):
         self.eval_daily_metrics()
 
-    def add(self, bktest_broker: Broker):
-        positions = bktest_broker.positions
+    def add(self, profit_hist: TradeHistory, positions: Optional[List[Position]] = None):
+        positions = [] if positions is None else positions
         self.ndeals += len(positions)
         self.tickers.update([pos.ticker for pos in positions])
         self.positions.extend(positions)
 
-        deposit = bktest_broker.profit_hist.deposit
+        deposit = profit_hist.deposit
         if self.deposit is None:
             self.deposit = deposit
-        elif bktest_broker.volume_control.rule == VolEstimRule.FIXED_POS_COST:
-            self.deposit += deposit - bktest_broker.wallet
+        elif profit_hist.volume_control.rule == VolEstimRule.FIXED_POS_COST:
+            self.deposit += deposit - profit_hist.wallet
 
-        self.leverage = bktest_broker.profit_hist.leverage
+        self.leverage = profit_hist.leverage
 
-        daily_hist, monthly_hist = self.process_profit_hist(bktest_broker.profit_hist.df)
+        daily_hist, monthly_hist = self.process_profit_hist(profit_hist.df)
         
         if self.daily_hist.empty:
             self.daily_hist = daily_hist

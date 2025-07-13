@@ -88,7 +88,7 @@ class BackTest(BaseTradeClass):
 
     def postprocess(self) -> BackTestResults:
         bt_res = BackTestResults()
-        bt_res.add(self.session.profit_hist, self.session.positions)
+        bt_res.add(self.session.profit_hist)
         bt_res.eval_daily_metrics()
         if bt_res.ndeals == 0:
             logger.warning("No trades!")
@@ -120,11 +120,11 @@ def launch_multirun(cfgs: list[dict]) -> BackTestResults:
         backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
         
         bt_res = BackTestResults()
-        bt_res.add(deepcopy(backtest_trading.session.profit_hist), backtest_trading.session.positions)
+        bt_res.add(deepcopy(backtest_trading.session.profit_hist))
         bt_res.eval_daily_metrics()
         bt_res.print_results()
         bt_res_composition.append(bt_res)
-        bt_res_combined.add(backtest_trading.session.profit_hist, backtest_trading.session.positions)
+        bt_res_combined.add(backtest_trading.session.profit_hist)
         
     bt_res_combined.eval_daily_metrics()
     bt_res_combined.print_results()
