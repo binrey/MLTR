@@ -25,6 +25,8 @@ class TradeHistory:
         self.cumulative_fees = 0
         active_position, max_profit = None, 0
         self.deposit, self.max_loss = None, None
+        self.wallet = 0
+        self.volume_control = None
 
         for self.hist_window, _ in tqdm(self.mw(), desc="Build profit curve", total=self.mw.timesteps_count, disable=True):
             cur_time = self.hist_window["Date"][-1]
@@ -65,8 +67,12 @@ class TradeHistory:
             self.profit_hist["loss"] = self.profit_hist["realized_pnl_withfees"] - self.profit_hist["max_profit"]
 
     def add_info(self, wallet: float, volume_control: VolumeControl, leverage: float):
+        self.wallet = wallet
         self.leverage = leverage
+        self.volume_control = volume_control
         self.max_loss = max(self.profit_hist["loss"].abs())
+        
+        # Correct deposit for volume control rule
         if volume_control.rule == VolEstimRule.DEPOSIT_BASED:
             self.deposit = max(wallet, self.max_loss)
         elif volume_control.rule == VolEstimRule.FIXED_POS_COST:
