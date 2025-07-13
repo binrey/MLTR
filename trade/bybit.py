@@ -188,7 +188,8 @@ class BybitTrading(BaseTradeClass):
                 sleep(1)
         return data
 
-    def wait_until_next_update(self, next_update_time):
+    def wait_until_next_update(self):
+        next_update_time = self.time.curr + np.timedelta64(self.period.minutes, "m")
         total_seconds = self.period.to_timedelta().astype(int)*60
         remaining_seconds = (next_update_time - self.get_server_time()).astype(int)
         while remaining_seconds > 0:
@@ -264,8 +265,6 @@ def launch(cfg, demo=False, clear_position=False):
 
     print()
     while True:
-        bybit_trading.handle_trade_message(None)
-        time_step_curr = bybit_trading.time.curr
-        time_step_next = time_step_curr + np.timedelta64(bybit_trading.period.minutes, "m")
-        bybit_trading.wait_until_next_update(time_step_next)
+        bybit_trading.handle_trade_message()
+        bybit_trading.wait_until_next_update()
     

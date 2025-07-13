@@ -103,6 +103,8 @@ class Broker:
         self.cumulative_fees = 0
         self.mw = MovingWindow(cfg) if init_moving_window else None
         self.deposit = self.wallet if self.volume_control.rule == VolEstimRule.DEPOSIT_BASED else 0
+        
+        self.hist_window = None
 
     @property
     def profits(self):
@@ -118,14 +120,14 @@ class Broker:
 
     # @profile_function
     def trade_stream(self, callback):
-        for self.hist_window, dt in tqdm(self.mw(), desc="Backtest", total=self.mw.timesteps_count, disable=False):
+        for self.hist_window, _ in tqdm(self.mw(), desc="Backtest", total=self.mw.timesteps_count, disable=False):
             self.time = self.hist_window["Date"][-1]
             self.hist_id = self.hist_window["Id"][-1]
             self.open_price = self.hist_window["Open"][-1]
 
             closed_position = self.update()
             # Run expert and update active orders
-            callback({"timestamp": self.time})  # TODO remove time
+            callback()
             closed_position_new = self.update(check_sl_tp=False)
             if closed_position is None:
                 if closed_position_new is not None:

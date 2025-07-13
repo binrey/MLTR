@@ -237,7 +237,7 @@ class BaseTradeClass(ABC):
             pickle.dump(existing_config, f)
         logger.debug(f"Config updated at {self.config_path}")
 
-    def handle_trade_message(self, message):
+    def handle_trade_message(self):
         server_time = self.get_server_time()
         self.time.update(self.get_rounded_time(server_time))
         logger.debug(f"\n> {date2str(server_time, 'ms')} -----------------------------")
