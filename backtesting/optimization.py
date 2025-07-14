@@ -180,7 +180,7 @@ class Optimizer:
             if len(cfg['symbol']) == 1:
                 symbol_ticker = cfg['symbol'][0].ticker
             else:
-                raise ValueError("Multiple symbols are not supported yet")
+                symbol_ticker = ""
         else:
             symbol_ticker = cfg['symbol'].ticker
         return self.cache_dir / decision_maker_type / symbol_ticker
@@ -242,14 +242,12 @@ class Optimizer:
         # Validate dates
         self._validate_backtest_dates()
         # Find best multistrategy
-        multistrategy_test = self.find_best_multistrategy(num_backtests=3)
+        multistrategy_test = self.find_best_multistrategy(num_backtests=4)
         # Generate optimization summary
         opt_summary = self._generate_optimization_summary()
 
         # Save and plot results
         # self._plot_optimization_results(opt_summary, symbol, period)
-
-
 
         return self.OptimizationResults(score_name=self.sortby,
                                         opt_summary=opt_summary,
@@ -357,7 +355,7 @@ class Optimizer:
             btest = BackTestResults()
             btest.add(trade_history)
             btest.eval_daily_metrics()
-            aprs[i] = btest.APR
+            aprs[i] = btest.metrics.recovery_factor
         sorted_btest_ids = sorted(aprs, key=lambda x: aprs[x], reverse=True)
         best_setup, btest_selected, best_apr = [], sorted_btest_ids[0], aprs[sorted_btest_ids[0]]
         
@@ -374,21 +372,24 @@ class Optimizer:
                     trade_hist = self.bt_results[btest_id]
                     multistrategy_test.add(trade_hist, same_deposit=False)
                 multistrategy_test.eval_daily_metrics()
-                print(btest2add, multistrategy_test.APR)
-                if multistrategy_test.APR > best_apr:
-                    best_apr = multistrategy_test.APR
+                
+                if multistrategy_test.metrics.recovery_factor > best_apr:
+                    best_apr = multistrategy_test.metrics.recovery_factor
                     btest_selected = btest2add
-                    print(f"new best apr: {best_apr}")
+                    print(f"+ {btest2add}: {multistrategy_test.tickers_set} {multistrategy_test.metrics.recovery_factor}")
             if btest_selected is None:
                 break
                     
-                    
-        multistrategy_test.process()
-        multistrategy_test.eval_daily_metrics()
-        multistrategy_test.print_results()
-        multistrategy_test.plot_results()
-        multistrategy_test.save_fig()
-        return multistrategy_test
+        print(best_setup)
+        multistrategy_best = BackTestResults()          
+        for btest_id in best_setup:
+            trade_hist = self.bt_results[btest_id]
+            multistrategy_best.add(trade_hist, same_deposit=False)
+        multistrategy_best.eval_daily_metrics()
+        multistrategy_best.print_results()
+        multistrategy_best.plot_results()
+        multistrategy_best.save_fig()
+        return multistrategy_best
 
     def _plot_optimization_results(self, symbol: Symbol, period) -> None:
         if self.opt_summary is None:
