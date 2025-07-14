@@ -88,8 +88,8 @@ class BackTestResults:
     def process(self):
         self.eval_daily_metrics()
 
-    def add(self, profit_hist: TradeHistory, positions: Optional[List[Position]] = None):
-        positions = [] if positions is None else positions
+    def add(self, profit_hist: TradeHistory, same_deposit: bool = True):
+        positions = profit_hist.positions
         self.ndeals += len(positions)
         self.tickers.update([pos.ticker for pos in positions])
         self.positions.extend(positions)
@@ -97,8 +97,11 @@ class BackTestResults:
         deposit = profit_hist.deposit
         if self.deposit is None:
             self.deposit = deposit
-        elif profit_hist.volume_control.rule == VolEstimRule.FIXED_POS_COST:
-            self.deposit += deposit - profit_hist.wallet
+        else:
+            if not same_deposit:
+                self.deposit += deposit
+            elif profit_hist.volume_control.rule == VolEstimRule.FIXED_POS_COST:
+                self.deposit += deposit - profit_hist.wallet
 
         self.leverage = profit_hist.leverage
 
@@ -139,10 +142,12 @@ class BackTestResults:
             self.monthly_hist = self_monthly_reindexed.add(monthly_hist_reindexed, fill_value=0)            
 
     def process_profit_hist(self, profit_hist: pd.DataFrame):
-        assert "dates" in profit_hist.columns, "profit_hist must have 'dates' column"
         if profit_hist.shape[0] == 0:
             return pd.DataFrame(), pd.DataFrame()
-        profit_hist.set_index("dates", inplace=True)
+        if "dates" in profit_hist.columns:
+            profit_hist.set_index("dates", inplace=True)
+        elif profit_hist.index.name != "dates":
+            "profit_hist must have 'dates' column or dates in index"
         daily_hist = self.resample_hist(profit_hist, "D", func="last")
         daily_hist["profit_csum"] = daily_hist["profit_csum_nofees"] - daily_hist["fees_csum"]
         daily_hist["finres"] = daily_hist["profit_csum"].diff().fillna(0)

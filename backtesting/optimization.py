@@ -10,17 +10,20 @@ from pathlib import Path
 from shutil import rmtree
 from time import time
 from typing import Any, Dict, List, Tuple
-from tqdm import tqdm
 
 import numpy as np
 import pandas as pd
 from loguru import logger
 from matplotlib import pyplot as plt
 from tabulate import tabulate
+from tqdm import tqdm
 
+from backtesting.backtest_broker import TradeHistory
 from backtesting.utils import BackTestResults, Metrics
 from common.type import Symbol
 from common.utils import date2str
+from data_processing import PULLERS
+from trade.backtest import BackTest
 from trade.backtest import launch as backtest_launch
 from trade.utils import Position
 
@@ -161,7 +164,7 @@ class Optimizer:
         self.sortby = sortby
         self.cfg = optim_cfg
         self.cfgs = []
-        self.btests: List[BackTestResults] = []
+        self.bt_results: List[TradeHistory] = []
 
     def _get_cache_subdir(self, cfg):
         """Get the appropriate cache subdirectory for a configuration."""
@@ -191,7 +194,11 @@ class Optimizer:
         logger.debug(f"start backtest {num}: {cfg}")
         locnum = 0
         while True:
-            btest = backtest_launch(cfg)
+            PULLERS["bybit"](**cfg)
+            backtest_trading = BackTest(cfg)
+            backtest_trading.initialize()
+            backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
+            # bt_res = backtest_trading.postprocess()
             locnum += 1
 
             # Create cache subdirectory
@@ -202,7 +209,7 @@ class Optimizer:
             cache_file = cache_subdir / \
                 f"btest.{num + locnum/100:05.2f}.pickle"
             with open(cache_file, "wb") as f:
-                pickle.dump((cfg, btest), f)
+                pickle.dump((cfg, backtest_trading.session.profit_hist), f)
             break
 
     def pool_handler(self, optim_cfg):
@@ -221,30 +228,33 @@ class Optimizer:
 
         cfgs = [(i, cfg) for i, cfg in enumerate(cfgs)]
         p = Pool(ncpu)
-        return p.map(self.backtest_process, cfgs,)
+        return p.map(self.backtest_process, cfgs)
 
     def optimize(self, optim_cfg) -> OptimizationResults:
         symbol = optim_cfg["symbol"]
         # results_dir = self.results_dir / f"{symbol.value}"
 
         # Load and validate results
-        self.cfgs, self.btests = self._load_backtest_results(optim_cfg)
+        self.cfgs, self.bt_results = self._load_backtest_results(optim_cfg)
         if not self.cfgs:
             raise ValueError(f"No backtest results found for {symbol.ticker}")
 
         # Validate dates
         self._validate_backtest_dates()
-
+        # Find best multistrategy
+        multistrategy_test = self.find_best_multistrategy(num_backtests=3)
         # Generate optimization summary
         opt_summary = self._generate_optimization_summary()
 
         # Save and plot results
         # self._plot_optimization_results(opt_summary, symbol, period)
 
+
+
         return self.OptimizationResults(score_name=self.sortby,
                                         opt_summary=opt_summary,
                                         configs_by_run=self.cfgs,
-                                        positions_by_run=self.btests)
+                                        positions_by_run=self.bt_results)
 
     def run_backtests(self) -> None:
         """
@@ -272,9 +282,9 @@ class Optimizer:
         for p in tqdm(pickle_files, desc="Loading backtest results"):
             try:
                 with open(p, "rb") as f:
-                    cfg, btest = pickle.load(f)
+                    cfg, trade_history = pickle.load(f)
                 cfgs.append(cfg)
-                btests.append(btest)
+                btests.append(trade_history)
             except (pickle.UnpicklingError, EOFError, IOError) as e:
                 logger.warning(f"Failed to load cache file {p}: {e}")
                 continue
@@ -283,7 +293,7 @@ class Optimizer:
 
     def _validate_backtest_dates(self) -> None:
         """Validate that all backtests have the same start date."""
-        start_dates = set([btest.date_start for btest in self.btests])
+        start_dates = set([btest.date_start for btest in self.bt_results])
         assert len(start_dates) == 1, f"Inconsistent backtest start dates. \
             Please adjust configuration to start from {date2str(max(start_dates))}"
 
@@ -315,7 +325,10 @@ class Optimizer:
                     opt_summary[k].append(v)
 
         # Add metrics
-        for btest in self.btests:
+        for trade_history in self.bt_results:
+            btest = BackTestResults()
+            btest.add(trade_history)
+            btest.eval_daily_metrics()
             opt_summary["APR"].append(btest.APR)
             opt_summary["final_profit"].append(btest.final_profit)
             opt_summary["ndeals_per_month"].append(btest.ndeals_per_month)
@@ -335,6 +348,48 @@ class Optimizer:
         opt_summary.sort_values(by=["APR"], ascending=False, inplace=True)
         return opt_summary
 
+    def find_best_multistrategy(self, num_backtests: int = 10) -> BackTestResults:
+        """
+        Find the combination of backtests provided best APR.
+        """
+        aprs = {}
+        for i, trade_history in enumerate(self.bt_results):
+            btest = BackTestResults()
+            btest.add(trade_history)
+            btest.eval_daily_metrics()
+            aprs[i] = btest.APR
+        sorted_btest_ids = sorted(aprs, key=lambda x: aprs[x], reverse=True)
+        best_setup, btest_selected, best_apr = [], sorted_btest_ids[0], aprs[sorted_btest_ids[0]]
+        
+        for adding_iter in range(1, num_backtests):
+            best_setup.append(btest_selected)
+            btest_selected = None
+            print()
+            print(adding_iter, best_setup, best_apr)
+            for btest2add in sorted_btest_ids:
+                if btest2add in best_setup:
+                    continue
+                multistrategy_test = BackTestResults()
+                for btest_id in best_setup + [btest2add]:
+                    trade_hist = self.bt_results[btest_id]
+                    multistrategy_test.add(trade_hist, same_deposit=False)
+                multistrategy_test.eval_daily_metrics()
+                print(btest2add, multistrategy_test.APR)
+                if multistrategy_test.APR > best_apr:
+                    best_apr = multistrategy_test.APR
+                    btest_selected = btest2add
+                    print(f"new best apr: {best_apr}")
+            if btest_selected is None:
+                break
+                    
+                    
+        multistrategy_test.process()
+        multistrategy_test.eval_daily_metrics()
+        multistrategy_test.print_results()
+        multistrategy_test.plot_results()
+        multistrategy_test.save_fig()
+        return multistrategy_test
+
     def _plot_optimization_results(self, symbol: Symbol, period) -> None:
         if self.opt_summary is None:
             self.opt_summary = self._generate_optimization_summary()
@@ -345,18 +400,18 @@ class Optimizer:
         for symbol in set(self.opt_summary["symbol"]):
             opt_summary_for_ticker = self.opt_summary[self.opt_summary["symbol"] == symbol]
             top_runs_ids.append(opt_summary_for_ticker.index[0])
-            sum_daily_profit += self.btests[top_runs_ids[-1]
+            sum_daily_profit += self.bt_results[top_runs_ids[-1]
                                             ].daily_hist["profit_csum"]
             logger.info(f"\n{opt_summary_for_ticker.head(10)}\n")
-            pd.DataFrame(self.btests[top_runs_ids[-1]].daily_hist["profit_csum"]).to_csv(
+            pd.DataFrame(self.bt_results[top_runs_ids[-1]].daily_hist["profit_csum"]).to_csv(
                 f"optimization/{symbol}.{period.value}.top_{self.sortby}_sorted.csv", index=False)
 
         profit_av = (sum_daily_profit / len(top_runs_ids)).values
-        APR_av, maxwait_av = self.btests[top_runs_ids[-1]].metrics_from_profit(profit_av)
+        APR_av, maxwait_av = self.bt_results[top_runs_ids[-1]].metrics_from_profit(profit_av)
         logger.info(
             f"\nAverage of top runs ({', '.join([f'{i}' for i in top_runs_ids])}): APR={APR_av:.2f}, maxwait={maxwait_av:.0f}\n")
         plot_daily_balances_with_av(
-            btests=self.btests,
+            btests=self.bt_results,
             test_ids=top_runs_ids,
             profit_av=profit_av,
             metrics_av=[("APR", APR_av), ("mwait", maxwait_av)]
@@ -387,9 +442,9 @@ class Optimizer:
             sum_daily_profit = 0
             test_ids = list(map(int, opt_res.test_ids.iloc[i].split(".")[1:]))
             for test_id in test_ids:
-                sum_daily_profit += self.btests[test_id].daily_hist["profit_csum"]
+                sum_daily_profit += self.bt_results[test_id].daily_hist["profit_csum"]
             profit_av = sum_daily_profit/len(test_ids)
-            metrics = Metrics(self.btests[0].daily_hist.index, profit_av.values)
+            metrics = Metrics(self.bt_results[0].daily_hist.index, profit_av.values)
             recovery.append(metrics.recovery_factorery)
             maxwait.append(metrics.max_period)
             opt_res["final_balance"].iloc[i] = profit_av.values[-1]
@@ -403,7 +458,7 @@ class Optimizer:
 
         legend = []
         for test_id in range(min(opt_res.shape[0], 5)):
-            plt.plot(self.btests[0].daily_hist.index, balances_av[opt_res.index[test_id]],
+            plt.plot(self.bt_results[0].daily_hist.index, balances_av[opt_res.index[test_id]],
                      linewidth=2 if test_id == 0 else 1)
             row = opt_res.iloc[test_id]
             legend.append(
@@ -417,7 +472,7 @@ class Optimizer:
         # plt.subplot(2, 1, 2)
         i = 0
         test_ids = list(map(int, opt_res.test_ids.iloc[i].split(".")[1:]))
-        plot_daily_balances_with_av(self.btests,
+        plot_daily_balances_with_av(self.bt_results,
                                     test_ids,
                                     balances_av[opt_res.index[i]].values,
                                     metrics_av=[("recovery", opt_res.iloc[i].recovery)])
