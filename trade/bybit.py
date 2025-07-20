@@ -23,7 +23,7 @@ import yaml
 from pybit.unified_trading import HTTP
 
 from experts.core import Expert
-from trade.base import BaseTradeClass, log_get_hist
+from trade.base import BaseTradeClass
 
 stackprinter.set_excepthook(style='color')
 # Если проблемы с отрисовкой графиков

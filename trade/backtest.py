@@ -14,7 +14,7 @@ from backtesting.backtest_broker import Broker
 from backtesting.utils import BackTestResults
 from data_processing import PULLERS
 from experts.core import Expert
-from trade.base import BaseTradeClass, log_get_hist
+from trade.base import BaseTradeClass
 from trade.utils import (
     ORDER_TYPE,
     Order,

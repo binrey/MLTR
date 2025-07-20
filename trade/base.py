@@ -252,11 +252,11 @@ class BaseTradeClass(ABC):
     def handle_trade_message(self):
         self._handle_trade_message()
         for n_attempt in range(5):
-            logger.debug(f"Check data: attempt {n_attempt + 1}/5")
+            logger.debug(f"Check data: attempt {n_attempt + 1}/5, wait 10 sec...")
             sleep(10)
             h4test = self.__get_hist()
             if self.h is not None and h4test["Volume"][-2] != self.h["Volume"][-2]:
-                logger.warning(f"Volume mismatch (new:{h4test['Volume'][-2]} != old:{self.h['Volume'][-2]}) after {n_attempt+1} attempts, reevaluate...")
+                logger.warning(f"Volume mismatch (new:{h4test['Volume'][-2]} != old:{self.h['Volume'][-2]}) after {n_attempt + 1} attempts, reevaluate...")
                 self.h = h4test
                 self.update(get_history=False)
             else:
