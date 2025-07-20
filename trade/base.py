@@ -29,16 +29,6 @@ stackprinter.set_excepthook(style='color')
 # export QT_QPA_PLATFORM=offscreen
 
 
-def log_get_hist(func: Callable[..., Any]) -> Callable[..., Any]:
-    def wrapper(self, *args, **kwargs):
-        result = func(self)
-        if result is not None:
-            logger.debug(
-                f"load: {result['Date'][-1]} | new: {result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}, v:{result['Volume'][-2]}")
-        return result
-    return wrapper
-
-
 @dataclass
 class StepData:
     curr: Position | np.datetime64 | None = None
@@ -124,6 +114,12 @@ class BaseTradeClass(ABC):
     @abstractmethod
     def get_hist(self):
         pass
+
+    def __get_hist(self):
+        result = self.get_hist()
+        logger.debug(
+            f"get data: {result['Date'][-1]} | new: {result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}, v:{result['Volume'][-2]}")
+        return result
 
     @abstractmethod
     def get_pos_history(self) -> list[Position]:
@@ -237,7 +233,7 @@ class BaseTradeClass(ABC):
             pickle.dump(existing_config, f)
         logger.debug(f"Config updated at {self.config_path}")
 
-    def handle_trade_message(self):
+    def _handle_trade_message(self):
         server_time = self.get_server_time()
         self.time.update(self.get_rounded_time(server_time))
         logger.debug(f"\n> {date2str(server_time, 'ms')} -----------------------------")
@@ -247,13 +243,26 @@ class BaseTradeClass(ABC):
 
             msg = f"{self.ticker}-{self.period.value}: {str(self.pos.curr) if self.pos.curr is not None else 'None'}"
             logger.debug(msg)
-            if self.my_telebot is not None:
+            # if self.my_telebot is not None:
                 # process = multiprocessing.Process(target=self.my_telebot.send_text,
                 #                                   args=[msg])
                 # process.start()
-                self.my_telebot.send_text(msg)
-        # else:
-        #     print ("\033[A\033[A")
+                # self.my_telebot.send_text(msg)
+
+    def handle_trade_message(self):
+        self._handle_trade_message()
+        for n_attempt in range(5):
+            logger.debug(f"Check data: attempt {n_attempt + 1}/5")
+            sleep(10)
+            h4test = self.__get_hist()
+            if self.h is not None and h4test["Volume"][-2] != self.h["Volume"][-2]:
+                logger.warning(f"Volume mismatch (new:{h4test['Volume'][-2]} != old:{self.h['Volume'][-2]}) after {n_attempt+1} attempts, reevaluate...")
+                self.h = h4test
+                self.update(get_history=False)
+            else:
+                logger.debug("Got valid data, OK!")
+                break
+
 
         if self.time.prev is None:
             self.log_config({"date_start": self.time.curr, "date_end": None})
@@ -325,19 +334,16 @@ class BaseTradeClass(ABC):
         except Exception as e:
             logger.error(f"Error logging trade: {e}")
 
-    def update(self):
-        self.h = self.get_hist()
+    def update(self, get_history=True):
+        if get_history:
+            self.h = self.__get_hist()
         if self.visualize or self.save_plots:
             self.visualizer.update_hist(self.h)
         self.update_market_state()
 
         if self.pos.created() or self.pos.deleted() or self.pos.changed():
             if self.vis_events == Vis.ON_DEAL:
-                # process = multiprocessing.Process(target=self.vis())
-                # process.start()
                 self.vis()
-                # if self.my_telebot is not None:
-                #     self.my_telebot.send_image(saved_img_path)
 
         if self.pos.deleted() or self.pos.changed_side():
             if self.log_trades:
