@@ -69,7 +69,7 @@ class BybitTrading(BaseTradeClass):
         logger.debug(f"Last pos from bybit: {pos_dict}")
         for n_attempt in range(10):
             if self.to_datetime(pos_dict["updatedTime"]) <= self.pos.curr.open_date:
-                logger.warning(f"Waiting for data base update... {n_attempt+1}/10")
+                logger.warning(f"Waiting for database update... {n_attempt+1}/10")
                 sleep(2)
                 pos_dict, _ = self.get_cur_prev_closed_pos()
             else:
@@ -167,7 +167,6 @@ class BybitTrading(BaseTradeClass):
         logger.debug(f"Parsed bybit position: updatedTime.{date} createdTime.{self.to_datetime(pos['createdTime'])} avgEntryPrice|avgPrice.{price} pnl.{pnl_realized}")
         return ticker, price, volume, sl, side, date, pnl_realized
 
-    @log_get_hist
     def get_hist(self):
         t = self.time.curr
         data = None

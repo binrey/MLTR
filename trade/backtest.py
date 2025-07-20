@@ -62,7 +62,6 @@ class BackTest(BaseTradeClass):
     def get_deposit(self) -> float:
         return self.session.available_deposit
 
-    @log_get_hist
     def get_hist(self):
         return self.session.hist_window
 

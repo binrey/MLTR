@@ -26,12 +26,12 @@ class Random(DecisionMaker):
     def look_around(self, h) -> DecisionMaker.Response:
         order_side, target_volume_fraction = None, 1
 
-        if self.timer < self.time_to_wait:
-            self.timer += 1
-            order_side = None
-        else:
-            order_side = np.random.choice([Side.BUY, Side.SELL, None, None])
-            self.timer = 0
+        # if self.timer < self.time_to_wait:
+        #     self.timer += 1
+        #     order_side = None
+        # else:
+        #     order_side = np.random.choice([Side.BUY, Side.SELL, None, None])
+        #     self.timer = 0
 
         if order_side is not None:
             self.sl_definer[Side.BUY] = h["Low"].min()
