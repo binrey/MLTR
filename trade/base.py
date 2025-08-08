@@ -86,6 +86,7 @@ class BaseTradeClass(ABC):
         self.trades_log_path = self.save_path / "positions"
         self.trades_log_path.mkdir(parents=True, exist_ok=True)
         self.traid_stops_min_size = cfg["traid_stops_min_size"]
+        self.date_start = np.datetime64(datetime.now())
 
         assert self.qty_step == self.get_qty_step()
 
@@ -218,19 +219,17 @@ class BaseTradeClass(ABC):
             "datetime64[m]").astype(int)//self.nmin
         return np.datetime64(int(trounded*self.nmin), "m")
 
-    def log_config(self, cfg):
-        if "date_start" in cfg:
-            config_path = self.save_path / f"config_{date2str(cfg['date_start'], 's')}.pkl"
-        else:
-            config_path = self.save_path / f"config_{date2str(np.datetime64(datetime.now()), 's')}.pkl"
+    def log_config(self, cfg: Optional[dict[str, Any]] = None):
+        config_path = self.save_path / f"config_{date2str(self.date_start, 'm')}.pkl"
+        
         try:
             with open(config_path, 'rb') as f:
                 existing_config = pickle.load(f)
+                if cfg is not None:
+                    existing_config.update(cfg)
         except (FileNotFoundError, EOFError):
-            existing_config = {}
-
-        # Update existing config with new values
-        existing_config.update(cfg)
+            logger.debug(f"No config found at {config_path}, creating new one")
+            existing_config = cfg
 
         with open(config_path, 'wb') as f:
             pickle.dump(existing_config, f)
@@ -266,9 +265,8 @@ class BaseTradeClass(ABC):
                 logger.debug("Got valid data, OK!")
                 break
 
-
         if self.time.prev is None:
-            self.log_config({"date_start": self.time.curr, "date_end": None})
+            self.log_config({"date_start": self.time.curr})
 
     def clear_log_dir(self):
         if self.save_plots:
@@ -358,4 +356,5 @@ class BaseTradeClass(ABC):
         self.exp_update(self.h, self.pos.curr, self.deposit)
         if self.should_save_backup:
             self.save_backup()
+
         self.log_config({"date_end": self.time.curr})
