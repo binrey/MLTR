@@ -50,7 +50,7 @@ config = dict(
     period=TimePeriod.M60,
     symbol=Symbols.BTCUSDT,
     data_type="bybit",
-    fee_rate=FeeRate(0.055, 0.00016),
+    fee_rate=FeeRate(0.1, 0.00016),
     save_backup=False,
     save_plots=False,
     vis_events=Vis.ON_DEAL,
@@ -75,17 +75,18 @@ backtest = update_config(
 optimization = update_config(
     config,
     conftype=ConfigType.OPTIMIZE,
-    date_start=np.datetime64("2025-01-01T00:00:00"),
+    date_start=np.datetime64("2018-01-01T00:00:00"),
     date_end=np.datetime64("2025-07-06T00:00:00"),
     clear_logs=False,
     log_trades=False,
     eval_buyhold=False,
-    hist_size=[32, 64, 128, 256],
+    symbol=[Symbols.BTCUSDT, Symbols.ETHUSDT],
+    hist_size=[64, 128, 256],
     trailing_stop={
-        "rate": [0.03, 0.02, 0.01]
+        "rate": [0.01, 0.02, 0.04]
         },
     decision_maker={
-        "sharpness": [3, 4, 5, 6],
+        "sharpness": [3, 4, 5],
         }
     )
 

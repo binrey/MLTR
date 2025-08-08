@@ -100,23 +100,24 @@ def process_real_log_dir(log_dir: Path):
 
 def process_log_dir(log_dir: Path) -> tuple[list[Position], list[Position]]:
     cfg_files = sorted(list((log_dir).glob("*.pkl")))
-    positions_test, positions_real, cfg2process = [], [], None
+    positions_real = process_real_log_dir(log_dir)
+
+    positions_test, cfg2process = [], None
     for cfg_file in cfg_files + [None]:
         if cfg_file is None:
             cfg_new = {"date_start": np.datetime64("now")}
         else:
+            # Start of the new cfg
             cfg_new = pickle.load(open(cfg_file, "rb"))
         if cfg2process is not None:
-            cfg2process["date_end"] = cfg_new["date_start"]
-            positions_test_, positions_real_ = process_logfile(cfg2process)
-            positions_test.extend(positions_test_)
-            positions_real.extend(positions_real_)
+            positions_test.extend(process_logfile(cfg2process, positions_real))
 
         cfg2process = cfg_new
+    
     return positions_test, positions_real
 
 
-def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]]:
+def process_logfile(cfg: Dict[str, Any], positions_real: list[Position]) -> tuple[list[Position]]:
     date_start = cfg["date_start"]
     date_end = cfg["date_end"]
     # Take into account history size
@@ -126,7 +127,6 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
         f"Pulling data for {SYMBOL.ticker} from {date_start_pull} ({date_start} - {hist_window}) to {date_end}")
     PULLERS[BROKER](SYMBOL, PERIOD, date_start_pull, date_end)
 
-    # Initialize market wallet from log file if available
     log_dir = Path(os.getenv("LOG_DIR")) / BROKER / EXPERT / f"{SYMBOL.ticker}-{PERIOD.value}"
     
     # Try to get market wallet from logs first
@@ -144,8 +144,8 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
         "visualize": False,
         "save_plots": False,
         "handle_trade_errors": False,
-        "wallet": market_wallet,
-        "vis_hist_length": 128,
+        # "wallet": market_wallet,
+        "vis_hist_length": 1024,
     })
 
     logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, cfg["clear_logs"])
@@ -159,7 +159,6 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
     val_res = BackTestResults()
     val_res.add(backtest_trading.session.profit_hist)
 
-    positions_real = process_real_log_dir(log_dir)
     profit_hist_real = TradeHistory(backtest_trading.session.mw, positions_real).df
     assert profit_hist_real.shape[0] > 0, "No real deals in history found"
     val_res.plot_validation(y_label="Fin result")
@@ -167,7 +166,7 @@ def process_logfile(cfg: Dict[str, Any]) -> tuple[list[Position], list[Position]
     val_res.add_profit_curve(profit_hist_real["dates"], backtest_trading.session.profit_hist.df["profit_csum_nofees"], f"{cfg['symbol'].ticker} test", "r", 1, 0.5)
 
     val_res.save_fig()
-    return backtest_trading.session.positions, positions_real
+    return backtest_trading.session.positions
 
 
 if __name__ == "__main__":

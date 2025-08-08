@@ -340,7 +340,7 @@ class BackTestResults:
         deposit = self.wallet + loss_max
         final_profit_rel = profit_curve[-1] / deposit * 100
         return final_profit_rel / self.num_years_on_trade, wait_max
-    
+
     def profits_histogram(self, positions_finresults):
         npos_by_bins, bin_edges = np.histogram(positions_finresults)
         finres_by_bins = (bin_edges[:-1] + bin_edges[1:]) / 2
@@ -352,10 +352,10 @@ class BackTestResults:
         if self.daily_hist is None:
             return 0.0
         return self.daily_hist["fees_csum"].iloc[-1]
-        
+
     def print_results(self, cfg: Optional[dict] = None, expert_name: Optional[str] = None, use_relative: bool = True) -> None:
         """Print formatted backtest results to the log."""
-        
+
         def sformat(nd): return "{:>30}: {:>5.@f}".replace("@", str(nd))
 
         print()
@@ -363,14 +363,14 @@ class BackTestResults:
             print(f"{cfg['symbol'].ticker}-{cfg['period']}-{cfg['hist_size']}: {expert_name}")
 
         print("-" * 40)
-        
+
         # Helper function to apply relative conversion if needed
         def apply_relative(value):
             return self.relative2deposit(value) if use_relative else value
-        
+
         def get_unit_suffix():
             return " %" if use_relative else ""
-        
+
         print(sformat(0).format("APR", self.APR) + get_unit_suffix())
         print(
             sformat(0).format("FINAL PROFIT", self.final_profit_rel if use_relative else self.final_profit)
@@ -383,8 +383,7 @@ class BackTestResults:
         )
         print(sformat(0).format(
             "MAXLOSS", apply_relative(self.metrics.max_drawdown)) + get_unit_suffix())
-        print(sformat(0).format(
+        print(sformat(1).format(
             "RECOVRY FACTOR", self.metrics.recovery_factor))
         print(sformat(0).format(
             "MAXWAIT", self.metrics.max_period) + " days")
-

@@ -81,6 +81,13 @@ class TimePeriod(Enum):
     def to_days(self, value: float):
         return value/self.hours/24
 
+    def round_to_period(self, value: np.datetime64):
+        if self.value == "M60":
+            rounded_value = value.astype("datetime64[h]").astype("datetime64[m]")
+        else:
+            rounded_value = value.astype("datetime64[m]")
+        return rounded_value
+
 class RunType(Enum):
     BACKTEST = "backtest"
     OPTIMIZE = "optimization"

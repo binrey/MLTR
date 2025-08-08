@@ -96,7 +96,6 @@ class BaseTradeClass(ABC):
         self.nmin = self.period.minutes
         self.time = StepData()
         self.exp_update = self.exp.update
-        self.config_path = self.save_path / f"config_{date2str(np.datetime64(datetime.now()), 's')}.pkl"
         self.log_config(cfg)
 
     @abstractmethod
@@ -220,8 +219,12 @@ class BaseTradeClass(ABC):
         return np.datetime64(int(trounded*self.nmin), "m")
 
     def log_config(self, cfg):
+        if "date_start" in cfg:
+            config_path = self.save_path / f"config_{date2str(cfg['date_start'], 's')}.pkl"
+        else:
+            config_path = self.save_path / f"config_{date2str(np.datetime64(datetime.now()), 's')}.pkl"
         try:
-            with open(self.config_path, 'rb') as f:
+            with open(config_path, 'rb') as f:
                 existing_config = pickle.load(f)
         except (FileNotFoundError, EOFError):
             existing_config = {}
@@ -229,9 +232,9 @@ class BaseTradeClass(ABC):
         # Update existing config with new values
         existing_config.update(cfg)
 
-        with open(self.config_path, 'wb') as f:
+        with open(config_path, 'wb') as f:
             pickle.dump(existing_config, f)
-        logger.debug(f"Config updated at {self.config_path}")
+        logger.debug(f"Config updated at {config_path}")
 
     def _handle_trade_message(self):
         server_time = self.get_server_time()
@@ -355,3 +358,4 @@ class BaseTradeClass(ABC):
         self.exp_update(self.h, self.pos.curr, self.deposit)
         if self.should_save_backup:
             self.save_backup()
+        self.log_config({"date_end": self.time.curr})
