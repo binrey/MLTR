@@ -56,6 +56,69 @@ class StepData:
         return self.curr is None and self.prev is not None
 
 
+class ConfigLogger:
+    """
+    A class to handle configuration logging operations including saving, loading, and updating configs.
+    """
+    
+    def __init__(self, save_path: Path, date_start: Optional[np.datetime64] = None, cfg: Optional[dict[str, Any]] = None):
+        """
+        Initialize ConfigLogger with the save path and optional start date.
+        
+        Args:
+            save_path: Path where config files will be saved
+            date_start: Start date for the config filename. If None, will be set when log_config is called
+        """
+        self.config_path = save_path / f"config_{date2str(date_start, 'm')}.pkl"
+        self.cfg = cfg if cfg is not None else {}
+    
+    def log_config(self) -> None:
+        """
+        Log configuration to a pickle file. If a config file already exists, it will be loaded,
+        updated with the new config (if provided), and saved back.
+        
+        Args:
+            cfg: Configuration dictionary to save/update. If None, only loads existing config
+            date_start: Start date for the config filename. If None, uses self.date_start or current time
+        """
+        with open(self.config_path, 'wb') as f:
+            pickle.dump(self.cfg, f)
+            logger.debug(f"Config saved at {self.config_path}")
+    
+    def load_config(self) -> Optional[dict[str, Any]]:
+        """
+        Load configuration from a pickle file.
+        
+        Args:
+            date_start: Start date for the config filename. If None, uses self.date_start
+            
+        Returns:
+            Configuration dictionary if found, None otherwise
+        """
+        try:
+            with open(self.config_path, 'rb') as f:
+                config = pickle.load(f)
+                logger.debug(f"Config loaded from {self.config_path}")
+                return config
+        except (FileNotFoundError, EOFError):
+            logger.debug(f"No config found at {self.config_path}")
+            return None
+    
+    def update_config(self, time: np.datetime64) -> None:
+        """
+        Update an existing configuration file with new values.
+        
+        Args:
+            cfg: Configuration dictionary to update with
+            date_start: Start date for the config filename. If None, uses self.date_start
+        """
+        if "date_start" not in self.cfg:
+            self.cfg.update({"date_start": time})
+            logger.debug(f"Update config date_start: {self.cfg['date_start']}")        
+        self.cfg.update({"date_end": time})
+        logger.debug(f"Update config date_end: {self.cfg['date_end']}")
+
+
 class BaseTradeClass(ABC):
     def __init__(self, cfg: dict[str, Any], expert: Expert, telebot: Optional[Telebot] = None) -> None:
 
@@ -97,7 +160,10 @@ class BaseTradeClass(ABC):
         self.nmin = self.period.minutes
         self.time = StepData()
         self.exp_update = self.exp.update
-        self.log_config(cfg)
+        
+        # Initialize ConfigLogger
+        self.config_logger = ConfigLogger(self.save_path, self.date_start, cfg)
+        self.config_logger.log_config()
 
     @abstractmethod
     def get_server_time(self) -> np.datetime64:
@@ -219,24 +285,6 @@ class BaseTradeClass(ABC):
             "datetime64[m]").astype(int)//self.nmin
         return np.datetime64(int(trounded*self.nmin), "m")
 
-    def log_config(self, cfg: Optional[dict[str, Any]] = None):
-        config_path = self.save_path / f"config_{date2str(self.date_start, 'm')}.pkl"
-        
-        try:
-            with open(config_path, 'rb') as f:
-                existing_config = pickle.load(f)
-                logger.debug(f"Config loaded from {config_path}")
-                if cfg is not None:
-                    existing_config.update(cfg)
-                    logger.debug(f"Config updated with {cfg}")
-        except (FileNotFoundError, EOFError):
-            logger.debug(f"No config found at {config_path}, creating new one")
-            existing_config = cfg
-
-        with open(config_path, 'wb') as f:
-            pickle.dump(existing_config, f)
-            logger.debug(f"Config saved at {config_path}")
-
     def _handle_trade_message(self):
         server_time = self.get_server_time()
         self.time.update(self.get_rounded_time(server_time))
@@ -244,7 +292,8 @@ class BaseTradeClass(ABC):
 
         if self.time.changed(no_none=True):
             self.update()
-            self.log_config({"date_start": self.time.curr})
+            self.config_logger.update_config(self.time.curr)
+            self.config_logger.log_config()
             msg = f"{self.ticker}-{self.period.value}: {str(self.pos.curr) if self.pos.curr is not None else 'None'}"
             logger.debug(msg)
             if self.my_telebot is not None:
@@ -355,5 +404,3 @@ class BaseTradeClass(ABC):
         self.exp_update(self.h, self.pos.curr, self.deposit)
         if self.should_save_backup:
             self.save_backup()
-
-        self.log_config({"date_end": self.time.curr})
