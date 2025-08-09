@@ -244,7 +244,7 @@ class BaseTradeClass(ABC):
 
         if self.time.changed(no_none=True):
             self.update()
-
+            self.log_config({"date_start": self.time.curr})
             msg = f"{self.ticker}-{self.period.value}: {str(self.pos.curr) if self.pos.curr is not None else 'None'}"
             logger.debug(msg)
             if self.my_telebot is not None:
@@ -266,9 +266,6 @@ class BaseTradeClass(ABC):
             else:
                 logger.debug("Got valid data, OK!")
                 break
-
-        if self.time.prev is None:
-            self.log_config({"date_start": self.time.curr})
 
     def clear_log_dir(self):
         if self.save_plots:
