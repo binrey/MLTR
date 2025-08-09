@@ -225,15 +225,17 @@ class BaseTradeClass(ABC):
         try:
             with open(config_path, 'rb') as f:
                 existing_config = pickle.load(f)
+                logger.debug(f"Config loaded from {config_path}")
                 if cfg is not None:
                     existing_config.update(cfg)
+                    logger.debug(f"Config updated with {cfg}")
         except (FileNotFoundError, EOFError):
             logger.debug(f"No config found at {config_path}, creating new one")
             existing_config = cfg
 
         with open(config_path, 'wb') as f:
             pickle.dump(existing_config, f)
-        logger.debug(f"Config updated at {config_path}")
+            logger.debug(f"Config saved at {config_path}")
 
     def _handle_trade_message(self):
         server_time = self.get_server_time()
@@ -245,11 +247,11 @@ class BaseTradeClass(ABC):
 
             msg = f"{self.ticker}-{self.period.value}: {str(self.pos.curr) if self.pos.curr is not None else 'None'}"
             logger.debug(msg)
-            # if self.my_telebot is not None:
+            if self.my_telebot is not None:
                 # process = multiprocessing.Process(target=self.my_telebot.send_text,
                 #                                   args=[msg])
                 # process.start()
-                # self.my_telebot.send_text(msg)
+                self.my_telebot.send_text(msg)
 
     def handle_trade_message(self):
         self._handle_trade_message()
