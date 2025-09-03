@@ -166,6 +166,7 @@ def process_logfile(cfg: Dict[str, Any], positions_real: list[Position]) -> tupl
     val_res.add_profit_curve(profit_hist_real["dates"], backtest_trading.session.profit_hist.df["profit_csum_nofees"], f"{cfg['symbol'].ticker} test", "r", 1, 0.5)
 
     val_res.save_fig()
+    val_res.show_fig()
     return backtest_trading.session.positions
 
 

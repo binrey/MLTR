@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from loguru import logger
+from PIL import Image
+from io import BytesIO
 
 from backtesting.backtest_broker import Broker, TradeHistory
 from common.type import VolEstimRule, to_datetime
@@ -307,6 +309,20 @@ class BackTestResults:
         plt.tight_layout()
         if self.fig is not None:
             self.fig.savefig(save_path)
+
+    def show_fig(self):
+        if self.fig is None:
+            return
+        # Ensure legend and layout are finalized before rendering
+        self.fig.axes[0].legend(self.legend_ax1)
+        plt.tight_layout()
+        # Render to buffer and display with PIL to avoid backend show issues
+        buffer = BytesIO()
+        self.fig.savefig(buffer, format="png", dpi=150, bbox_inches="tight")
+        buffer.seek(0)
+        Image.open(buffer).show()
+        buffer.close()
+        plt.close(self.fig)
 
     @property
     def final_profit(self):
