@@ -72,6 +72,7 @@ backtest = update_config(
     eval_buyhold=True,
     clear_logs=True,
     log_trades=True,
+    verify_data=False,
 )
 
 optimization = update_config(

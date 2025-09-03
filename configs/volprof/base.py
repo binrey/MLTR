@@ -70,6 +70,7 @@ backtest = update_config(
     eval_buyhold=False,
     clear_logs=True,
     log_trades=True,
+    verify_data=False,
 )
 
 optimization = update_config(
@@ -80,6 +81,7 @@ optimization = update_config(
     clear_logs=False,
     log_trades=False,
     eval_buyhold=False,
+    verify_data=False,
     symbol=[Symbols.BTCUSDT, Symbols.ETHUSDT],
     hist_size=[64, 128, 256],
     trailing_stop={
@@ -99,5 +101,5 @@ bybit = update_config(
     log_trades=True,
     save_backup=True,
     handle_trade_errors=True,
-
+    verify_data=True,
 )
