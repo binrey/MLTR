@@ -20,8 +20,10 @@ class TradeHistory:
         self.leverage = 1
         self.positions = positions
 
-        self.posdict_open: Dict[np.datetime64, int] = {pos.open_date.astype("datetime64[m]"): i for i, pos in enumerate(positions)}
-        self.posdict_closed: Dict[np.datetime64, int] = {pos.close_date.astype("datetime64[m]"): i for i, pos in enumerate(positions)}
+        self.posdict_open: Dict[np.datetime64, int] = {
+            self.mw.period.round_to_period(pos.open_date): i for i, pos in enumerate(positions)}
+        self.posdict_closed: Dict[np.datetime64, int] = {
+            self.mw.period.round_to_period(pos.close_date): i for i, pos in enumerate(positions)}
         self.cumulative_profit = 0
         self.cumulative_fees = 0
         active_position, max_profit = None, 0
@@ -90,6 +92,13 @@ class TradeHistory:
     @cached_property
     def df(self):
         return self.profit_hist
+    
+    @cached_property
+    def ticker(self):
+        tickers = set(pos.ticker for pos in self.positions)
+        if len(tickers) > 1:
+            raise ValueError(f"Multiple tickers in the same backtest: {tickers}")
+        return tickers.pop()
 
 
 class Broker:

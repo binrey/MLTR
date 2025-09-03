@@ -1,6 +1,13 @@
 import numpy as np
 
-from common.type import ConfigType, Symbols, TimePeriod, Vis, VolEstimRule
+from common.type import (
+    ConfigType,
+    Symbols,
+    TimePeriod,
+    Vis,
+    VolEstimRule,
+    VolumeControl,
+)
 from common.utils import FeeRate, update_config
 from experts.core.position_control import *
 from experts.ma_cross import ClsMACross
@@ -32,9 +39,14 @@ config = dict(
     wallet=1000,
     lot=0.08,
     leverage=1,
-    vol_estimation_rule=VolEstimRule.DEPOSIT_BASED,
+    volume_control=dict(
+        type=VolumeControl,
+        rule=VolEstimRule.FIXED_POS_COST,
+        deposit_fraction=0.33,
+    ),
     close_only_by_stops=False,
     hist_size=256,
+    traid_stops_min_size=0.2,
     tstart=0,
     tend=None,
     period=TimePeriod.M60,

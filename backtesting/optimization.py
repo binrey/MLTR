@@ -27,10 +27,10 @@ from trade.backtest import BackTest
 from trade.backtest import launch as backtest_launch
 from trade.utils import Position
 
-logger.remove()
-logger.add(sys.stderr, level="INFO")
-logger = logger.bind(module="data_processing.dataloading")
-logger.disable("data_processing.dataloading")
+# logger.remove()
+# logger.add(sys.stderr, level="INFO")
+# logger = logger.bind(module="data_processing.dataloading")
+# logger.disable("data_processing.dataloading")
 
 pd.set_option('display.max_colwidth', 1028)
 pd.set_option('display.width', 1000)
@@ -350,20 +350,20 @@ class Optimizer:
         """
         Find the combination of backtests provided best APR.
         """
-        aprs = {}
+        metrics = {}
         for i, trade_history in enumerate(self.bt_results):
             btest = BackTestResults()
             btest.add(trade_history)
             btest.eval_daily_metrics()
-            aprs[i] = btest.metrics.recovery_factor
-        sorted_btest_ids = sorted(aprs, key=lambda x: aprs[x], reverse=True)
-        best_setup, btest_selected, best_apr = [], sorted_btest_ids[0], aprs[sorted_btest_ids[0]]
+            metrics[i] = btest.metrics.recovery_factor
+        sorted_btest_ids = sorted(metrics, key=lambda x: metrics[x], reverse=True)
+        btest_selected = sorted_btest_ids[0]
+        best_setup, best_metric = [btest_selected], metrics[btest_selected]
+        print(f"+ {btest_selected}: {self.bt_results[btest_selected].ticker} {best_metric:.2f}")
         
         for adding_iter in range(1, num_backtests):
-            best_setup.append(btest_selected)
             btest_selected = None
-            print()
-            print(adding_iter, best_setup, best_apr)
+            print(f"{adding_iter} {best_setup} {best_metric:.2f}")
             for btest2add in sorted_btest_ids:
                 if btest2add in best_setup:
                     continue
@@ -373,12 +373,14 @@ class Optimizer:
                     multistrategy_test.add(trade_hist, same_deposit=False)
                 multistrategy_test.eval_daily_metrics()
                 
-                if multistrategy_test.metrics.recovery_factor > best_apr:
-                    best_apr = multistrategy_test.metrics.recovery_factor
+                if multistrategy_test.metrics.recovery_factor > best_metric:
+                    best_metric = multistrategy_test.metrics.recovery_factor
                     btest_selected = btest2add
-                    print(f"+ {btest2add}: {multistrategy_test.tickers_set} {multistrategy_test.metrics.recovery_factor}")
+                    print(f"+ {btest_selected}: {trade_hist.ticker} {best_metric:.2f}")
             if btest_selected is None:
                 break
+            else:
+                best_setup.append(btest_selected)
                     
         print(best_setup)
         multistrategy_best = BackTestResults()          
