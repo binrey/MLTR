@@ -194,7 +194,8 @@ class BackTestResults:
 
     def add_profit_curve(self, days: pd.Index, values: pd.Series, name: str, color: str, linewidth: float, alpha: float):
         self.fig.axes[0].plot(days, values, linewidth=linewidth, color=color, alpha=alpha)
-        self.legend_ax1.append(name)
+        if name is not None:
+            self.legend_ax1.append(name)
 
     def add_from_other_results(self, btest_results: "BackTestResults", color: str, linewidth: float = 1, alpha: float = 0.5, use_relative: bool = True):
         data = btest_results.relative2deposit(btest_results.daily_hist["profit_csum"]) if use_relative else btest_results.daily_hist["profit_csum"]

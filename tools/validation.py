@@ -101,19 +101,45 @@ def process_real_log_dir(log_dir: Path):
 def process_log_dir(log_dir: Path) -> tuple[list[Position], list[Position]]:
     cfg_files = sorted(list((log_dir).glob("*.pkl")))
     positions_real = process_real_log_dir(log_dir)
-
-    positions_test, cfg2process = [], None
+    positions_test, cfg2process, last_test_profit, last_real_profit,  = [], None, 0, 0    
+    val_res = BackTestResults()
+    val_res.plot_validation(y_label="Fin result")
     for cfg_file in cfg_files + [None]:
         if cfg_file is None:
-            cfg_new = {"date_start": np.datetime64("now")}
+            cfg = {"date_start": np.datetime64("now")}
         else:
             # Start of the new cfg
-            cfg_new = pickle.load(open(cfg_file, "rb"))
-        if cfg2process is not None:
-            positions_test.extend(process_logfile(cfg2process, positions_real))
+            cfg = pickle.load(open(cfg_file, "rb"))
 
-        cfg2process = cfg_new
-    
+        if cfg2process is not None:
+            backtest_trading = process_logfile(cfg2process, positions_real)
+            positions_test.extend(backtest_trading.session.positions)
+            val_res.add(backtest_trading.session.profit_hist)
+            val_res.add_profit_curve(backtest_trading.session.profit_hist.df.index,
+                                     backtest_trading.session.profit_hist.df["profit_csum_nofees"]+last_test_profit,
+                                     f"{cfg2process['symbol'].ticker} TEST" if cfg_file is None else None, "r", 1, 0.5)
+            last_test_profit += backtest_trading.session.profit_hist.df["profit_csum_nofees"].iloc[-1]
+
+            profit_hist_real = TradeHistory(backtest_trading.session.mw, positions_real).df
+            assert profit_hist_real.shape[0] > 0, "No real deals in history found"
+            val_res.add_profit_curve(profit_hist_real["dates"], 
+                                     profit_hist_real["profit_csum_nofees"]+last_real_profit,
+                                     f"{cfg2process['symbol'].ticker} REAL" if cfg_file is None else None, "g", 3, 0.5)
+            last_real_profit += profit_hist_real["profit_csum_nofees"].iloc[-1]
+
+        
+        
+        # if date_start is None:
+        #     date_start = cfg_new["date_start"]
+        # if cfg_file is None:
+        #     cfg_optim = cfg2process.copy()
+        #     cfg_optim["date_start"] = date_start
+        #     positions_test.extend(process_logfile(cfg_optim, positions_real))    
+
+
+        cfg2process = cfg
+    val_res.save_fig()
+    val_res.show_fig()
     return positions_test, positions_real
 
 
@@ -156,18 +182,8 @@ def process_logfile(cfg: Dict[str, Any], positions_real: list[Position]) -> tupl
     backtest_trading.initialize()
     backtest_trading.session.trade_stream(backtest_trading.handle_trade_message)
 
-    val_res = BackTestResults()
-    val_res.add(backtest_trading.session.profit_hist)
 
-    profit_hist_real = TradeHistory(backtest_trading.session.mw, positions_real).df
-    assert profit_hist_real.shape[0] > 0, "No real deals in history found"
-    val_res.plot_validation(y_label="Fin result")
-    val_res.add_profit_curve(profit_hist_real["dates"], profit_hist_real["profit_csum_nofees"], f"{cfg['symbol'].ticker} real", "g", 3, 0.5)
-    val_res.add_profit_curve(profit_hist_real["dates"], backtest_trading.session.profit_hist.df["profit_csum_nofees"], f"{cfg['symbol'].ticker} test", "r", 1, 0.5)
-
-    val_res.save_fig()
-    val_res.show_fig()
-    return backtest_trading.session.positions
+    return backtest_trading
 
 
 if __name__ == "__main__":
@@ -193,13 +209,14 @@ if __name__ == "__main__":
     positions_test.sort(key=lambda x: x.open_date)
 
     time_lags, open_slippages, close_slippages = [], [], []
+    open_slippages_rel, close_slippages_rel = [], []
     match_count, prof_diff_summ = 0, 0
 
     logger.info("")
     logger.info(f"Validation for {len(positions_test)} positions")
     logger.info("----------------------------------------")
-    logger.info(f"{'Open Date':<16} {'Side':<11} {'Open Slip,%':>15} {'Time Lag,s':>15} {'Prof.diff,$':>15} {'Close Slip,%':>15}")
-    ir, sum_prof_real, sum_prof_test = 0, 0, 0
+    logger.info(f"{'Open Date':<16} {'Side':<11} {'Open Slip,$':>15} {'Open Slip,%':>15} {'Time Lag,s':>15} {'Close Slip,$':>15} {'Close Slip,%':>15} {'Prof.diff,$':>15}")
+    ir, sum_prof_real = 0, 0
     for pos_test in positions_test:
         date_test = pos_test.open_date.astype("datetime64[m]")
         logline, logline_suffix = f"{date_test} {pos_test.side:<4}", ""
@@ -211,30 +228,25 @@ if __name__ == "__main__":
                 time_lags.append((pos_real.open_date.astype("datetime64[ms]") -
                                   pos_test.open_date.astype("datetime64[ms]")).astype(int)/1000)
                 match_count += 1
+                sum_prof_real += pos_real.profit_abs
                 
                 # Calculate open slippage
                 open_slip = (pos_test.open_price - pos_real.open_price) * pos_test.side.value * pos_test.volume
                 open_slippages.append(open_slip)
+                # Relative open slippage (signed, positive = worse price vs real)
+                open_slip_rel = (pos_test.open_price - pos_real.open_price) / pos_real.open_price * pos_test.side.value
+                open_slippages_rel.append(open_slip_rel)
                 prof_diff = pos_test.profit_abs - pos_real.profit_abs
                 prof_diff_summ += prof_diff
-                logline += f" <- OK: {open_slip:15.2f} {time_lags[-1]:15.2f} {prof_diff:15.2f}"
+                logline += f" <- OK: {open_slip:15.2f} {open_slip_rel*100:15.4f} {time_lags[-1]:15.2f}"
                 found_real = True
 
-                # Bybit unexpectedly missmatch current close date and price with previous position
-                if pos_real.close_date.astype("datetime64[m]") != pos_test.close_date:
-                    # if pos_real.close_date == positions_real[ir-1].close_date:
-                    #     pos_real.close_date = pos_test.close_date
-                    #     pos_real.close_price = pos_test.close_price
-                    #     if pos_real.sl_hist is not None and len(pos_real.sl_hist) > 0:
-                    #         pos_real.close_price = pos_real.sl_hist[-1][1]
-                    #     logline_suffix = " (REPAIRED)"
-                    # else:
-                    logline += f" CLOSE ERROR: real:{pos_real.close_date} test:{pos_test.close_date}"
-                
-                if pos_real.close_date.astype("datetime64[m]") == pos_test.close_date:
-                    close_slip = -(pos_test.close_price - pos_real.close_price) * pos_test.side.value * pos_test.volume
-                    close_slippages.append(close_slip)
-                    logline += f" {close_slip:15.2f}"
+                close_slip = (pos_test.close_price - pos_real.close_price) * pos_test.side.value * pos_test.volume
+                close_slippages.append(close_slip)
+                # Relative close slippage (signed, positive = worse price vs real)
+                close_slip_rel = (pos_test.close_price - pos_real.close_price) / pos_real.close_price * pos_test.side.value
+                close_slippages_rel.append(close_slip_rel)
+                logline += f" {close_slip:15.2f} {close_slip_rel*100:15.4f} {prof_diff:15.2f}"
                 break
 
             else:
@@ -247,9 +259,10 @@ if __name__ == "__main__":
             logline += " <- NO REAL"
         logger.info(logline + logline_suffix)
 
-    logger.info(" "*29 + f"{np.sum(open_slippages):15.2f} {np.mean(time_lags):15.2f} {prof_diff_summ:15.2f} {np.sum(close_slippages):15.2f}")
+    logger.info(" "*29 + f"{np.sum(open_slippages):15.2f} {np.mean(open_slippages_rel)*100:15.4f} {np.mean(time_lags):15.2f} {np.sum(close_slippages):15.2f} {np.mean(close_slippages_rel)*100:15.4f} {prof_diff_summ:15.2f}")
     logger.info("----------------------------------------")
-    logger.info(f"Mean time lag:       " + (f"{np.mean(time_lags):.2f}s" if len(positions_test) > 0 else "NO TEST"))
-    logger.info(f"Match rate:          " + (f"{match_count / len(positions_test) * 100:.2f}%" if len(positions_test) > 0 else "NO TEST"))
-    logger.info(f"Mean open slippage:  " + (f"{np.mean(open_slippages)*100:.4f}%" if len(open_slippages) > 0 else "NO TEST"))
-    logger.info(f"Mean close slippage: " + (f"{np.mean(close_slippages)*100:.4f}%" if len(close_slippages) > 0 else "NO TEST"))
+    logger.info(f"Mean time lag:       " + (f"{np.mean(time_lags):.2f}s" if len(positions_test) > 0 else "NO TEST MATCHES"))
+    logger.info(f"Match rate:          " + (f"{match_count / len(positions_test) * 100:.2f}%" if len(positions_test) > 0 else "NO TEST MATCHES"))
+    logger.info(f"Mean relative open slippage:  " + (f"{np.mean(open_slippages_rel)*100:.4f}%" if len(open_slippages_rel) > 0 else "NO TEST MATCHES"))
+    logger.info(f"Mean relative close slippage: " + (f"{np.mean(close_slippages_rel)*100:.4f}%" if len(close_slippages_rel) > 0 else "NO TEST MATCHES"))
+    logger.info(f"Relative profit diff:   " + (f"{-prof_diff_summ / sum_prof_real * 100:.4f}%" if sum_prof_real > 0 else "NO TEST MATCHES"))
