@@ -285,7 +285,7 @@ class MovingWindow():
     def __call__(self, output_time=True):
         logger.info(f"Start generate {self.ticker} data from {self.date_start} (id:{self.id2start}) to {self.date_end} (id:{self.id2end})")
         # for t in tqdm(range(self.id2start, self.id2end), desc=f"Processing {self.ticker}"):
-        for t in range(self.id2start, self.id2end):    
+        for t in range(self.id2start, self.id2end+1):    
             yield self[t] if output_time else self[t][0]
 
 
