@@ -13,25 +13,26 @@ from trade.utils import ORDER_TYPE, Order, Position
 
 
 class TradeHistory:
-    def __init__(self, moving_window: MovingWindow, positions: List[Position]):
+    def __init__(self, moving_window: MovingWindow, positions: List[Position], active_position: Optional[Position] = None):
         self.mw = moving_window
         self.mw.size = 1
         self.profit_hist = defaultdict(list)
         self.leverage = 1
         self.positions = positions
-
+        self.active_position = active_position
         self.posdict_open: Dict[np.datetime64, int] = {
             self.mw.period.round_to_period(pos.open_date): i for i, pos in enumerate(positions)}
         self.posdict_closed: Dict[np.datetime64, int] = {
             self.mw.period.round_to_period(pos.close_date): i for i, pos in enumerate(positions)}
         self.cumulative_profit = 0
         self.cumulative_fees = 0
-        active_position, max_profit = None, 0
+        max_profit = 0
         self.deposit, self.max_loss = None, None
         self.wallet = 0
         self.volume_control = None
         self.date_start = self.mw.date_start
         self.date_end = self.mw.date_end
+        
 
         for self.hist_window, _ in tqdm(self.mw(), desc="Build profit curve", total=self.mw.timesteps_count, disable=True):
             cur_time = self.hist_window["Date"][-1]
@@ -42,17 +43,17 @@ class TradeHistory:
                 closed_position = self.positions[closed_position_id]
                 self.cumulative_profit += closed_position.profit_abs
                 self.cumulative_fees += closed_position.fees_abs
-                active_position = None
+                self.active_position = None
 
             if self.posdict_open.get(cur_time, None) is not None:
-                active_position = self.positions[self.posdict_open[cur_time]]
+                self.active_position = self.positions[self.posdict_open[cur_time]]
 
             # If an active position exists, add its unrealized profit
             active_profit, active_volume, active_cost = 0, 0, 0
-            if active_position is not None:
-                active_profit = active_position.side.value * (last_price - active_position.open_price) * active_position.volume
-                active_volume = float(active_position.volume)
-                active_cost = active_position.open_price * active_volume
+            if self.active_position is not None:
+                active_profit = self.active_position.side.value * (last_price - self.active_position.open_price) * self.active_position.volume
+                active_volume = float(self.active_position.volume)
+                active_cost = self.active_position.open_price * active_volume
 
             max_profit = max(max_profit, self.cumulative_profit - self.cumulative_fees)
 
@@ -111,6 +112,7 @@ class Broker:
         self.wallet = cfg["wallet"]
         self.volume_control: VolumeControl = cfg["volume_control"]
         self.active_orders: List[Order] = []
+        self.start_active_position: Position = None
         self.active_position: Position = None
         self.positions: List[Position] = []
         self.orders = []
@@ -137,6 +139,10 @@ class Broker:
     def fees_abs(self):
         return [p.fees_abs for p in self.positions]
 
+    def set_start_active_position(self, position: Position):
+        self.start_active_position = position
+        self.active_position = position
+
     # @profile_function
     def trade_stream(self, callback):
         for self.hist_window, _ in tqdm(self.mw(), desc="Backtest", total=self.mw.timesteps_count, disable=False):
@@ -160,7 +166,7 @@ class Broker:
                                       time=self.time,
                                       hist_id=self.hist_id)
             
-        self.profit_hist = TradeHistory(self.mw, self.positions)
+        self.profit_hist = TradeHistory(self.mw, self.positions, self.start_active_position)
         self.profit_hist.add_info(self.wallet, self.volume_control, self.leverage)
 
     def close_orders(self, hist_id, i=None):
