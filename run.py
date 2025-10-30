@@ -98,9 +98,10 @@ if __name__ == "__main__":
     run_type = RunType.from_str(args.run_type)
     cfgs = [PyConfig(path) for path in args.config_paths]
 
-    log_dir = os.path.join(os.getenv("LOG_DIR"), run_type.value)
+    log_dir = os.getenv("LOG_DIR")
     if log_dir is None:
         raise ValueError(f"LOG_DIR environment variable is not set")
+    log_dir = os.path.join(log_dir, run_type.value)
     log_level = os.getenv("LOGLEVEL")
     if log_level is None:
         raise ValueError(f"LOGLEVEL environment variable is not set")
