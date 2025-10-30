@@ -16,9 +16,9 @@ from trade.bybit import launch as bybit_launch
 
 load_dotenv(override=True)
 
-def run_backtest(cfg: PyConfig):
-    logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.BACKTEST.value),
-                            log_level=os.getenv("LOGLEVEL"))
+def run_backtest(cfg: PyConfig, log_dir: str, log_level: str):
+    logger_wrapper = Logger(log_dir=log_dir,
+                            log_level=log_level)
     logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, cfg["clear_logs"])
     cfg["save_backup"] = False
     return backtest_launch(cfg)
@@ -28,9 +28,9 @@ def run_multirun(cfgs: list[PyConfig]):
     launch_multirun(cfgs)
 
 
-def run_optimization(cfg: PyConfig, run_backtests):
-    logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.OPTIMIZE.value),
-                            log_level=os.getenv("LOGLEVEL"))
+def run_optimization(cfg: PyConfig, run_backtests, log_dir: str, log_level: str):
+    logger_wrapper = Logger(log_dir=log_dir,
+                            log_level=log_level)
     symbol = cfg["symbol"]
     if isinstance(symbol, list):
         ticker = "-".join(map(lambda x: x.ticker, symbol))
@@ -48,9 +48,9 @@ def run_optimization(cfg: PyConfig, run_backtests):
     logger.info(f"\n{str(results)}")
 
 
-def run_bybit(cfg: PyConfig, demo: bool, clear_position: bool):
-    logger_wrapper = Logger(log_dir=os.path.join(os.getenv("LOG_DIR"), RunType.BYBIT.value),
-                            log_level=os.getenv("LOGLEVEL"))
+def run_bybit(cfg: PyConfig, demo: bool, clear_position: bool, log_dir: str, log_level: str):
+    logger_wrapper = Logger(log_dir=log_dir,
+                            log_level=log_level)
     logger_wrapper.initialize(cfg["name"], cfg["symbol"].ticker, cfg["period"].value, cfg["clear_logs"])
     cfg["save_backup"] = True
     cfg["save_plots"] = False
@@ -98,14 +98,21 @@ if __name__ == "__main__":
     run_type = RunType.from_str(args.run_type)
     cfgs = [PyConfig(path) for path in args.config_paths]
 
+    log_dir = os.path.join(os.getenv("LOG_DIR"), run_type.value)
+    if log_dir is None:
+        raise ValueError(f"LOG_DIR environment variable is not set")
+    log_level = os.getenv("LOGLEVEL")
+    if log_level is None:
+        raise ValueError(f"LOGLEVEL environment variable is not set")
+
     if run_type == RunType.BYBIT:
-        run_bybit(cfgs[0].get_bybit(), args.demo, args.clear_position)
+        run_bybit(cfgs[0].get_bybit(), args.demo, args.clear_position, log_dir, log_level)
     elif run_type == RunType.OPTIMIZE:
-        run_optimization(cfgs[0].get_optimization(), args.run_backtests)
+        run_optimization(cfgs[0].get_optimization(), args.run_backtests, log_dir, log_level)
     elif run_type == RunType.MULTIRUN:
         run_multirun([cfg.get_backtest() for cfg in cfgs])
     elif run_type == RunType.BACKTEST:
-        run_backtest(cfgs[0].get_backtest())
+        run_backtest(cfgs[0].get_backtest(), log_dir, log_level)
     elif run_type == RunType.CROSS_VALIDATION:
         run_cross_validation(cfgs[0].get_optimization())
     else:
