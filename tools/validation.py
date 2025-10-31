@@ -33,6 +33,8 @@ def parse_args():
     parser.add_argument('--period', type=str, default="M1", 
                        choices=[p.name for p in TimePeriod.__members__.values()],
                        help='Time period (default: M1)')
+    parser.add_argument('--no-update', action='store_true',
+                       help='Use local logs if they exist, skip downloading from remote')
     return parser.parse_args()
 
 
@@ -67,14 +69,23 @@ def parse_market_wallet_from_logs(log_dir: Path) -> float:
     return None
 
 
-def download_logs(log_dir: Path):
-    if not log_dir.exists():
-        remote_logs_path = os.getenv('REMOTE_LOGS')
-        if not remote_logs_path:
-            raise ValueError("REMOTE_LOGS environment variable is not set")
-
-        # os.makedirs(LOCAL_LOGS_DIR, exist_ok=True)
-        subprocess.run(["scp", "-r", remote_logs_path, "./"], check=True)
+def download_logs(log_dir: Path, skip_if_exists: bool = False):
+    """Download logs from remote location.
+    
+    Args:
+        log_dir: Path to the local log directory
+        skip_if_exists: If True, skip download if log_dir already exists
+    """
+    if skip_if_exists and log_dir.exists():
+        logger.info(f"Using existing local logs at {log_dir}")
+        return
+    
+    remote_logs_path = os.getenv('REMOTE_LOGS')
+    if not remote_logs_path:
+        raise ValueError("REMOTE_LOGS environment variable is not set")
+    
+    logger.info(f"Downloading logs from {remote_logs_path}")
+    subprocess.run(["scp", "-r", remote_logs_path, "./"], check=True)
 
 
 def process_real_log_dir(log_dir: Path):
@@ -201,7 +212,7 @@ if __name__ == "__main__":
 
     log_dir = LOCAL_LOGS_DIR / BROKER / EXPERT / TAG
 
-    download_logs(log_dir)
+    download_logs(log_dir, skip_if_exists=args.no_update)
     positions_test, positions_real = process_log_dir(log_dir)
 
     if len(positions_test) == 0:
@@ -228,27 +239,29 @@ if __name__ == "__main__":
             if date_real == date_test and pos_real.side == pos_test.side:
                 ir += 1
                 tp += 1
-                time_lags.append((pos_real.open_date.astype("datetime64[ms]") -
-                                  pos_test.open_date.astype("datetime64[ms]")).astype(int)/1000)
-                sum_prof_real += pos_real.profit_abs
                 
                 # Calculate open slippage
-                open_slip = (pos_test.open_price - pos_real.open_price) * pos_test.side.value * pos_test.volume
-                open_slippages.append(open_slip)
-                # Relative open slippage (signed, positive = worse price vs real)
-                open_slip_rel = (pos_test.open_price - pos_real.open_price) / pos_real.open_price * pos_test.side.value
-                open_slippages_rel.append(open_slip_rel)
+                open_diff = (pos_test.open_price - pos_real.open_price) * pos_test.side.value
+                open_slippages.append(open_diff * pos_test.volume * pos_test.volume)
+                open_slippages_rel.append(open_diff / pos_real.open_price * 100)
+                logline += f" <- OK: {open_diff:15.2f} {open_slippages_rel[-1]:15.4f}"
+
+                # Calculate open time lag
+                time_lags.append((pos_real.open_date.astype("datetime64[ms]") -
+                                  pos_test.open_date.astype("datetime64[ms]")).astype(int)/1000)
+                logline += f" {time_lags[-1]:15.2f}"
+
+                # Calculate close slippage
+                close_diff = (pos_real.close_price - pos_test.close_price) * pos_test.side.value
+                close_slippages.append(close_diff * pos_test.volume * pos_test.volume)
+                close_slippages_rel.append(close_diff / pos_real.close_price * 100)
+                logline += f" {close_diff:15.2f} {close_slippages_rel[-1]:15.4f}"
+
                 prof_diff = pos_real.profit_abs - pos_test.profit_abs
                 prof_diff_summ += prof_diff
-                logline += f" <- OK: {open_slip:15.2f} {open_slip_rel*100:15.4f} {time_lags[-1]:15.2f}"
+                logline += f" {prof_diff:15.2f}"
                 found_real = True
-
-                close_slip = (pos_test.close_price - pos_real.close_price) * pos_test.side.value * pos_test.volume
-                close_slippages.append(close_slip)
-                # Relative close slippage (signed, positive = worse price vs real)
-                close_slip_rel = (pos_test.close_price - pos_real.close_price) / pos_real.close_price * pos_test.side.value
-                close_slippages_rel.append(close_slip_rel)
-                logline += f" {close_slip:15.2f} {close_slip_rel*100:15.4f} {prof_diff:15.2f}"
+                sum_prof_real += pos_real.profit_abs
                 break
             else:
                 if date_real < date_test:
@@ -262,10 +275,15 @@ if __name__ == "__main__":
             fp += 1
         logger.info(logline + logline_suffix)
 
-    logger.info(" "*29 + f"{np.sum(open_slippages):15.2f} {np.mean(open_slippages_rel)*100:15.4f} {np.mean(time_lags):15.2f} {np.sum(close_slippages):15.2f} {np.mean(close_slippages_rel)*100:15.4f} {prof_diff_summ:15.2f}")
+    mean_open_slippage = np.mean(open_slippages_rel) if len(open_slippages_rel) > 0 else 0
+    mean_close_slippage = np.mean(close_slippages_rel) if len(close_slippages_rel) > 0 else 0
+
+    logger.info(f"{'SUM VALUES: ':>29}" + f"{np.sum(open_slippages):15.2f} {mean_open_slippage:15.4f} {np.mean(time_lags):15.2f} {np.sum(close_slippages):15.2f} {mean_close_slippage:15.4f} {prof_diff_summ:15.2f}")
     logger.info("----------------------------------------")
     logger.info(f"Mean time lag:       " + (f"{np.mean(time_lags):.2f}s" if len(positions_test) > 0 else "NO TEST MATCHES"))
     logger.info(f"Match rate (accuracy):          " + (f"{tp / (tp + fn + fp) * 100:.2f}%" if len(positions_test) > 0 else "NO TEST MATCHES"))
-    logger.info(f"Mean relative open slippage:  " + (f"{np.mean(open_slippages_rel)*100:.4f}%" if len(open_slippages_rel) > 0 else "NO TEST MATCHES"))
-    logger.info(f"Mean relative close slippage: " + (f"{np.mean(close_slippages_rel)*100:.4f}%" if len(close_slippages_rel) > 0 else "NO TEST MATCHES"))
+    logger.info(f"Mean relative open slippage:  " + (f"{mean_open_slippage:.4f}%" if len(open_slippages_rel) > 0 else "NO TEST MATCHES"))
+    logger.info(f"Mean relative close slippage: " + (f"{mean_close_slippage:.4f}%" if len(close_slippages_rel) > 0 else "NO TEST MATCHES"))
     logger.info(f"Relative profit diff:   " + (f"{prof_diff_summ / sum_prof_real * 100:.4f}%" if sum_prof_real > 0 else "NO TEST MATCHES"))
+    logger.info("\n* negative values mean the real position was opened/closed at a worse price than the test position")
+    logger.info("* negative profit diff means the real position has less profit than the test position\n\n")
