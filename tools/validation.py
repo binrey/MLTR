@@ -115,7 +115,7 @@ def process_log_dir(log_dir: Path) -> tuple[list[Position], list[Position]]:
     positions_test, cfg2process, last_test_profit, last_real_profit,  = [], None, 0, 0    
     val_res = BackTestResults()
     val_res.plot_validation(y_label="Fin result")
-    active_position = None
+    active_position, date_start = None, None
     for cfg_file in cfg_files + [None]:
         if cfg_file is None:
             cfg = {"date_start": np.datetime64("now")}
@@ -141,15 +141,28 @@ def process_log_dir(log_dir: Path) -> tuple[list[Position], list[Position]]:
             active_position = backtest_trading.session.active_position
 
         
-        
-        # if date_start is None:
-        #     date_start = cfg_new["date_start"]
-        # if cfg_file is None:
-        #     cfg_optim = cfg2process.copy()
-        #     cfg_optim["date_start"] = date_start
-        #     positions_test.extend(process_logfile(cfg_optim, positions_real))    
+        """
+        # One backtest for all time period
+        if date_start is None:
+            date_start = cfg["date_start"]
+        if cfg_file is None:
+            cfg_optim = cfg2process.copy()
+            cfg_optim["date_start"] = date_start
+            backtest_trading = process_logfile(cfg_optim, active_position)
+            positions_test.extend(backtest_trading.session.positions) 
+            val_res.add(backtest_trading.session.profit_hist)
+            val_res.add_profit_curve(backtest_trading.session.profit_hist.df.index,
+                                    backtest_trading.session.profit_hist.df["profit_csum_nofees"]+last_test_profit,
+                                    f"{cfg2process['symbol'].ticker} TEST" if cfg_file is None else None, "r", 1, 0.5)
+            last_test_profit += backtest_trading.session.profit_hist.df["realized_pnl"].iloc[-1]
 
-
+            profit_hist_real = TradeHistory(backtest_trading.session.mw, positions_real, active_position).df
+            assert profit_hist_real.shape[0] > 0, "No real deals in history found"
+            val_res.add_profit_curve(profit_hist_real["dates"], 
+                                    profit_hist_real["profit_csum_nofees"]+last_real_profit,
+                                    f"{cfg2process['symbol'].ticker} REAL" if cfg_file is None else None, "g", 3, 0.5)
+            last_real_profit += profit_hist_real["realized_pnl"].iloc[-1]
+        """
         cfg2process = cfg
     val_res.save_fig()
     val_res.show_fig()
