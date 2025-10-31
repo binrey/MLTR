@@ -1,0 +1,15 @@
+[Unit]
+Description=Algo trading bot
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/MLTR/
+ExecStart=/root/MLTR/env/bin/python run.py bybit configs/%p/%i.py
+Restart=always
+RestartSec=5
+Environment="PYTHONUNBUFFERED=1" "ENV=prod"
+
+[Install]
+WantedBy=multi-user.target
