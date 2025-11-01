@@ -1,6 +1,6 @@
 from collections import defaultdict
 from functools import cached_property
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -102,7 +102,7 @@ class TradeHistory:
         return tickers.pop()
 
 
-class Broker:
+class SingleSymbolBroker:
     def __init__(self, cfg: Dict[str, Any], init_moving_window=True):
         self.symbol:Symbol = cfg["symbol"]
         self.period = cfg["period"]
@@ -143,24 +143,24 @@ class Broker:
         self.start_active_position = position
         self.active_position = position
 
-    # @profile_function
-    def trade_stream(self, callback):
-        for self.hist_window, _ in tqdm(self.mw(), desc="Backtest", total=self.mw.timesteps_count, disable=False):
-            self.time = self.hist_window["Date"][-1]
-            self.hist_id = self.hist_window["Id"][-1]
-            self.open_price = self.hist_window["Open"][-1]
+    def stream_step(self, callback, hist_window: np.ndarray):
+        self.hist_window = hist_window
+        self.time = self.hist_window["Date"][-1]
+        self.hist_id = self.hist_window["Id"][-1]
+        self.open_price = self.hist_window["Open"][-1]
 
-            closed_position = self.update()
-            # Run expert and update active orders
-            callback()
-            closed_position_new = self.update(check_sl_tp=False)
-            if closed_position is None:
-                if closed_position_new is not None:
-                    closed_position = closed_position_new
-            elif closed_position_new is not None:
-                if self.update(check_sl_tp=False) is not None:
-                    raise ValueError("closed positions disagreement!")
+        closed_position = self.update()
+        # Run expert and update active orders
+        callback()
+        closed_position_new = self.update(check_sl_tp=False)
+        if closed_position is None:
+            if closed_position_new is not None:
+                closed_position = closed_position_new
+        elif closed_position_new is not None:
+            if self.update(check_sl_tp=False) is not None:
+                raise ValueError("closed positions disagreement!")
 
+    def stream_postprocess(self):
         if self.active_position is not None and self.close_last_position:
             closed_position = self.close_active_pos(price=self.open_price,
                                       time=self.time,
@@ -168,6 +168,11 @@ class Broker:
             
         self.profit_hist = TradeHistory(self.mw, self.positions, self.start_active_position)
         self.profit_hist.add_info(self.wallet, self.volume_control, self.leverage)
+
+    def trade_stream(self, callback):
+        for hist_window, _ in tqdm(self.mw(), desc="Backtest", total=self.mw.timesteps_count, disable=False):
+            self.stream_step(callback, hist_window)
+        self.stream_postprocess()
 
     def close_orders(self, hist_id, i=None):
         if i is not None:
@@ -328,3 +333,74 @@ class Broker:
                 self.active_orders.remove(order)
 
         return closed_position
+
+
+class MultiSymbolBroker:
+    def __init__(self, cfgs: List[Dict[str, Any]]):
+        # Use ticker string as the key to avoid unhashable Symbol instances
+        self.brokers_by_symbol: Dict[str, SingleSymbolBroker] = {
+            cfg["symbol"].ticker: SingleSymbolBroker(cfg) for cfg in cfgs
+        }
+        if not self.brokers_by_symbol:
+            raise ValueError("MultiSymbolBroker requires at least one cfg")
+        # Select the first symbol by default
+        self.current_ticker: str = next(iter(self.brokers_by_symbol.keys()))
+
+    # --- Symbol management ---
+    def switch_symbol(self, symbol: Symbol | str):
+        ticker = symbol.ticker if isinstance(symbol, Symbol) else symbol
+        if ticker not in self.brokers_by_symbol:
+            raise KeyError(f"Unknown symbol: {ticker}")
+        self.current_ticker = ticker
+
+    @property
+    def current_broker(self) -> SingleSymbolBroker:
+        return self.brokers_by_symbol[self.current_ticker]
+
+    @property
+    def symbols(self) -> List[str]:
+        return list(self.brokers_by_symbol.keys())
+
+    # --- Interface parity with SingleSymbolBroker (proxy to current broker) ---
+    def __getattr__(self, name: str):
+        # Delegate attribute/method access to the current broker
+        return getattr(self.current_broker, name)
+
+    # Explicit proxies for commonly used members (for clarity and IDE support)
+    @property
+    def time(self):
+        return self.current_broker.time
+
+    @property
+    def hist_window(self):
+        return self.current_broker.hist_window
+
+    @property
+    def positions(self):
+        return self.current_broker.positions
+
+    @property
+    def active_position(self):
+        return self.current_broker.active_position
+
+    @property
+    def available_deposit(self):
+        return self.current_broker.available_deposit
+
+    def trade_stream(self, callback: Callable):
+        return self.current_broker.trade_stream(callback)
+
+    def stream_step(self, callback: Callable, hist_window: np.ndarray):
+        return self.current_broker.stream_step(callback, hist_window)
+
+    def stream_postprocess(self):
+        return self.current_broker.stream_postprocess()
+
+    def set_active_orders(self, new_orders_list: List[Order]) -> str:
+        return self.current_broker.set_active_orders(new_orders_list)
+
+    def update_sl(self, sl):
+        return self.current_broker.update_sl(sl)
+
+    def update_tp(self, tp):
+        return self.current_broker.update_tp(tp)

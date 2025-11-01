@@ -11,7 +11,7 @@ from backtesting.optimization import Optimizer
 from common.type import RunType
 from common.utils import Logger, PyConfig
 from trade.backtest import launch as backtest_launch
-from trade.backtest import launch_multirun
+from trade.backtest import launch_sync_multirun
 from trade.bybit import launch as bybit_launch
 
 load_dotenv(override=True)
@@ -25,7 +25,7 @@ def run_backtest(cfg: PyConfig, log_dir: str, log_level: str):
 
 
 def run_multirun(cfgs: list[PyConfig]):
-    launch_multirun(cfgs)
+    launch_sync_multirun(cfgs)
 
 
 def run_optimization(cfg: PyConfig, run_backtests, log_dir: str, log_level: str):

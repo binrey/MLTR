@@ -10,7 +10,7 @@ import pandas as pd
 import stackprinter
 from loguru import logger
 
-from backtesting.backtest_broker import Broker
+from backtesting.backtest_broker import SingleSymbolBroker, MultiSymbolBroker
 from backtesting.utils import BackTestResults
 from data_processing import PULLERS
 from experts.core import Expert
@@ -34,7 +34,7 @@ stackprinter.set_excepthook(style='color')
 
 class BackTest(BaseTradeClass):
     def __init__(self, cfg) -> None:
-        self.session = Broker(cfg)
+        self.session = SingleSymbolBroker(cfg)
         super().__init__(cfg=cfg,
                          expert=Expert(cfg=cfg,
                                       create_orders_func=self.create_orders,
@@ -49,6 +49,9 @@ class BackTest(BaseTradeClass):
             if save_path.exists():
                 rmtree(save_path)
             save_path.mkdir(parents=True)
+
+    def set_multisymbol_session(self, session: MultiSymbolBroker):
+        self.session = session
 
     def get_server_time(self) -> np.datetime64:
         return self.session.time
@@ -107,6 +110,45 @@ def launch(cfg) -> BackTestResults:
     bt_res.save_fig()
 
     return bt_res
+
+
+def launch_sync_multirun(cfgs: list[dict]) -> BackTestResults:
+    session = MultiSymbolBroker(cfgs)
+    bt_res_combined = BackTestResults()
+    bt_res_composition: list[BackTestResults] = []
+    backtest_trading_list: list[BackTest] = []
+    for cfg in cfgs:
+        PULLERS["bybit"](**cfg)
+        backtest_trading = BackTest(cfg)
+        backtest_trading.set_multisymbol_session(session)
+        backtest_trading.initialize()
+        backtest_trading_list.append(backtest_trading)
+
+    mws = [bt.session.mw(output_time=False) for bt in backtest_trading_list]
+    steps_count = len(backtest_trading_list[0].session.mw)
+
+    for i in range(steps_count):
+        for bt, mw in zip(backtest_trading_list, mws):
+            bt.session.stream_step(bt.handle_trade_message, next(mw))
+
+    for bt in backtest_trading_list:
+        bt.session.stream_postprocess()
+        bt_res = BackTestResults()
+        bt_res.add(deepcopy(bt.session.profit_hist))
+        bt_res.eval_daily_metrics()
+        bt_res.print_results()
+        bt_res_composition.append(bt_res)
+        bt_res_combined.add(bt.session.profit_hist)
+        
+    bt_res_combined.eval_daily_metrics()
+    bt_res_combined.print_results()
+    bt_res_combined.plot_results(plot_profit_without_fees=False)
+    
+    colors = get_distinct_colors(len(bt_res_composition))
+    for i, bt_res in enumerate(bt_res_composition):
+        bt_res_combined.add_from_other_results(btest_results=bt_res, color=colors[i % len(colors)])
+    bt_res_combined.save_fig()
+    return bt_res_combined
 
 
 def launch_multirun(cfgs: list[dict]) -> BackTestResults:

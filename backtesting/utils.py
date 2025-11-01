@@ -11,7 +11,7 @@ from loguru import logger
 from PIL import Image
 from io import BytesIO
 
-from backtesting.backtest_broker import Broker, TradeHistory
+from backtesting.backtest_broker import SingleSymbolBroker, TradeHistory
 from common.type import VolEstimRule, to_datetime
 from trade.utils import Position
 

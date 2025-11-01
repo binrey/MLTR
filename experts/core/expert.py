@@ -128,16 +128,6 @@ class Expert:
         if h["Date"][-1] in self.no_trading_days:
             self._reset_state()
 
-        # y = None
-        # if self.cfg.run_model_device and self.order_dir != 0:
-        #     x = build_features(h,
-        #                        self.order_dir,
-        #                        self.stops_processor.cfg.sl,
-        #                        self.cfg.rate
-        #                        )
-        #     x = torch.tensor(x).unsqueeze(0).unsqueeze(0).float().to(self.cfg.run_model_device)
-        #     y = [0.5, 1, 2, 4, 8][self.model.predict(x).item()]
-
         if not target_state.is_active:
             return
 
