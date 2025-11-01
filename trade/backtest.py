@@ -124,21 +124,25 @@ def launch_sync_multirun(cfgs: list[dict]) -> BackTestResults:
         backtest_trading.initialize()
         backtest_trading_list.append(backtest_trading)
 
-    mws = [bt.session.mw(output_time=False) for bt in backtest_trading_list]
-    steps_count = len(backtest_trading_list[0].session.mw)
+    # Create per-symbol moving window generators from the underlying single-symbol brokers
+    mws = [session.brokers_by_symbol[bt.ticker].mw(output_time=False) for bt in backtest_trading_list]
+    # Use the shortest history among symbols to avoid StopIteration
+    steps_count = min(len(session.brokers_by_symbol[bt.ticker].mw) for bt in backtest_trading_list)
 
     for i in range(steps_count):
         for bt, mw in zip(backtest_trading_list, mws):
-            bt.session.stream_step(bt.handle_trade_message, next(mw))
+            session.switch_symbol(bt.ticker)
+            session.stream_step(bt.handle_trade_message, next(mw))
 
     for bt in backtest_trading_list:
-        bt.session.stream_postprocess()
+        session.switch_symbol(bt.ticker)
+        session.stream_postprocess()
         bt_res = BackTestResults()
-        bt_res.add(deepcopy(bt.session.profit_hist))
+        bt_res.add(deepcopy(session.profit_hist))
         bt_res.eval_daily_metrics()
         bt_res.print_results()
         bt_res_composition.append(bt_res)
-        bt_res_combined.add(bt.session.profit_hist)
+        bt_res_combined.add(session.profit_hist)
         
     bt_res_combined.eval_daily_metrics()
     bt_res_combined.print_results()

@@ -277,6 +277,7 @@ class BackTestResults:
                  f"{self.metrics.max_period:.0f} days",
                  color="r",
                  fontsize=12)
+        self.legend_ax1.append("ATH period")
 
         ax2.plot(
             self.daily_hist.index,

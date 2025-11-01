@@ -388,7 +388,7 @@ class MultiSymbolBroker:
         return self.current_broker.available_deposit
 
     def trade_stream(self, callback: Callable):
-        return self.current_broker.trade_stream(callback)
+        raise NotImplementedError
 
     def stream_step(self, callback: Callable, hist_window: np.ndarray):
         return self.current_broker.stream_step(callback, hist_window)
