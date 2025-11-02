@@ -25,6 +25,11 @@ def run_backtest(cfg: PyConfig, log_dir: str, log_level: str):
 
 
 def run_multirun(cfgs: list[PyConfig]):
+    assert all(cfgs[0]["name"] == cfg["name"] for cfg in cfgs), "All experts must be the same"
+    assert all(cfgs[0]["period"] == cfg["period"] for cfg in cfgs), "All periods must be the same"
+    logger_wrapper = Logger(log_dir=log_dir,
+                            log_level=log_level)
+    logger_wrapper.initialize(cfgs[0]["name"], cfgs[0]["symbol"].ticker, cfgs[0]["period"].value, cfgs[0]["clear_logs"])
     launch_sync_multirun(cfgs)
 
 

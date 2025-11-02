@@ -1,16 +1,12 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable
-
+from typing import Any, Callable, Optional
 from loguru import logger
-
-# import torch
 from backtesting.backtest_broker import Position
 from common.type import Side, Symbol, VolEstimRule
 from experts.core.decision_maker import DecisionMaker
 from experts.core.position_control import StopsController, TrailingStop
-
-# from indicators import *
+from trade.utils import ORDER_TYPE, Order
 
 
 def init_target_from_cfg(cfg):
@@ -22,7 +18,6 @@ def init_target_from_cfg(cfg):
 class Expert:
     def __init__(self,
                  cfg: dict[str, Any],
-                 create_orders_func: Callable[[Side, float, int], None],
                  modify_sl_func: Callable[[float], None],
                  modify_tp_func: Callable[[float], None]):
         self.symbol: Symbol = cfg["symbol"]
@@ -59,17 +54,23 @@ class Expert:
         self.active_position = None
         self.deposit = self.wallet
         
-        self.create_orders = create_orders_func
         self.modify_sl = modify_sl_func
         self.modify_tp = modify_tp_func
 
     def __str__(self):
         return f"{str(self.decision_maker)} sl: {str(self.sl_processor)}  tp: {str(self.tp_processor)}"
 
-    def update(self, h, active_position: Position, deposit: float):
-        self.active_position = active_position
+    def update(self, h, active_positions: Optional[list[Position]] = None, deposit: float = 0):
+        if active_positions is not None:
+            self.active_positions = {p.ticker: p for p in active_positions}
+        else:
+            self.active_positions = {}
+        self.active_symbols: list[Symbol] = list(self.active_positions.keys())
+        self.active_position = self.active_positions.get(self.symbol.ticker, None)
+        
+        self.free_wallet = self.wallet - sum(p.cost for p in self.active_positions.values() if p.ticker != self.symbol)
         self.deposit = deposit
-        self.get_body(h)
+        return self.get_body(h)
 
     def _reset_state(self):
         """Resets the expert state on no trading days."""
@@ -79,6 +80,8 @@ class Expert:
     def estimate_volume(self, h):
         if self.volume_control.rule is VolEstimRule.FIXED_POS_COST:
             base = self.volume_control.define(self.wallet)
+        elif self.volume_control.rule is VolEstimRule.ALL_OR_EQUAL:
+            base = self.wallet / (len(self.active_symbols) + 1)
         elif self.volume_control.rule is VolEstimRule.DEPOSIT_BASED:
             base = self.volume_control.define(self.deposit)
         else:
@@ -121,7 +124,7 @@ class Expert:
         self.decision_maker.update_inner_state(h)
 
         if self.close_only_by_stops and self.active_position:
-            return
+            return []
 
         target_state: DecisionMaker.Response = self.decision_maker.look_around(h)
 
@@ -129,7 +132,7 @@ class Expert:
             self._reset_state()
 
         if not target_state.is_active:
-            return
+            return []
 
         max_volume = self.estimate_volume(h)
 
@@ -183,12 +186,23 @@ class Expert:
                     order_volume = max(0, target_volume - self.active_position.volume)
 
         if order_volume > 0:
-            self.create_orders(side=target_state.side,
-                               volume=order_volume,
-                               time_id=h["Id"][-1])
-
-    def close_current_position(self):
-        if self.active_position is not None:
-            self.create_orders(side=Side.reverse(self.active_position.side),
-                               volume=self.active_position.volume,
-                               time_id=None)
+            orders = []
+            if self.volume_control.rule is VolEstimRule.ALL_OR_EQUAL:
+                for ticker, position in self.active_positions.items():
+                    if ticker != self.symbol.ticker:
+                        orders.append(Order(price=0, 
+                                            ticker=ticker,
+                                            side=Side.reverse(position.side), 
+                                            type=ORDER_TYPE.MARKET, 
+                                            volume=float(position.volume/2), # TODO: check if this is correct
+                                            time=h["Date"][-1], 
+                                            indx=h["Id"][-1]))
+            orders.append(Order(price=0,
+                                ticker=self.symbol.ticker,
+                                side=target_state.side, 
+                                type=ORDER_TYPE.MARKET, 
+                                volume=order_volume, 
+                                time=h["Date"][-1], 
+                                indx=h["Id"][-1]))
+            return orders
+        return []

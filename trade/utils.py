@@ -13,13 +13,11 @@ from data_processing.dataloading import DTYPE
 
 
 def log_creating_order(func: Callable[..., Any]) -> Callable[..., Any]:
-    def wrapper(self, side: Side, volume: float, time_id: Optional[int] = None):
-        logger.debug(f"Creating order {side} {volume}...")
-        result = func(self, side, volume, time_id)
-        if isinstance(result, list):
-            result = " ".join(map(str, result))
-        logger.debug(f"Orders created: {result}")
-        return result
+    def wrapper(self, order: Order):
+        logger.debug(f"Creating order {order.id}...")
+        func(self, order)
+        logger.debug(f"Order created: {order.id}")
+        return order
     return wrapper
 
 
@@ -66,12 +64,13 @@ class ORDER_TYPE(Enum):
 
 
 class Order:
-    def __init__(self, price: float, side: Side, type: ORDER_TYPE, volume: int, indx: int, time: np.datetime64):
+    def __init__(self, price: float, ticker: str, side: Side, type: ORDER_TYPE, volume: int, time: np.datetime64, indx: Optional[int] = None):
         self.price = price
+        self.ticker = ticker
         self.side = side
         self.type = type
         self.volume = volume
-        self.open_indx = indx
+        self.open_indx = indx if indx is not None else 0
         self.open_date = time
         self.close_date = None
 
@@ -84,7 +83,7 @@ class Order:
 
     @property
     def id(self):
-        return f"{self.open_indx}-{self.str_dir}-{self.price:.2f}"
+        return f"{self.ticker}-{self.open_indx}-{self.str_dir}-{self.price:.2f}"
 
     def close(self, date):
         self.close_date = date

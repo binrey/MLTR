@@ -19,7 +19,7 @@ from common.type import Side, Symbol, Vis
 from common.utils import Telebot, date2str
 from common.visualization import Visualizer
 from experts.core.expert import Expert
-from trade.utils import Position
+from trade.utils import ORDER_TYPE, Order, Position
 
 pd.options.mode.chained_assignment = None
 
@@ -142,6 +142,7 @@ class BaseTradeClass(ABC):
         self.log_trades = cfg['log_trades']
         self.handle_trade_errors = cfg['handle_trade_errors']
         self.verify_data = cfg.get('verify_data', False)
+        self.log_config = cfg['log_config']
         self.save_path = Path(os.getenv(
             "LOG_DIR"), cfg["conftype"].value, cfg["name"], f"{self.ticker}-{self.period.value}")
         self.save_path.mkdir(parents=True, exist_ok=True)
@@ -168,6 +169,10 @@ class BaseTradeClass(ABC):
 
     @abstractmethod
     def get_server_time(self) -> np.datetime64:
+        pass
+
+    @abstractmethod
+    def get_all_active_positions(self) -> list[Position]:
         pass
 
     @abstractmethod
@@ -253,15 +258,20 @@ class BaseTradeClass(ABC):
             cur_side = open_position.side
         return Symbol.round_qty(qty=target_volume - cur_volume*cur_side.value, qty_step=self.qty_step)
 
-    def create_orders(self, side: Side, volume: float, time_id: Optional[int] = None):
-        volume = Symbol.round_qty(qty=volume, qty_step=self.qty_step)
+    def create_orders(self, orders: list[Order]):
+        for order in orders:
+            self.create_order(order)
+        return orders
+
+    def create_order(self, order: Order):
+        volume = Symbol.round_qty(qty=order.volume, qty_step=self.qty_step)
         if not volume:
             return
         if self.pos.curr is None:
-            target_volume = volume*side.value
+            target_volume = volume * order.side.value
         else:
-            target_volume = Symbol.round_qty(qty=self.pos.curr.volume*self.pos.curr.side.value + volume*side.value, qty_step=self.qty_step)
-        self._create_orders(side, volume, time_id)
+            target_volume = Symbol.round_qty(qty=self.pos.curr.volume*self.pos.curr.side.value + volume*order.side.value, qty_step=self.qty_step)
+        self._create_order(order)
 
         if self.handle_trade_errors:
             open_position = self.get_open_position()
@@ -274,7 +284,13 @@ class BaseTradeClass(ABC):
             n_attempts = 0
             while volume_diff != 0:
                 logger.warning(f"Volume diff: {volume_diff}, target_volume: {target_volume}")
-                self._create_orders(side=Side.from_int(volume_diff), volume=abs(volume_diff), time_id=time_id)
+                order2correct = Order(price=0, 
+                                      side=Side.from_int(volume_diff), 
+                                      type=ORDER_TYPE.MARKET, 
+                                      volume=abs(volume_diff), 
+                                      time=self.time.curr, 
+                                      indx=self.time.curr.astype(np.int64))
+                self._create_order(order2correct)
                 volume_diff = self._compute_volume_diff(self.get_open_position(), target_volume)
                 n_attempts += 1
                 if n_attempts > 10:
@@ -294,7 +310,8 @@ class BaseTradeClass(ABC):
         if self.time.changed(no_none=True):
             self.update()
             self.config_logger.update_config(self.time.curr)
-            self.config_logger.log_config()
+            if self.log_config:
+                self.config_logger.log_config()
             msg = f"{self.ticker}-{self.period.value}: {str(self.pos.curr) if self.pos.curr is not None else 'None'}"
             logger.debug(msg)
             if self.my_telebot is not None:
@@ -348,8 +365,13 @@ class BaseTradeClass(ABC):
         if self.pos.curr is not None:
             self.exp.active_position = self.pos.curr
             if close_current_position:
-                self.exp.close_current_position()
-                sleep(3)
+                self.create_order(Order(price=0,
+                                        ticker=self.pos.curr.ticker,
+                                        side=Side.reverse(self.pos.curr.side),
+                                        type=ORDER_TYPE.MARKET,
+                                        volume=float(self.pos.curr.volume),
+                                        time=self.time.curr,
+                                        indx=self.time.curr.astype(np.int64)))
                 self.update_market_state()
                 self.clear_log_dir()
             else:
@@ -403,6 +425,8 @@ class BaseTradeClass(ABC):
         if self.vis_events == Vis.ON_STEP:
             self.vis()
 
-        self.exp_update(self.h, self.pos.curr, self.deposit)
+        orders = self.exp_update(self.h, self.get_all_active_positions(), self.deposit)
+        if orders:
+            self.create_orders(orders)
         if self.should_save_backup:
             self.save_backup()

@@ -82,7 +82,7 @@ class TradeHistory:
         # Correct deposit for volume control rule
         if volume_control.rule == VolEstimRule.DEPOSIT_BASED:
             self.deposit = max(wallet, self.max_loss)
-        elif volume_control.rule == VolEstimRule.FIXED_POS_COST:
+        elif volume_control.rule == VolEstimRule.FIXED_POS_COST or volume_control.rule == VolEstimRule.ALL_OR_EQUAL:
             self.deposit = wallet + self.max_loss
         else:
             raise ValueError(f"Unknown volume control rule: {volume_control.rule}")
@@ -144,14 +144,21 @@ class SingleSymbolBroker:
         self.active_position = position
 
     def stream_step(self, callback, hist_window: np.ndarray):
+        closed_position = self.pre_expert_update(hist_window)
+        # Run expert and update active orders
+        callback()
+        self.post_expert_update(closed_position)
+        
+    def pre_expert_update(self, hist_window):
         self.hist_window = hist_window
         self.time = self.hist_window["Date"][-1]
         self.hist_id = self.hist_window["Id"][-1]
         self.open_price = self.hist_window["Open"][-1]
 
         closed_position = self.update()
-        # Run expert and update active orders
-        callback()
+        return closed_position
+
+    def post_expert_update(self, closed_position):
         closed_position_new = self.update(check_sl_tp=False)
         if closed_position is None:
             if closed_position_new is not None:
@@ -191,6 +198,12 @@ class SingleSymbolBroker:
         if self.active_position is not None and tp is not None:
             self.active_position.update_tp(tp, self.time)
 
+    def set_active_order(self, order: Order):
+        for active_order in self.active_orders:
+            if active_order.open_indx != order.open_indx:
+                self.close_orders(self.hist_id)
+        self.active_orders.append(order)
+
     def set_active_orders(self, new_orders_list: List[Order]) -> str:
         if len(new_orders_list):
             self.close_orders(self.hist_id)
@@ -225,7 +238,8 @@ class SingleSymbolBroker:
 
         if self.active_position is not None and self.active_position.sl is not None:
             self.active_orders.append(Order(
-                            price=self.active_position.sl, 
+                            price=self.active_position.sl,
+                            ticker=self.active_position.ticker,
                             side=Side.reverse(self.active_position.side), 
                             type=ORDER_TYPE.STOPLOSS,
                             volume=self.active_position.volume,
@@ -235,6 +249,7 @@ class SingleSymbolBroker:
         if self.active_position is not None and self.active_position.tp is not None:
             self.active_orders.append(Order(
                             price=self.active_position.tp, 
+                            ticker=self.active_position.ticker,
                             side=Side.reverse(self.active_position.side), 
                             type=ORDER_TYPE.TAKEPROF,
                             volume=self.active_position.volume,
@@ -361,6 +376,17 @@ class MultiSymbolBroker:
     def symbols(self) -> List[str]:
         return list(self.brokers_by_symbol.keys())
 
+    def set_active_order(self, order: Order):
+        current_broker = self.brokers_by_symbol[order.ticker]
+        for active_order in current_broker.active_orders:
+            if active_order.open_indx != order.open_indx:
+                current_broker.close_orders(order.open_indx)
+        current_broker.active_orders.append(order)
+
+    def set_active_orders(self, orders_list: List[Order]) -> str:
+        for order in orders_list:
+            self.set_active_order(order)
+
     # --- Interface parity with SingleSymbolBroker (proxy to current broker) ---
     def __getattr__(self, name: str):
         # Delegate attribute/method access to the current broker
@@ -382,6 +408,11 @@ class MultiSymbolBroker:
     @property
     def active_position(self):
         return self.current_broker.active_position
+
+    @property
+    def active_pos_for_all_symbols(self):
+        return [broker.active_position for broker in self.brokers_by_symbol.values()
+                if broker.active_position is not None]
 
     @property
     def available_deposit(self):

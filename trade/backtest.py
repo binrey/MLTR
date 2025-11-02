@@ -2,7 +2,7 @@ import random
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
-from typing import Optional
+from typing import Any, Generator, Optional
 
 import matplotlib.colors as mcolors
 import numpy as np
@@ -37,7 +37,6 @@ class BackTest(BaseTradeClass):
         self.session = SingleSymbolBroker(cfg)
         super().__init__(cfg=cfg,
                          expert=Expert(cfg=cfg,
-                                      create_orders_func=self.create_orders,
                                       modify_sl_func=self.modify_sl,
                                       modify_tp_func=self.modify_tp),
                          telebot=None)
@@ -59,6 +58,9 @@ class BackTest(BaseTradeClass):
     def get_current_position(self) -> Position:
         return self.session.active_position
 
+    def get_all_active_positions(self) -> list[Position]:
+        return self.session.active_pos_for_all_symbols
+
     def get_open_position(self):
         return self.session.active_position
 
@@ -75,8 +77,12 @@ class BackTest(BaseTradeClass):
         return self.qty_step
 
     @log_creating_order
-    def _create_orders(self, side, volume, time_id):
-        orders = [Order(0, side, ORDER_TYPE.MARKET, volume, time_id, time_id)]
+    def _create_order(self, order: Order):
+        self.session.set_active_order(order)
+        return order
+
+    def _create_orders(self, orders_dict_list: list[dict[str, list[Order]]]):
+        orders = [Order(0, order["side"], ORDER_TYPE.MARKET, order["volume"], order["time_id"], order["time_id"]) for order in orders_dict_list]
         self.session.set_active_orders(orders)
         return orders
         
@@ -130,9 +136,16 @@ def launch_sync_multirun(cfgs: list[dict]) -> BackTestResults:
     steps_count = min(len(session.brokers_by_symbol[bt.ticker].mw) for bt in backtest_trading_list)
 
     for i in range(steps_count):
+        closed_positions = []
         for bt, mw in zip(backtest_trading_list, mws):
             session.switch_symbol(bt.ticker)
-            session.stream_step(bt.handle_trade_message, next(mw))
+            closed_positions.append(session.pre_expert_update(next(mw)))
+        for bt in backtest_trading_list:
+            session.switch_symbol(bt.ticker)
+            bt.handle_trade_message()
+        for bt, closed_position in zip(backtest_trading_list, closed_positions):
+            session.switch_symbol(bt.ticker)
+            session.post_expert_update(closed_position)
 
     for bt in backtest_trading_list:
         session.switch_symbol(bt.ticker)

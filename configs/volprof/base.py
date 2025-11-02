@@ -38,7 +38,7 @@ config = dict(
     wallet=1000,
     volume_control=dict(
         type=VolumeControl,
-        rule=VolEstimRule.FIXED_POS_COST,
+        rule=VolEstimRule.ALL_OR_EQUAL,
         deposit_fraction=1,
     ),
     leverage=1,
@@ -65,12 +65,13 @@ config = dict(
 backtest = update_config(
     config,
     conftype=ConfigType.BACKTEST,
-    date_start=np.datetime64("2018-01-01T00:00:00"),
-    date_end=np.datetime64("2025-07-06T00:00:00"),
+    date_start=np.datetime64("2023-10-01T00:00:00"),
+    date_end=np.datetime64("2025-11-01T00:00:00"),
     eval_buyhold=False,
     clear_logs=True,
-    log_trades=True,
+    log_trades=False,
     verify_data=False,
+    log_config=False,
 )
 
 optimization = update_config(
@@ -89,7 +90,8 @@ optimization = update_config(
         },
     decision_maker={
         "sharpness": [3, 4, 5],
-        }
+        },
+    log_config=False,
     )
 
 bybit = update_config(
@@ -102,4 +104,5 @@ bybit = update_config(
     save_backup=True,
     handle_trade_errors=True,
     verify_data=True,
+    log_config=True,
 )

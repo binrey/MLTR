@@ -105,6 +105,7 @@ class RunType(Enum):
 class VolEstimRule(Enum):
     FIXED_POS_COST = "fixed_pos_cost"
     DEPOSIT_BASED = "deposit_based"
+    ALL_OR_EQUAL = "all_or_equal"
 
 @dataclass
 class VolumeControl:
@@ -112,7 +113,7 @@ class VolumeControl:
     deposit_fraction: float = 1
 
     def define(self, deposit: float) -> float:
-        return deposit*self.deposit_fraction
+        return deposit * self.deposit_fraction
 
 Point = Tuple[np.datetime64, float]
 Bar = Tuple[float, float]
