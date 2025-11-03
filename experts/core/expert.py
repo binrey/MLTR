@@ -81,7 +81,7 @@ class Expert:
         if self.volume_control.rule is VolEstimRule.FIXED_POS_COST:
             base = self.volume_control.define(self.wallet)
         elif self.volume_control.rule is VolEstimRule.ALL_OR_EQUAL:
-            base = self.wallet / (len(self.active_symbols) + 1)
+            base = self.wallet / (len([s for s in self.active_symbols if s != self.symbol.ticker]) + 1)
         elif self.volume_control.rule is VolEstimRule.DEPOSIT_BASED:
             base = self.volume_control.define(self.deposit)
         else:
@@ -197,12 +197,15 @@ class Expert:
                                             volume=float(position.volume/2), # TODO: check if this is correct
                                             time=h["Date"][-1], 
                                             indx=h["Id"][-1]))
-            orders.append(Order(price=0,
-                                ticker=self.symbol.ticker,
-                                side=target_state.side, 
-                                type=ORDER_TYPE.MARKET, 
-                                volume=order_volume, 
-                                time=h["Date"][-1], 
-                                indx=h["Id"][-1]))
+
+            order_volume = Symbol.round_qty(qty=order_volume, qty_step=self.symbol.qty_step)
+            if order_volume:
+                orders.append(Order(price=0,
+                                    ticker=self.symbol.ticker,
+                                    side=target_state.side, 
+                                    type=ORDER_TYPE.MARKET, 
+                                    volume=order_volume, 
+                                    time=h["Date"][-1], 
+                                    indx=h["Id"][-1]))
             return orders
         return []

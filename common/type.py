@@ -165,7 +165,7 @@ class Symbol:
 
     @classmethod
     def round_qty(cls, qty: float, qty_step: float):
-        return round(math.floor(qty / qty_step) * qty_step, cls.qty_digits(qty_step))
+        return round(math.floor(qty / qty_step) * qty_step, cls.qty_digits(qty_step)) # TODO: check if this is correct 56.99999 -> 56
 
     @classmethod
     def round_price(cls, tick_size: float, price: float):
