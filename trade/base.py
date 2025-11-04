@@ -172,10 +172,6 @@ class BaseTradeClass(ABC):
         pass
 
     @abstractmethod
-    def get_all_active_positions(self) -> list[Position]:
-        pass
-
-    @abstractmethod
     def get_current_position(self) -> Position:
         pass
 
@@ -309,6 +305,10 @@ class BaseTradeClass(ABC):
 
         if self.time.changed(no_none=True):
             self.update()
+            orders = self.exp_update(self.h, self.pos.curr, self.deposit)
+            self.create_orders(orders)
+            if self.should_save_backup:
+                self.save_backup()
             self.config_logger.update_config(self.time.curr)
             if self.log_config:
                 self.config_logger.log_config()
@@ -424,9 +424,3 @@ class BaseTradeClass(ABC):
 
         if self.vis_events == Vis.ON_STEP:
             self.vis()
-
-        orders = self.exp_update(self.h, self.get_all_active_positions(), self.deposit)
-        if orders:
-            self.create_orders(orders)
-        if self.should_save_backup:
-            self.save_backup()

@@ -60,15 +60,8 @@ class Expert:
     def __str__(self):
         return f"{str(self.decision_maker)} sl: {str(self.sl_processor)}  tp: {str(self.tp_processor)}"
 
-    def update(self, h, active_positions: Optional[list[Position]] = None, deposit: float = 0):
-        if active_positions is not None:
-            self.active_positions = {p.ticker: p for p in active_positions}
-        else:
-            self.active_positions = {}
-        self.active_symbols: list[Symbol] = list(self.active_positions.keys())
-        self.active_position = self.active_positions.get(self.symbol.ticker, None)
-        
-        self.free_wallet = self.wallet - sum(p.cost for p in self.active_positions.values() if p.ticker != self.symbol)
+    def update(self, h, active_position: Optional[Position] = None, deposit: float = 0):
+        self.active_position = active_position        
         self.deposit = deposit
         return self.get_body(h)
 
@@ -81,7 +74,7 @@ class Expert:
         if self.volume_control.rule is VolEstimRule.FIXED_POS_COST:
             base = self.volume_control.define(self.wallet)
         elif self.volume_control.rule is VolEstimRule.ALL_OR_EQUAL:
-            base = self.wallet / (len([s for s in self.active_symbols if s != self.symbol.ticker]) + 1)
+            base = self.wallet
         elif self.volume_control.rule is VolEstimRule.DEPOSIT_BASED:
             base = self.volume_control.define(self.deposit)
         else:
@@ -186,26 +179,14 @@ class Expert:
                     order_volume = max(0, target_volume - self.active_position.volume)
 
         if order_volume > 0:
-            orders = []
-            if self.volume_control.rule is VolEstimRule.ALL_OR_EQUAL:
-                for ticker, position in self.active_positions.items():
-                    if ticker != self.symbol.ticker:
-                        orders.append(Order(price=0, 
-                                            ticker=ticker,
-                                            side=Side.reverse(position.side), 
-                                            type=ORDER_TYPE.MARKET, 
-                                            volume=float(position.volume/2), # TODO: check if this is correct
-                                            time=h["Date"][-1], 
-                                            indx=h["Id"][-1]))
-
             order_volume = Symbol.round_qty(qty=order_volume, qty_step=self.symbol.qty_step)
             if order_volume:
-                orders.append(Order(price=0,
-                                    ticker=self.symbol.ticker,
-                                    side=target_state.side, 
-                                    type=ORDER_TYPE.MARKET, 
-                                    volume=order_volume, 
-                                    time=h["Date"][-1], 
-                                    indx=h["Id"][-1]))
-            return orders
+                order = Order(price=0,
+                              ticker=self.symbol.ticker,
+                              side=target_state.side, 
+                              type=ORDER_TYPE.MARKET, 
+                              volume=order_volume, 
+                              time=h["Date"][-1], 
+                              indx=h["Id"][-1])
+            return [order]
         return []
