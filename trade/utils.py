@@ -8,7 +8,7 @@ import pandas as pd
 from loguru import logger
 
 from common.type import Line, Point, Side, to_datetime
-from common.utils import FeeConst, FeeModel, date2str
+from common.utils import FeeRate, date2str
 from data_processing.dataloading import DTYPE
 
 
@@ -102,7 +102,7 @@ class Position:
         period: str = "M5",
         sl: Optional[float] = None,
         tp: Optional[float] = None,
-        fee_rate: Optional[FeeModel] = None,
+        fee_rate: Optional[FeeRate] = None,
         fee: float = None,
     ):
         self.vol_round = int(1/qty_step)
@@ -133,7 +133,7 @@ class Position:
         self.close_indx = None
         self.profit = None
         self.profit_abs = None
-        self.fee_rate = fee_rate if fee_rate is not None else FeeConst(0, 0)
+        self.fee_rate = fee_rate if fee_rate is not None else FeeRate()
         self.fees = 0
         self.fees_abs = 0
         self._update_fees(self.open_price, self.volume, fee)
@@ -174,6 +174,7 @@ class Position:
     def _update_fees(self, price, volume, fee: Optional[float] = None):
         if fee is None:
             fee = self.fee_rate.order_execution_fee(price, volume)
+            slippage = self.fee_rate.order_execution_slippage(price, volume) # TODO: implement slippage calculation only if it's not a market order
             if self.close_date is not None and self.open_date is not None:
                 fee += self.fee_rate.position_suply_fee(
                     self.open_date,
@@ -181,7 +182,7 @@ class Position:
                     (self.open_price + self.close_price) / 2,
                     volume,
                 )
-        self.fees_abs += fee
+        self.fees_abs += fee + slippage
         self.fees = self.fees_abs / self.volume / self.open_price * 100
 
     def _update_profit_abs(self, price, volume):

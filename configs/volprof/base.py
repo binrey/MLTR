@@ -38,7 +38,7 @@ config = dict(
     wallet=1000,
     volume_control=dict(
         type=VolumeControl,
-        rule=VolEstimRule.ALL_OR_EQUAL,
+        rule=VolEstimRule.FIXED_POS_COST,
         deposit_fraction=1,
     ),
     leverage=1,
@@ -50,7 +50,10 @@ config = dict(
     period=TimePeriod.M60,
     symbol=Symbols.BTCUSDT,
     data_type="bybit",
-    fee_rate=FeeRate(0.1, 0.00016),
+    fee_rate=FeeRate(
+        order_execution_rate=0.1, 
+        order_execution_slippage_rate=0.015, 
+        position_suply_rate=0.00016),
     save_backup=False,
     save_plots=False,
     vis_events=Vis.ON_DEAL,
@@ -65,7 +68,7 @@ config = dict(
 backtest = update_config(
     config,
     conftype=ConfigType.BACKTEST,
-    date_start=np.datetime64("2023-10-01T00:00:00"),
+    date_start=np.datetime64("2018-01-01T00:00:00"),
     date_end=np.datetime64("2025-11-01T00:00:00"),
     eval_buyhold=False,
     clear_logs=True,
@@ -98,7 +101,6 @@ bybit = update_config(
     config,
     leverage=1,
     conftype=ConfigType.BYBIT,
-    credentials="bybit_volprof",
     clear_logs=False,
     log_trades=True,
     save_backup=True,

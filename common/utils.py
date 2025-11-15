@@ -159,36 +159,24 @@ def update_config(config, **kwargs):
 
 
 @dataclass
-class FeeModel(ABC):
+
+class FeeRate:
     order_execution_rate: float = field(default=0, hash=True)
     position_suply_rate: float = field(default=0, hash=True)
-    
-    @abstractmethod
-    def order_execution_fee(self, price, volume):
-        pass
-    
-    @abstractmethod
-    def position_suply_fee(self, open_date, close_date, mean_price, volume):
-        pass
+    order_execution_slippage_rate: float = field(default=0, hash=True)
     
     def __hash__(self):
-        return hash((self.order_execution_rate, self.position_suply_rate))
+        return hash((self.order_execution_rate, self.position_suply_rate, self.order_execution_slippage_rate))
 
-class FeeRate(FeeModel):
     def order_execution_fee(self, price, volume):
         return price * volume * self.order_execution_rate / 100
+
+    def order_execution_slippage(self, price, volume):
+        return price * volume * self.order_execution_slippage_rate / 100
     
     def position_suply_fee(self, open_date, close_date, mean_price, volume):
         h8_count = np.diff([open_date, close_date]).astype('timedelta64[h]').astype(np.float32).item()/8
         return self.position_suply_rate / 100 * h8_count * mean_price * volume
-    
-class FeeConst(FeeModel):
-    def order_execution_fee(self, price, volume):
-        return volume * self.order_execution_rate
-    
-    def position_suply_fee(self, open_date, close_date, mean_price, volume):
-        h8_count = np.diff([open_date, close_date]).astype('timedelta64[h]').astype(np.float32).item()/24
-        return self.position_suply_rate * h8_count * volume
 
     
 def date2str(date: np.datetime64 | pd.Timestamp, step="s") -> str:

@@ -142,7 +142,7 @@ class BaseTradeClass(ABC):
         self.log_trades = cfg['log_trades']
         self.handle_trade_errors = cfg['handle_trade_errors']
         self.verify_data = cfg.get('verify_data', False)
-        self.log_config = cfg['log_config']
+        self.log_config = cfg.get('log_config', False)
         self.save_path = Path(os.getenv(
             "LOG_DIR"), cfg["conftype"].value, cfg["name"], f"{self.ticker}-{self.period.value}")
         self.save_path.mkdir(parents=True, exist_ok=True)
