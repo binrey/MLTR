@@ -159,7 +159,6 @@ def update_config(config, **kwargs):
 
 
 @dataclass
-
 class FeeRate:
     order_execution_rate: float = field(default=0, hash=True)
     position_suply_rate: float = field(default=0, hash=True)

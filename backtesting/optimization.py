@@ -157,11 +157,12 @@ class Optimizer:
         def best_score(self) -> float:
             return self.opt_summary.iloc[0][self.score_name]
 
-    def __init__(self, optim_cfg: Dict[str, Any], results_dir="results/optimization", sortby: str = "APR"):
+    def __init__(self, optim_cfg: Dict[str, Any], results_dir="results/optimization"):
         self.results_dir = Path(results_dir)
         self.results_dir.mkdir(exist_ok=True, parents=True)
         self.cache_dir = Path(".cache/backtests")
-        self.sortby = sortby
+        self.sortby = optim_cfg.get("param2sort", "APR")
+        self.find_best_multistrategy = optim_cfg.get("find_best_multistrategy", False)
         self.cfg = optim_cfg
         self.cfgs = []
         self.bt_results: List[TradeHistory] = []
@@ -242,7 +243,9 @@ class Optimizer:
         # Validate dates
         self._validate_backtest_dates()
         # Find best multistrategy
-        multistrategy_test = self.find_best_multistrategy(num_backtests=4)
+        multistrategy_test = None
+        if self.find_best_multistrategy:
+            multistrategy_test = self._find_best_multistrategy(num_backtests=4)
         # Generate optimization summary
         opt_summary = self._generate_optimization_summary()
 
@@ -346,7 +349,7 @@ class Optimizer:
         opt_summary.sort_values(by=["APR"], ascending=False, inplace=True)
         return opt_summary
 
-    def find_best_multistrategy(self, num_backtests: int = 10) -> BackTestResults:
+    def _find_best_multistrategy(self, num_backtests: int = 10) -> BackTestResults:
         """
         Find the combination of backtests provided best APR.
         """
@@ -359,11 +362,11 @@ class Optimizer:
         sorted_btest_ids = sorted(metrics, key=lambda x: metrics[x], reverse=True)
         btest_selected = sorted_btest_ids[0]
         best_setup, best_metric = [btest_selected], metrics[btest_selected]
-        print(f"+ {btest_selected}: {self.bt_results[btest_selected].ticker} {best_metric:.2f}")
+        logger.info(f"+ {btest_selected}: {self.bt_results[btest_selected].ticker} {best_metric:.2f}")
         
         for adding_iter in range(1, num_backtests):
             btest_selected = None
-            print(f"{adding_iter} {best_setup} {best_metric:.2f}")
+            logger.info(f"{adding_iter} {best_setup} {best_metric:.2f}")
             for btest2add in sorted_btest_ids:
                 if btest2add in best_setup:
                     continue
@@ -376,13 +379,13 @@ class Optimizer:
                 if multistrategy_test.metrics.recovery_factor > best_metric:
                     best_metric = multistrategy_test.metrics.recovery_factor
                     btest_selected = btest2add
-                    print(f"+ {btest_selected}: {trade_hist.ticker} {best_metric:.2f}")
+                    logger.info(f"+ {btest_selected}: {trade_hist.ticker} {best_metric:.2f}")
             if btest_selected is None:
                 break
             else:
                 best_setup.append(btest_selected)
                     
-        print(best_setup)
+        logger.info(best_setup)
         multistrategy_best = BackTestResults()          
         for btest_id in best_setup:
             trade_hist = self.bt_results[btest_id]

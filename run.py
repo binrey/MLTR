@@ -11,7 +11,7 @@ from backtesting.optimization import Optimizer
 from common.type import RunType
 from common.utils import Logger, PyConfig
 from trade.backtest import launch as backtest_launch
-from trade.backtest import launch_sync_multirun
+from trade.backtest import launch_multirun, launch_sync_multirun
 from trade.bybit import launch as bybit_launch
 
 load_dotenv(override=True)
@@ -25,8 +25,12 @@ def run_backtest(cfg: PyConfig, log_dir: str, log_level: str):
 
 
 def run_multirun(cfgs: list[PyConfig]):
-    assert all(cfgs[0]["name"] == cfg["name"] for cfg in cfgs), "All experts must be the same"
-    assert all(cfgs[0]["period"] == cfg["period"] for cfg in cfgs), "All periods must be the same"
+    logger_wrapper = Logger(log_dir=log_dir,
+                            log_level=log_level)
+    logger_wrapper.initialize(cfgs[0]["name"], cfgs[0]["symbol"].ticker, cfgs[0]["period"].value, cfgs[0]["clear_logs"])
+    launch_multirun(cfgs)
+
+def run_sync_multirun(cfgs: list[PyConfig]):
     logger_wrapper = Logger(log_dir=log_dir,
                             log_level=log_level)
     logger_wrapper.initialize(cfgs[0]["name"], cfgs[0]["symbol"].ticker, cfgs[0]["period"].value, cfgs[0]["clear_logs"])
@@ -83,7 +87,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "run_type",
         type=str,
-        choices=["backtest", "optimize", "bybit", "cross_validation", "multirun"],
+        choices=["backtest", "optimize", "bybit", "cross_validation", "multirun", "multirun_sync"],
         help="Type of run to execute."
     )
     parser.add_argument(
@@ -117,6 +121,8 @@ if __name__ == "__main__":
         run_optimization(cfgs[0].get_optimization(), args.run_backtests, log_dir, log_level)
     elif run_type == RunType.MULTIRUN:
         run_multirun([cfg.get_backtest() for cfg in cfgs])
+    elif run_type == RunType.MULTIRUN_SYNC:
+        run_sync_multirun([cfg.get_backtest() for cfg in cfgs])
     elif run_type == RunType.BACKTEST:
         run_backtest(cfgs[0].get_backtest(), log_dir, log_level)
     elif run_type == RunType.CROSS_VALIDATION:

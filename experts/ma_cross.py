@@ -19,7 +19,6 @@ class ClsMACross(DecisionMaker):
         self.min_step = cfg["min_step"]
         self.speed = self.min_step #cfg["speed"]
         self.indicators = self.setup_indicators()
-
         self.description = DecisionMaker.make_description(self.type, cfg)
 
 

@@ -122,8 +122,9 @@ class SingleSymbolBroker:
         self.open_price = None
         self.cumulative_profit = 0
         self.cumulative_fees = 0
-        self.mw = MovingWindow(cfg) if init_moving_window else None
         self.deposit = self.wallet if self.volume_control.rule == VolEstimRule.DEPOSIT_BASED else 0
+        self.mw = MovingWindow(cfg) if init_moving_window else None
+        
         
         self.hist_window = None
 
@@ -377,15 +378,11 @@ class MultiSymbolBroker:
         return list(self.brokers_by_symbol.keys())
 
     def set_active_order(self, order: Order):
-        current_broker = self.brokers_by_symbol[order.ticker]
-        for active_order in current_broker.active_orders:
+        self.switch_symbol(order.ticker)
+        for active_order in self.current_broker.active_orders:
             if active_order.open_indx != order.open_indx:
-                current_broker.close_orders(order.open_indx)
-        current_broker.active_orders.append(order)
-
-    def set_active_orders(self, orders_list: List[Order]) -> str:
-        for order in orders_list:
-            self.set_active_order(order)
+                self.current_broker.close_orders(order.open_indx)
+        self.current_broker.active_orders.append(order)
 
     # --- Interface parity with SingleSymbolBroker (proxy to current broker) ---
     def __getattr__(self, name: str):

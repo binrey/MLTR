@@ -1,4 +1,5 @@
 from copy import deepcopy
+from math import atan
 from typing import List
 
 import numpy as np
@@ -46,7 +47,11 @@ class MovingAverage:
         ma_current_value = h["Close"][-self.period-1:-2].mean()
         # Calculate standard deviation as base for level steps
         base_step = h["Close"][-self.period-1:-2].std() * self.min_step
-        
+        # Calculate slope of the moving average
+        if self.main_ma_values[-1] > 0:
+            ma_slope = (ma_current_value - self.main_ma_values[-1]) / self.main_ma_values[-1] * 100
+        else:
+            ma_slope = 0
         # Calculate levels
         for level in self.levels:
             # Calculate dynamic step size that grows with level number
@@ -69,7 +74,8 @@ class MovingAverage:
         self.main_ma_values[:-1] = self.main_ma_values[1:]
         # append new value to the right
         self.main_ma_values[-1] = ma_current_value
-        
+
+        self.ma_slope = ma_slope
         return ma_current_value
 
     @property

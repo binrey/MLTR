@@ -172,9 +172,10 @@ class Position:
         self.tp_hist.append((time, tp))
 
     def _update_fees(self, price, volume, fee: Optional[float] = None):
+        # Fees are provided if Position is loaded from a file or from a database. Otherwise, we calculate them.
         if fee is None:
             fee = self.fee_rate.order_execution_fee(price, volume)
-            slippage = self.fee_rate.order_execution_slippage(price, volume) # TODO: implement slippage calculation only if it's not a market order
+            fee += self.fee_rate.order_execution_slippage(price, volume) # TODO: implement slippage calculation only if it's not a market order
             if self.close_date is not None and self.open_date is not None:
                 fee += self.fee_rate.position_suply_fee(
                     self.open_date,
@@ -182,7 +183,7 @@ class Position:
                     (self.open_price + self.close_price) / 2,
                     volume,
                 )
-        self.fees_abs += fee + slippage
+        self.fees_abs += fee
         self.fees = self.fees_abs / self.volume / self.open_price * 100
 
     def _update_profit_abs(self, price, volume):

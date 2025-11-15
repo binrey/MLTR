@@ -351,6 +351,14 @@ class BackTestResults:
     def ndeals_per_month(self):
         return self.ndeals / max(1, self.num_years_on_trade) / 12
 
+    @property
+    def nlong(self) -> int:
+        return sum(1 for p in self.positions if getattr(p.side, "value", 0) > 0)
+
+    @property
+    def nshort(self) -> int:
+        return sum(1 for p in self.positions if getattr(p.side, "value", 0) < 0)
+
     def metrics_from_profit(self, profit_curve):
         loss_max, wait_max = [
             self._calc_metrics(profit_curve)[1][k] for k in ("loss_max", "maxwait")
@@ -399,6 +407,8 @@ class BackTestResults:
             sformat(1).format("DEALS/MONTH", self.ndeals_per_month)
             + f"   ({self.ndeals} total)"
         )
+        print(sformat(0).format("LONG DEALS", self.nlong))
+        print(sformat(0).format("SHORT DEALS", self.nshort))
         print(sformat(0).format(
             "MAXLOSS", apply_relative(self.metrics.max_drawdown)) + get_unit_suffix())
         print(sformat(1).format(

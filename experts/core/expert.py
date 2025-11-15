@@ -160,7 +160,6 @@ class Expert:
 
         if target_volume > 1:
             target_volume = 1
-            logger.warning("try to set up target volume more than max value...set to one")
         target_volume *= max_volume
 
         order_volume = 0
@@ -175,8 +174,7 @@ class Expert:
                 #     return
             else:
                 # Add to position
-                if target_volume == 0:
-                    order_volume = max(0, target_volume - self.active_position.volume)
+                order_volume = max(0, target_volume - self.active_position.volume)
 
         if order_volume > 0:
             order_volume = Symbol.round_qty(qty=order_volume, qty_step=self.symbol.qty_step)
@@ -188,5 +186,5 @@ class Expert:
                               volume=order_volume, 
                               time=h["Date"][-1], 
                               indx=h["Id"][-1])
-            return [order]
+                return [order]
         return []

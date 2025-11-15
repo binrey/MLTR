@@ -94,7 +94,7 @@ class RunType(Enum):
     CROSS_VALIDATION = "cross_validation"
     BYBIT = "bybit"
     MULTIRUN = "multirun"
-
+    MULTIRUN_SYNC = "multirun_sync"
     @classmethod
     def from_str(cls, label):
         if label.upper() in cls.__members__:
@@ -105,7 +105,6 @@ class RunType(Enum):
 class VolEstimRule(Enum):
     FIXED_POS_COST = "fixed_pos_cost"
     DEPOSIT_BASED = "deposit_based"
-    ALL_OR_EQUAL = "all_or_equal"
 
 @dataclass
 class VolumeControl:

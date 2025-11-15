@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 
 import finplot as fplt
 import matplotlib
+import matplotlib.colors as mcolors
 import mplfinance as mpf
 import numpy as np
 import pandas as pd
@@ -220,3 +221,23 @@ class Visualizer:
             logger.error(f"error in save plot: {e}")
 
         return save_name
+
+
+def get_distinct_colors(num_colors):
+    """
+    Generate a list of distinct colors for plotting multiple curves.
+    
+    Args:
+        num_colors: Number of distinct colors needed
+        
+    Returns:
+        List of color values
+    """
+    colors = list(mcolors.TABLEAU_COLORS.values())
+    # If we need more colors than available in TABLEAU_COLORS, add more from CSS4_COLORS
+    if num_colors > len(colors):
+        more_colors = list(mcolors.CSS4_COLORS.values())
+        np.random.shuffle(more_colors)
+        colors.extend(more_colors)
+    
+    return colors
