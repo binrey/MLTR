@@ -31,7 +31,7 @@ config = dict(
     ),
     trailing_stop=dict(
         type=FixRate,
-        rate=0.05,
+        rate=0.,
     ),
     
     name="macross",
