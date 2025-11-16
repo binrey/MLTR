@@ -198,10 +198,6 @@ class BaseTradeClass(ABC):
         pass
 
     @abstractmethod
-    def _create_orders(self, side: Side, volume: float, time_id: Optional[int] = None):
-        pass
-
-    @abstractmethod
     def _modify_sl(self, sl: Optional[float]):
         pass
 
@@ -260,37 +256,37 @@ class BaseTradeClass(ABC):
         return orders
 
     def create_order(self, order: Order):
-        # volume = Symbol.round_qty(qty=order.volume, qty_step=self.qty_step)
-        # if not volume:
-        #     return
-        # if self.pos.curr is None:
-        #     target_volume = volume * order.side.value
-        # else:
-        #     target_volume = Symbol.round_qty(qty=self.pos.curr.volume*self.pos.curr.side.value + volume*order.side.value, qty_step=self.qty_step)
+        if not order.volume:
+            logger.warning(f"Order volume is 0, skipping...")
+            return
+        if self.pos.curr is None:
+            target_volume = order.volume * order.side.value
+        else:
+            target_volume = self.pos.curr.volume*self.pos.curr.side.value + order.volume*order.side.value
         self._create_order(order)
 
         if self.handle_trade_errors:
             open_position = self.get_open_position()
-            if open_position is None and order.volume != 0:
+            if open_position is None and target_volume != 0:
                 sleep(2)
-                logger.warning(f"Get none open position, while target volume is {order.volume} - double check for open position...")
+                logger.warning(f"Get none open position, while target volume is {target_volume} - double check for open position...")
                 open_position = self.get_open_position()
         
-            volume_diff = self._compute_volume_diff(self.get_open_position(), order.volume)
+            volume_diff = self._compute_volume_diff(self.get_open_position(), target_volume)
             n_attempts = 0
             while volume_diff != 0:
-                logger.warning(f"Volume diff: {volume_diff}, target_volume: {order.volume}")
+                logger.warning(f"Volume diff: {volume_diff}, target_volume: {target_volume}")
                 order2correct = Order(price=0, 
+                                      ticker=self.ticker,
                                       side=Side.from_int(volume_diff), 
                                       type=ORDER_TYPE.MARKET, 
                                       volume=abs(volume_diff), 
-                                      time=self.time.curr, 
-                                      indx=self.time.curr.astype(np.int64))
+                                      time=self.time.curr)
                 self._create_order(order2correct)
-                volume_diff = self._compute_volume_diff(self.get_open_position(), order.volume)
+                volume_diff = self._compute_volume_diff(self.get_open_position(), target_volume)
                 n_attempts += 1
                 if n_attempts > 10:
-                    logger.error(f"Failed to create orders after {n_attempts} attempts: {volume_diff} -> {order.volume}")
+                    logger.error(f"Failed to create orders after {n_attempts} attempts: vol. diff = {volume_diff}, vol. target = {target_volume}")
                     break
 
     def get_rounded_time(self, time: np.datetime64) -> np.datetime64:
@@ -369,9 +365,8 @@ class BaseTradeClass(ABC):
                                         ticker=self.pos.curr.ticker,
                                         side=Side.reverse(self.pos.curr.side),
                                         type=ORDER_TYPE.MARKET,
-                                        volume=float(self.pos.curr.volume),
-                                        time=self.time.curr,
-                                        indx=self.time.curr.astype(np.int64)))
+                                        volume=self.pos.curr.volume,
+                                        time=self.time.curr))
                 self.update_market_state()
                 self.clear_log_dir()
             else:

@@ -69,7 +69,7 @@ class VolProf(DecisionMaker):
         return None, None
 
     def look_around(self, h) -> DecisionMaker.Response:
-        order_side, target_volume_fraction = None, 1
+        order_side = None
         self.indicator.update(h)
         max_vol_id = self.indicator.vol_hist.argmax()
 
@@ -95,7 +95,7 @@ class VolProf(DecisionMaker):
                     order_side = Side.SELL
 
         logger.debug(f"order_side: {order_side}")
-        return DecisionMaker.Response(side=order_side, target_volume_fraction=target_volume_fraction)
+        return DecisionMaker.Response(side=order_side, target_volume_fraction=1)
 
     def setup_sl(self, side: Side):
         return self.sl_definer[side]

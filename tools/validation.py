@@ -195,6 +195,7 @@ def process_logfile(cfg: Dict[str, Any], active_position: Position) -> tuple[lis
         "close_last_position": False,
         "visualize": False,
         "save_plots": False,
+        "verify_data": False,
         "handle_trade_errors": False,
         # "wallet": market_wallet,
         "vis_hist_length": 1024,

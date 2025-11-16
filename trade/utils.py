@@ -83,7 +83,7 @@ class Order:
 
     @property
     def id(self):
-        return f"{self.ticker}-{self.open_indx}-{self.str_dir}-{self.price:.2f}"
+        return f"{self.ticker}-{self.volume}-{self.str_dir}-{self.price:.2f}"
 
     def close(self, date):
         self.close_date = date

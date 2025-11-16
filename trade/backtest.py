@@ -75,11 +75,6 @@ class BackTest(BaseTradeClass):
     def _create_order(self, order: Order):
         self.session.set_active_order(order)
         return order
-
-    def _create_orders(self, orders_dict_list: list[dict[str, list[Order]]]):
-        orders = [Order(0, order["side"], ORDER_TYPE.MARKET, order["volume"], order["time_id"], order["time_id"]) for order in orders_dict_list]
-        self.session.set_active_orders(orders)
-        return orders
         
     @log_modify_sl
     def _modify_sl(self, sl: Optional[float]):

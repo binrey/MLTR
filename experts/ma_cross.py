@@ -33,37 +33,26 @@ class ClsMACross(DecisionMaker):
         return [self.ma_fast, self.ma_slow]
 
     def look_around(self, h) -> bool:
-        order_side, lots_to_order, volume_fraction = None, None, None
+        order_side, lots_to_order = None, None
         self.ma_fast.update(h)
         self.ma_slow.update(h)
         levels_curr, levels_prev = self.ma_slow.current_ma_values, self.ma_slow.previous_ma_values
         ma_slow_prev, ma_slow_curr = levels_prev[0], levels_curr[0]
         ma_fast_prev, ma_fast_curr = self.ma_fast.previous_ma_values[0], self.ma_fast.current_ma_values[0]
 
-        if self.mode == "trend":
-            if ma_fast_curr > ma_slow_curr:
-                order_side = Side.BUY
-                volume_fraction = 1
-            elif ma_fast_curr < ma_slow_curr:
-                order_side = Side.SELL
-                volume_fraction = 1
-
-        elif self.mode == "contrtrend":
-            if ma_slow_curr and ma_slow_prev:
-                for level in range(self.ma_slow.upper_levels, -1, -1): #self.ma_slow.levels_count//2, 0, -1):
-                    if levels_curr[level]:
-                        if ma_fast_prev > levels_prev[level] and ma_fast_curr < levels_curr[level]:
-                            order_side = Side.SELL
-                            lots_to_order = abs(level)
-                            break
-                for level in range(-self.ma_slow.lower_levels, 1, 1):
-                    if levels_curr[level]:
-                        if ma_fast_prev < levels_prev[level] and ma_fast_curr > levels_curr[level]:
-                            order_side = Side.BUY
-                            lots_to_order = abs(level)
-                            break
-        else:
-            raise Exception("Unknown mode")         
+        if ma_slow_curr and ma_slow_prev:
+            for level in range(self.ma_slow.upper_levels, -1, -1): #self.ma_slow.levels_count//2, 0, -1):
+                if levels_curr[level]:
+                    if ma_fast_prev > levels_prev[level] and ma_fast_curr < levels_curr[level]:
+                        order_side = Side.SELL
+                        lots_to_order = abs(level)
+                        break
+            for level in range(-self.ma_slow.lower_levels, 1, 1):
+                if levels_curr[level]:
+                    if ma_fast_prev < levels_prev[level] and ma_fast_curr > levels_curr[level]:
+                        order_side = Side.BUY
+                        lots_to_order = abs(level)
+                        break       
 
         if order_side:
             self.sl_definer[Side.BUY] = h["Low"][-self.ma_fast_period:].min()
@@ -72,9 +61,9 @@ class ClsMACross(DecisionMaker):
             self.draw_items += self.ma_slow.vis_objects
             self.draw_items += self.ma_fast.vis_objects
 
-        return DecisionMaker.Response(side=order_side,
-                                      target_volume_fraction=volume_fraction,
-                                      increment_by_num_lots = lots_to_order)
+        response = DecisionMaker.Response(side=order_side,
+                                          increment_by_num_lots=lots_to_order)
+        return response
 
     def setup_sl(self, side: Side):
         return self.sl_definer[side]

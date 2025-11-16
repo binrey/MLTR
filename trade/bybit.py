@@ -11,6 +11,7 @@ from trade.utils import (
     log_creating_order,
     log_modify_sl,
     log_modify_tp,
+    Order,
 )
 
 pd.options.mode.chained_assignment = None
@@ -33,7 +34,7 @@ stackprinter.set_excepthook(style='color')
 class BybitTrading(BaseTradeClass):
     def __init__(self, cfg, telebot: Telebot, bybit_session: HTTP) -> None:
         self.session = bybit_session
-        super().__init__(cfg=cfg, expert=Expert(cfg, self.create_orders, self.modify_sl, self.modify_tp), telebot=telebot)
+        super().__init__(cfg=cfg, expert=Expert(cfg, self.modify_sl, self.modify_tp), telebot=telebot)
         logger.info(f"Initialized BybitTrading with ticker: {self.ticker}, period: {self.period}")
 
     def get_server_time(self) -> np.datetime64:
@@ -123,12 +124,16 @@ class BybitTrading(BaseTradeClass):
                 pos_object = self.pos.curr
                 if open_position.sl is not None:
                     pos_object.update_sl(open_position.sl, self.time.prev)
+
                 if open_position.volume < pos_object.volume:
                     logger.error(f"Attempt to reduce position volume: {pos_object.volume} -> {open_position.volume}")
                 else:
-                    pos_object.add_to_position(open_position.volume - pos_object.volume, float(open_position.open_price), self.time.prev)
-                # TODO: update tp
-                # pos_object.update_tp(pos["takeProfit"], self.time.prev)
+                    av_price_from_bybit = float(open_position.open_price)
+                    additional_volume = open_position.volume - pos_object.volume
+                    if additional_volume > 0:
+                        additional_price = (av_price_from_bybit * open_position.volume - pos_object.open_price * pos_object.volume) / additional_volume
+                        pos_object.add_to_position(additional_volume, additional_price, self.time.prev)
+
                 return pos_object
 
         elif open_position is not None:
@@ -202,19 +207,16 @@ class BybitTrading(BaseTradeClass):
         print("\rWaiting 00m 00s [##############################]", flush=True)  # Clear line at the end
 
     @log_creating_order
-    def _create_orders(self, side: Side, volume: float, time_id: Optional[int] = None):
+    def _create_order(self, order: Order):
         resp = None
         try:
             resp = self.session.place_order(
                 category="linear",
                 symbol=self.ticker,
-                side=side.name.capitalize(),
+                side=order.side.name.capitalize(),
                 orderType="Market",
-                qty=volume,
+                qty=float(order.volume),
                 timeInForce="GTC",
-                # orderLinkId="spot-test-po1stonly",
-                # stopLoss="" if sl is None else str(abs(sl)),
-                # takeProfit="" if tp is None else str(tp)
                 )["retMsg"]
         except Exception as ex:
             resp = ex

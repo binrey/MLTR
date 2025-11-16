@@ -17,6 +17,21 @@ class DecisionMaker(ABC):
         increment_volume_fraction: Optional[float] = None
         increment_by_num_lots: Optional[int] = None
 
+        # ensure at most one of: target_volume_fraction, increment_volume_fraction, increment_by_num_lots
+        def __post_init__(self):
+            num_specified = sum(
+                x is not None
+                for x in (
+                    self.target_volume_fraction,
+                    self.increment_volume_fraction,
+                    self.increment_by_num_lots,
+                )
+            )
+            if num_specified > 1:
+                raise ValueError(
+                    "Only one of target_volume_fraction, increment_volume_fraction, increment_by_num_lots can be not None"
+                )
+
         @property
         def is_active(self):
             return self.side is not None
