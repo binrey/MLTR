@@ -308,7 +308,7 @@ class BaseTradeClass(ABC):
             self.config_logger.update_config(self.time.curr)
             if self.log_config:
                 self.config_logger.log_config()
-            msg = f"{self.ticker}-{self.period.value}: {str(self.pos.curr) if self.pos.curr is not None else 'None'}"
+            msg = f"{self.exp.decision_maker.type}-{self.period.value}-{self.ticker}: {str(self.pos.curr) if self.pos.curr is not None else 'None'}"
             logger.debug(msg)
             if self.my_telebot is not None:
                 # process = multiprocessing.Process(target=self.my_telebot.send_text,

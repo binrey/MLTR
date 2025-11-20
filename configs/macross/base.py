@@ -15,7 +15,6 @@ from experts.ma_cross import ClsMACross
 config = dict(
     decision_maker=dict[str, type[ClsMACross] | str | int | float](
         type=ClsMACross,
-        mode = "contrtrend",
         ma_fast_period=16,
         upper_levels = 0,
         lower_levels = 1,
