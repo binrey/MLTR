@@ -11,7 +11,6 @@ class ClsMACross(DecisionMaker):
 
     def __init__(self, cfg: dict[str, Any]):
         super(ClsMACross, self).__init__(cfg)
-        self.mode = cfg["mode"]
         self.ma_slow_period = self.hist_size
         self.ma_fast_period = self.ma_slow_period//cfg["ma_fast_period"]
         self.upper_levels = cfg["upper_levels"]
