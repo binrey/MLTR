@@ -10,7 +10,7 @@ updates = dict(
     leverage = 1,
     hist_size = 128,
     trailing_stop = {"rate": 0.02},
-    decision_maker = {"sharpness": 3}
+    decision_maker = {"sharpness": 3},
     credentials="bybit_volprof",
 )
 
