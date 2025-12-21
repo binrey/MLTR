@@ -13,11 +13,12 @@ from data_processing.dataloading import DTYPE
 
 
 def log_creating_order(func: Callable[..., Any]) -> Callable[..., Any]:
-    def wrapper(self, order: Order):
-        logger.debug(f"Creating order {order.id}...")
-        func(self, order)
-        logger.debug(f"Order created: {order.id}")
-        return order
+    def wrapper(self, order: Order):        
+        resp =func(self, order)
+        logger.debug(f"Creating order {order.id}...{resp['retMsg']}:")
+        logger.debug(f" result: {resp['result']}")
+        logger.debug(f" retExtInfo: {resp['retExtInfo']}")
+        return resp
     return wrapper
 
 

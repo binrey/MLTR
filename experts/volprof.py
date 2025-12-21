@@ -95,7 +95,8 @@ class VolProf(DecisionMaker):
                     order_side = Side.SELL
 
         logger.debug(f"order_side: {order_side}")
-        return DecisionMaker.Response(side=order_side, target_volume_fraction=1)
+        response = DecisionMaker.Response(side=order_side, target_volume_fraction=1)
+        return response
 
     def setup_sl(self, side: Side):
         return self.sl_definer[side]

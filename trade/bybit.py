@@ -217,7 +217,7 @@ class BybitTrading(BaseTradeClass):
                 orderType="Market",
                 qty=float(order.volume),
                 timeInForce="GTC",
-                )["retMsg"]
+                )
         except Exception as ex:
             resp = ex
         return resp

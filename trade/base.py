@@ -263,7 +263,8 @@ class BaseTradeClass(ABC):
             target_volume = order.volume * order.side.value
         else:
             target_volume = self.pos.curr.volume*self.pos.curr.side.value + order.volume*order.side.value
-        self._create_order(order)
+        
+        resp = self._create_order(order)
 
         if self.handle_trade_errors:
             open_position = self.get_open_position()

@@ -5,7 +5,7 @@ from configs.volprof.BTCUSDT import backtest, bybit
 updates = dict(
     volume_control = {"deposit_fraction": 0.5},
     period=TimePeriod.M1,
-    wallet=150,
+    wallet=1000,
     traid_stops_min_size = 0.025,
 )
 
