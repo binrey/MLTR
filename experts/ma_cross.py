@@ -1,5 +1,7 @@
 
 from typing import Any
+
+from loguru import logger
 from common.type import Side
 from indicators.ma import MovingAverage
 
@@ -42,12 +44,14 @@ class ClsMACross(DecisionMaker):
         if ma_slow_curr and ma_slow_prev:
             for level in range(self.ma_slow.upper_levels, -1, -1): #self.ma_slow.levels_count//2, 0, -1):
                 if levels_curr[level]:
+                    logger.debug(f"macross: level {level}: check condition: ma_fast_prev {ma_fast_prev} > ma_slow_prev[{level}] {levels_prev[level]} and ma_fast_curr {ma_fast_curr} < ma_fast_curr[{level}] {levels_curr[level]}")
                     if ma_fast_prev > levels_prev[level] and ma_fast_curr < levels_curr[level]:
                         order_side = Side.SELL
                         lots_to_order = abs(level)
                         break
             for level in range(-self.ma_slow.lower_levels, 1, 1):
                 if levels_curr[level]:
+                    logger.debug(f"macross: level {level}: check condition: ma_fast_prev {ma_fast_prev} < ma_slow_prev[{level}] {levels_prev[level]} and ma_fast_curr {ma_fast_curr} > ma_fast_curr[{level}] {levels_curr[level]}")
                     if ma_fast_prev < levels_prev[level] and ma_fast_curr > levels_curr[level]:
                         order_side = Side.BUY
                         lots_to_order = abs(level)
