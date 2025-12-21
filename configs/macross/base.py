@@ -70,7 +70,7 @@ backtest = update_config(
     config,
     conftype=ConfigType.BACKTEST,
     date_start=np.datetime64("2018-01-01T00:00:00"),
-    date_end=np.datetime64("2025-11-01T00:00:00"),
+    date_end=np.datetime64("2026-01-01T00:00:00"),
     clear_logs=True,
     log_trades=False,
     verify_data=False,
