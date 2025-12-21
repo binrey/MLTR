@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Any, Callable, Optional
+
 from loguru import logger
+
 from backtesting.backtest_broker import Position
 from common.type import Side, Symbol, VolEstimRule
 from experts.core.decision_maker import DecisionMaker
@@ -176,6 +178,7 @@ class Expert:
                 # Add to position
                 order_volume = max(0, target_volume - self.active_position.volume)
 
+        logger.debug(f"order_volume: {order_volume}, target_volume: {target_volume}, max_volume: {max_volume}, active_position.volume: {self.active_position.volume if self.active_position else 0}")
         if order_volume > 0:
             order_volume = Symbol.round_qty(qty=order_volume, qty_step=self.symbol.qty_step)
             if order_volume:
