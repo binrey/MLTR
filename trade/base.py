@@ -122,7 +122,7 @@ class ConfigLogger:
 class BaseTradeClass(ABC):
     def __init__(self, cfg: dict[str, Any], expert: Expert, telebot: Optional[Telebot] = None) -> None:
 
-        self.my_telebot = telebot
+        self.telebot = telebot
         self.exp = expert
         self.h, self.time = None, StepData()
         self.pos: StepData[Position] = StepData()
@@ -285,8 +285,11 @@ class BaseTradeClass(ABC):
                 self._create_order(order2correct)
                 volume_diff = self._compute_volume_diff(self.get_open_position(), target_volume)
                 n_attempts += 1
-                if n_attempts > 10:
-                    logger.error(f"Failed to create orders after {n_attempts} attempts: vol. diff = {volume_diff}, vol. target = {target_volume}")
+                sleep(2)
+                if n_attempts > 9:
+                    error_msg = f"Failed to create orders after {n_attempts} attempts: vol. diff = {volume_diff}, vol. target = {target_volume}"
+                    logger.error(error_msg)
+                    self.telebot.send_text(error_msg)
                     break
 
     def get_rounded_time(self, time: np.datetime64) -> np.datetime64:
@@ -310,11 +313,11 @@ class BaseTradeClass(ABC):
                 self.config_logger.log_config()
             msg = f"{self.exp.decision_maker.type}-{self.period.value}-{self.ticker}: {str(self.pos.curr) if self.pos.curr is not None else 'None'}"
             logger.debug(msg)
-            if self.my_telebot is not None:
+            if self.telebot is not None:
                 # process = multiprocessing.Process(target=self.my_telebot.send_text,
                 #                                   args=[msg])
                 # process.start()
-                self.my_telebot.send_text(msg)
+                self.telebot.send_text(msg)
 
     def handle_trade_message(self):
         self._handle_trade_message()

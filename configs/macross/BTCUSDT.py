@@ -4,9 +4,9 @@ from configs.macross.base import backtest, bybit
 
 updates = dict(
     symbol = Symbols.BTCUSDT,
-    period=TimePeriod.M60,
-    wallet=4000,
-    volume_control = {"deposit_fraction": 0.25},
+    period=TimePeriod.M1,
+    wallet=500,
+    volume_control = {"deposit_fraction": 0.5},
     leverage = 1,
     hist_size = 200,
     lot = 1, # 0.16, 0.12 0.1,
