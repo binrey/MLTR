@@ -5,14 +5,7 @@ from loguru import logger
 
 from common.type import Side
 from common.utils import Telebot
-from trade.utils import (
-    Position,
-    get_bybit_hist,
-    log_creating_order,
-    log_modify_sl,
-    log_modify_tp,
-    Order,
-)
+from trade.utils import Order, Position, get_bybit_hist, log_modify_sl, log_modify_tp
 
 pd.options.mode.chained_assignment = None
 from typing import Any, Dict, Optional, Union
@@ -206,7 +199,6 @@ class BybitTrading(BaseTradeClass):
             remaining_seconds -= sleep_time
         print("\rWaiting 00m 00s [##############################]", flush=True)  # Clear line at the end
 
-    @log_creating_order
     def _create_order(self, order: Order):
         resp = None
         try:
@@ -218,6 +210,9 @@ class BybitTrading(BaseTradeClass):
                 qty=float(order.volume),
                 timeInForce="GTC",
                 )
+            logger.debug(f"Creating order {order.id}...{resp['retMsg']}:")
+            logger.debug(f" result: {resp['result']}")
+            logger.debug(f" retExtInfo: {resp['retExtInfo']}")
         except Exception as ex:
             resp = ex
         return resp

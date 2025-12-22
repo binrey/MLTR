@@ -2,7 +2,7 @@
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
-from typing import Any, Generator, Optional
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -16,8 +16,7 @@ from common.visualization import get_distinct_colors
 from data_processing import PULLERS
 from experts.core import Expert
 from trade.base import BaseTradeClass
-from trade.utils import (ORDER_TYPE, Order, Position, log_creating_order,
-                         log_modify_sl, log_modify_tp)
+from trade.utils import Order, Position, log_modify_sl, log_modify_tp
 
 pd.options.mode.chained_assignment = None
 
@@ -71,9 +70,9 @@ class BackTest(BaseTradeClass):
     def get_qty_step(self):
         return self.qty_step
 
-    @log_creating_order
     def _create_order(self, order: Order):
         self.session.set_active_order(order)
+        logger.debug(f"Creating order {order.id}...OK")
         return order
         
     @log_modify_sl

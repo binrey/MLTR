@@ -12,16 +12,6 @@ from common.utils import FeeRate, date2str
 from data_processing.dataloading import DTYPE
 
 
-def log_creating_order(func: Callable[..., Any]) -> Callable[..., Any]:
-    def wrapper(self, order: Order):        
-        resp =func(self, order)
-        logger.debug(f"Creating order {order.id}...{resp['retMsg']}:")
-        logger.debug(f" result: {resp['result']}")
-        logger.debug(f" retExtInfo: {resp['retExtInfo']}")
-        return resp
-    return wrapper
-
-
 def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(self, sl: Optional[float]):
         current_pos = self.get_current_position()
