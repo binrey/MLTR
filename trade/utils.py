@@ -9,7 +9,6 @@ from loguru import logger
 
 from common.type import Line, Point, Side, to_datetime
 from common.utils import FeeRate, date2str
-from data_processing.dataloading import DTYPE
 
 
 def log_modify_sl(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -30,21 +29,6 @@ def log_modify_tp(func: Callable[..., Any]) -> Callable[..., Any]:
         result = func(self, tp)
         return result
     return wrapper
-
-
-def get_bybit_hist(mresult):
-    input = np.array(mresult["list"], dtype=np.float64)[::-1]
-    data = np.zeros(input.shape[0], dtype=DTYPE)
-
-    data['Id'] = input[:, 0].astype(np.int64)
-    data['Date'] = data['Id'].astype("datetime64[ms]")
-    data['Open'] = input[:, 1]
-    data['High'] = input[:, 2]
-    data['Low'] = input[:, 3]
-    data['Close'] = input[:, 4]
-    data['Volume'] = input[:, 5]
-
-    return data
 
 
 class ORDER_TYPE(Enum):

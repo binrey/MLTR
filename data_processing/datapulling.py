@@ -8,7 +8,7 @@ from loguru import logger
 from pybit.unified_trading import HTTP
 
 from common.type import Symbol, TimePeriod
-from trade.utils import get_bybit_hist
+from data_processing.dataloading import get_bybit_hist
 
 
 class BybitDownloader:

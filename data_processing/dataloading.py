@@ -12,13 +12,29 @@ from tqdm import tqdm
 from common.type import TimePeriod, to_datetime
 
 # Define the dtype for the structured array
-DTYPE = [('Date', np.dtype('<M8[m]')), 
-         ('Open', np.dtype('float64')), 
-         ('High', np.dtype('float64')), 
-         ('Low', np.dtype('float64')), 
-         ('Close', np.dtype('float64')), 
+DTYPE = [('Date', np.dtype('<M8[m]')),
+         ('Open', np.dtype('float64')),
+         ('High', np.dtype('float64')),
+         ('Low', np.dtype('float64')),
+         ('Close', np.dtype('float64')),
          ('Volume', np.dtype('float64')),
          ('Id', np.dtype('int64'))]
+
+
+def get_bybit_hist(mresult):
+    """Convert raw Bybit kline response into structured numpy array with DTYPE."""
+    input_arr = np.array(mresult["list"], dtype=np.float64)[::-1]
+    data = np.zeros(input_arr.shape[0], dtype=DTYPE)
+
+    data['Id'] = input_arr[:, 0].astype(np.int64)
+    data['Date'] = data['Id'].astype("datetime64[ms]")
+    data['Open'] = input_arr[:, 1]
+    data['High'] = input_arr[:, 2]
+    data['Low'] = input_arr[:, 3]
+    data['Close'] = input_arr[:, 4]
+    data['Volume'] = input_arr[:, 5]
+
+    return data
         
 def build_features(f, dir, sl, rate, open_date=None, timeframe=None):
     fo = f.Open/f.Open[-1]

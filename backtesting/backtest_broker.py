@@ -74,20 +74,20 @@ class TradeHistory:
             self.profit_hist["loss"] = self.profit_hist["realized_pnl_withfees"] - self.profit_hist["max_profit"]
 
     def add_info(self, wallet: float, volume_control: VolumeControl, leverage: float):
-        self.wallet = wallet
+        self.wallet = wallet * volume_control.deposit_fraction
         self.leverage = leverage
         self.volume_control = volume_control
         self.max_loss = max(self.profit_hist["loss"].abs())
         
         # Correct deposit for volume control rule
         if volume_control.rule == VolEstimRule.DEPOSIT_BASED:
-            self.deposit = max(wallet, self.max_loss)
+            self.deposit = max(self.wallet, self.max_loss)
         elif volume_control.rule == VolEstimRule.FIXED_POS_COST or volume_control.rule == VolEstimRule.ALL_OR_EQUAL:
-            self.deposit = wallet + self.max_loss
+            self.deposit = self.wallet + self.max_loss
         else:
             raise ValueError(f"Unknown volume control rule: {volume_control.rule}")
-        if self.deposit > wallet:
-            logger.warning(f"deposit was increased: {self.deposit} > {wallet}")
+        if self.deposit > self.wallet:
+            logger.warning(f"deposit was increased: {self.deposit} > {self.wallet}")
         logger.info(f"Export backtest results: deposit: {self.deposit}, max_loss: {self.max_loss}, leverage: {self.leverage}")
 
     @cached_property

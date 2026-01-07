@@ -5,7 +5,8 @@ from loguru import logger
 
 from common.type import Side
 from common.utils import Telebot
-from trade.utils import Order, Position, get_bybit_hist, log_modify_sl, log_modify_tp
+from data_processing.dataloading import get_bybit_hist
+from trade.utils import Order, Position, log_modify_sl, log_modify_tp
 
 pd.options.mode.chained_assignment = None
 from typing import Any, Dict, Optional, Union
