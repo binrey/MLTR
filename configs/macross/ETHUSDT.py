@@ -9,9 +9,9 @@ updates = dict(
     volume_control = {"deposit_fraction": 0.5},
     leverage = 1,
     hist_size = 500,
-    lot = 0.8,
+    lot = 0.2,
     decision_maker = {
-        "ma_fast_period": 80,
+        "ma_fast_period": 60,
         "upper_levels": 0,
         "lower_levels": 1,
         "min_step": 0.6,
