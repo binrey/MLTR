@@ -5,9 +5,9 @@ from configs.volprof.base import backtest, bybit
 updates = dict(
     symbol = Symbols.ETHUSDT,
     period=TimePeriod.M60,
-    wallet=4000,
-    volume_control = {"deposit_fraction": 0.25},
-    leverage = 1,
+    wallet=1000,
+    volume_control = {"deposit_fraction": 0.5},
+    leverage = 2,
     hist_size = 128,
     trailing_stop = {"rate": 0.02},
     decision_maker = {"sharpness": 3},

@@ -5,8 +5,8 @@ from configs.volprof.base import backtest, bybit
 updates = dict(
     symbol = Symbols.BTCUSDT,
     period=TimePeriod.M60,
-    wallet=4000,
-    volume_control = {"deposit_fraction": 0.25},
+    wallet=1000,
+    volume_control = {"deposit_fraction": 0.5},
     leverage = 2,
     hist_size = 64,
     trailing_stop = {"rate": 0.02},
