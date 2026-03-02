@@ -304,9 +304,46 @@ class MovingWindow():
 
     def __call__(self, output_time=True):
         logger.info(f"Start generate {self.ticker} data from {self.date_start} (id:{self.id2start}) to {self.date_end} (id:{self.id2end})")
-        # for t in tqdm(range(self.id2start, self.id2end), desc=f"Processing {self.ticker}"):
-        for t in range(self.id2start, self.id2end+1):
-            yield self[t] if output_time else self[t][0]
+        if self.id2start > self.id2end:
+            return
+
+        # Reuse a rolling structured buffer instead of allocating/copying
+        # full window on every step.
+        left = self.id2start - self.size + 1
+        right = self.id2start + 1
+        window = np.empty(self.size, dtype=self.hist.dtype)
+        np.copyto(window, self.hist[left:right])
+
+        for t in range(self.id2start, self.id2end + 1):
+            t0 = perf_counter()
+
+            # Build synthetic last candle exactly as in __getitem__.
+            close_last = window["Close"][-1]
+            high_last = window["High"][-1]
+            low_last = window["Low"][-1]
+            vol_last = window["Volume"][-1]
+            open_last = window["Open"][-1]
+            window["Close"][-1] = open_last
+            window["High"][-1] = open_last
+            window["Low"][-1] = open_last
+            window["Volume"][-1] = 0
+
+            elapsed = perf_counter() - t0
+            if output_time:
+                yield window, elapsed
+            else:
+                yield window
+
+            # Restore real last candle before shifting so the next window keeps
+            # historical bars unchanged.
+            window["Close"][-1] = close_last
+            window["High"][-1] = high_last
+            window["Low"][-1] = low_last
+            window["Volume"][-1] = vol_last
+
+            if t < self.id2end:
+                window[:-1] = window[1:]
+                window[-1] = self.hist[t + 1]
 
 
 if __name__ == "__main__":
