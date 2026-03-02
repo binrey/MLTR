@@ -69,7 +69,7 @@ backtest = update_config(
     config,
     conftype=ConfigType.BACKTEST,
     date_start=np.datetime64("2018-01-01T00:00:00"),
-    date_end=np.datetime64("2026-01-01T00:00:00"),
+    date_end=np.datetime64("2026-04-01T00:00:00"),
     eval_buyhold=False,
     clear_logs=True,
     log_trades=False,

@@ -120,7 +120,6 @@ def process_log_dir(log_dir: Path) -> tuple[list[Position], list[Position]]:
         if cfg_file is None:
             cfg = {"date_start": np.datetime64("now")}
         else:
-            # Start of the new cfg
             cfg = pickle.load(open(cfg_file, "rb"))
 
         if cfg2process is not None:
@@ -164,12 +163,14 @@ def process_log_dir(log_dir: Path) -> tuple[list[Position], list[Position]]:
             last_real_profit += profit_hist_real["realized_pnl"].iloc[-1]
         """
         cfg2process = cfg
+        logger.info(f"\nProcessing logfile: {cfg_file}")
     val_res.save_fig()
     val_res.show_fig()
     return positions_test, positions_real
 
 
 def process_logfile(cfg: Dict[str, Any], active_position: Position) -> tuple[list[Position]]:
+    assert cfg["date_start"] is not None and cfg["date_start"] is not None, "date_start is not set"
     date_start = cfg["date_start"]
     date_end = cfg["date_end"]
     # Take into account history size
