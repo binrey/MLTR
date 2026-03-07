@@ -90,6 +90,25 @@ class BackTestResults:
     def process(self):
         self.eval_daily_metrics()
 
+    @staticmethod
+    def _merge_hist(
+        base_hist: pd.DataFrame,
+        incoming_hist: pd.DataFrame,
+        fill_mode: str,
+    ) -> pd.DataFrame:
+        if base_hist.empty:
+            return incoming_hist
+        all_index = base_hist.index.union(incoming_hist.index)
+        left = base_hist.reindex(all_index)
+        right = incoming_hist.reindex(all_index)
+        if fill_mode == "ffill":
+            left = left.ffill()
+            right = right.ffill()
+        else:
+            left = left.fillna(0)
+            right = right.fillna(0)
+        return left.add(right, fill_value=0)
+
     def add(self, profit_hist: TradeHistory, same_deposit: bool = True):
         positions = profit_hist.positions
         self.ndeals += len(positions)
@@ -108,57 +127,31 @@ class BackTestResults:
         self.leverage = profit_hist.leverage
 
         daily_hist, monthly_hist = self.process_profit_hist(profit_hist.df)
-        
-        if self.daily_hist.empty:
-            self.daily_hist = daily_hist
-        else:
-            # Align the indices of both DataFrames
-            all_dates = self.daily_hist.index.union(daily_hist.index)
-            
-            # Reindex both DataFrames to include all dates
-            self_reindexed = self.daily_hist.reindex(all_dates)
-            daily_hist_reindexed = daily_hist.reindex(all_dates)
-            
-            # Fill NaNs with the last value for each DataFrame
-            self_reindexed.ffill(inplace=True)
-            daily_hist_reindexed.ffill(inplace=True)
-            
-            # Add the DataFrames
-            self.daily_hist = self_reindexed.add(daily_hist_reindexed, fill_value=0)
-            
-        if self.monthly_hist.empty:
-            self.monthly_hist = monthly_hist
-        else:
-            # Apply similar logic for monthly_hist
-            all_months = self.monthly_hist.index.union(monthly_hist.index)
-            
-            # Reindex both DataFrames to include all months
-            self_monthly_reindexed = self.monthly_hist.reindex(all_months)
-            monthly_hist_reindexed = monthly_hist.reindex(all_months)
-            
-            # Fill NaNs with zeros for monthly data
-            self_monthly_reindexed.fillna(0, inplace=True)
-            monthly_hist_reindexed.fillna(0, inplace=True)
-            
-            # Add the DataFrames
-            self.monthly_hist = self_monthly_reindexed.add(monthly_hist_reindexed, fill_value=0)            
+
+        self.daily_hist = self._merge_hist(self.daily_hist, daily_hist, fill_mode="ffill")
+        self.monthly_hist = self._merge_hist(self.monthly_hist, monthly_hist, fill_mode="zero")
 
     def process_profit_hist(self, profit_hist: pd.DataFrame):
         if profit_hist.shape[0] == 0:
             return pd.DataFrame(), pd.DataFrame()
         if "dates" in profit_hist.columns:
-            profit_hist.set_index("dates", inplace=True)
+            hist = profit_hist.set_index("dates", drop=True)
         elif profit_hist.index.name != "dates":
             "profit_hist must have 'dates' column or dates in index"
-        daily_hist = self.resample_hist(profit_hist, "D", func="last")
+            hist = profit_hist
+        else:
+            hist = profit_hist
+        daily_hist = self.resample_hist(hist, "D", func="last")
         daily_hist["profit_csum"] = daily_hist["profit_csum_nofees"] - daily_hist["fees_csum"]
         daily_hist["finres"] = daily_hist["profit_csum"].diff().fillna(0)
         monthly_hist = self.resample_hist(daily_hist, "M")
         return daily_hist, monthly_hist
 
     def resample_hist(self, hist, period="D", func="sum"):
-        target_dates = pd.date_range(start=to_datetime(hist.index.min()).date(),
-                                     end=to_datetime(hist.index.max()).date(),
+        idx_min = to_datetime(hist.index.min()).date()
+        idx_max = to_datetime(hist.index.max()).date()
+        target_dates = pd.date_range(start=idx_min,
+                                     end=idx_max,
                                      freq=period)
         
         agg_method = "sum" if func == "sum" else "last"

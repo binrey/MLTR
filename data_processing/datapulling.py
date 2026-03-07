@@ -80,17 +80,32 @@ class BybitDownloader:
                 logger.info(f"Data already exists in database")
                 return h
 
+        start_from = h.index[-1] if len(h) > 0 else date_start
+        chunks = []
+
         res = self._get_data_from_message(
-            self.get_klines(start_date=h.index[-1] if len(h) > 0 else date_start,
-                            end_date=None))
-        if len(h) > 0:
-            res = res[1:]
-        h = pd.concat([h, res])
-        while res.shape[0] and h.index[-1] < date_end:
-            logger.info(f"Last date : {h.index[-1]}")
-            res = self._get_data_from_message(self.get_klines(start_date=h.index[-1],
-                                                              end_date=None))[1:]
-            h = pd.concat([h, res])
+            self.get_klines(start_date=start_from, end_date=None)
+        )
+        if len(h) > 0 and not res.empty:
+            res = res.iloc[1:]
+        if not res.empty:
+            chunks.append(res)
+
+        last_loaded = h.index[-1] if len(h) > 0 else (res.index[-1] if not res.empty else date_start)
+        while not res.empty and last_loaded < date_end:
+            logger.info(f"Last date : {last_loaded}")
+            res = self._get_data_from_message(
+                self.get_klines(start_date=last_loaded, end_date=None)
+            )
+            if not res.empty:
+                res = res.iloc[1:]
+            if res.empty:
+                break
+            chunks.append(res)
+            last_loaded = res.index[-1]
+
+        if chunks:
+            h = pd.concat([h] + chunks)
         h.to_csv(self.init_data)
         return h
 
