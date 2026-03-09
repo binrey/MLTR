@@ -178,7 +178,13 @@ class Expert:
                 # Add to position
                 order_volume = max(0, target_volume - self.active_position.volume)
 
-        logger.debug(f"order_volume: {order_volume}, target_volume: {target_volume}, max_volume: {max_volume}, active_position.volume: {self.active_position.volume if self.active_position else 0}")
+        logger.opt(lazy=True).debug(
+            "order_volume: {}, target_volume: {}, max_volume: {}, active_position.volume: {}",
+            lambda: order_volume,
+            lambda: target_volume,
+            lambda: max_volume,
+            lambda: self.active_position.volume if self.active_position else 0,
+        )
         if order_volume > 0:
             order_volume = Symbol.round_qty(qty=order_volume, qty_step=self.symbol.qty_step)
             if order_volume:

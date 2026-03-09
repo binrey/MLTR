@@ -10,6 +10,24 @@ from loguru import logger
 
 from common.type import TimeVolumeProfile
 
+try:
+    from numba import njit
+except Exception:  # pragma: no cover - optional dependency
+    njit = None
+
+
+if njit is not None:
+    @njit(cache=True)
+    def _histogram_numba(data: np.ndarray, bins: np.ndarray, weights: np.ndarray):
+        hist = np.zeros(bins.shape[0] - 1, dtype=np.float64)
+        for i in range(data.shape[0]):
+            idx = np.searchsorted(bins, data[i], side="right") - 1
+            if 0 <= idx < hist.shape[0]:
+                hist[idx] += weights[i]
+        return hist
+else:
+    _histogram_numba = None
+
 
 class VolDistribution:
     """Calculates volume distribution across price levels using histogram binning."""
@@ -48,6 +66,17 @@ class VolDistribution:
 
     @staticmethod
     def histogram(data, bins, weights):
+        use_numba = (
+            _histogram_numba is not None
+            and os.getenv("MLTR_DISABLE_NUMBA", "0") != "1"
+        )
+        if use_numba:
+            return _histogram_numba(
+                np.asarray(data, dtype=np.float64),
+                np.asarray(bins, dtype=np.float64),
+                np.asarray(weights, dtype=np.float64),
+            )
+
         # Find the bin index for each data point
         inds = np.searchsorted(bins, data, side='right') - 1
         # Exclude values that fall outside the bin range
@@ -100,20 +129,26 @@ class VolDistribution:
 
     def _update_without_cache(self, h: np.ndarray) -> TimeVolumeProfile:
         """Update method without caching logic"""
-        upper_price = h["High"][:-1].max()
-        lower_price = h["Low"][:-1].min()
-        max_open_cls = np.vstack([h["Close"][:-1], h["Open"][:-1]]).max(0)
-        min_open_cls = np.vstack([h["Close"][:-1], h["Open"][:-1]]).min(0)
+        high = h["High"][:-1]
+        low = h["Low"][:-1]
+        open_ = h["Open"][:-1]
+        close = h["Close"][:-1]
+        volume = h["Volume"][:-1]
+
+        upper_price = high.max()
+        lower_price = low.min()
+        max_open_cls = np.maximum(close, open_)
+        min_open_cls = np.minimum(close, open_)
         mean_body_size = (max_open_cls - min_open_cls).mean()
         nbins = 2
         if mean_body_size > 0:
             nbins = int(np.ceil((upper_price - lower_price)/mean_body_size))
         self.price_bins = np.linspace(lower_price, upper_price, nbins)
 
-        upper = h["High"][:-1] - max_open_cls
-        lower = min_open_cls - h["Low"][:-1]
-        x = (h["High"][:-1]*upper + h["Low"][:-1]*lower)/(upper + lower + 0.001)
-        y = h["Volume"][:-1]
+        upper = high - max_open_cls
+        lower = min_open_cls - low
+        x = (high * upper + low * lower) / (upper + lower + 0.001)
+        y = volume
 
         self.vol_hist = self.histogram(x, bins=self.price_bins, weights=y)
         bars = [(x, y) for x, y in zip(self.price_bins, self.vol_hist)]

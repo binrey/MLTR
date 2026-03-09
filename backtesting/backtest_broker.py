@@ -230,6 +230,76 @@ class SingleSymbolBroker:
         self.positions.append(closed_position)
         return closed_position
 
+    def _resolve_order_trigger(
+        self,
+        order_type: ORDER_TYPE,
+        order_price: float,
+        order_open_indx: int,
+        order_side: Side,
+        order_volume: float,
+        last_low: float,
+        last_high: float,
+        last_time: np.datetime64,
+        last_hist_id: int,
+        check_sl_tp: bool,
+    ):
+        triggered_price: float = None
+        triggered_id = None
+        triggered_side: Optional[Side] = None
+        triggered_date: np.datetime64 = None
+        triggered_vol = None
+
+        if order_type == ORDER_TYPE.MARKET and order_open_indx == self.hist_id:
+            logger.opt(lazy=True).debug(
+                "process order {}-{}-{}-{:.2f}",
+                lambda: self.symbol.ticker,
+                lambda: order_volume,
+                lambda: order_side,
+                lambda: order_price,
+            )
+            triggered_price = self.open_price
+            triggered_side = order_side
+            triggered_date, triggered_id, triggered_vol = (
+                self.time,
+                self.hist_id,
+                order_volume,
+            )
+        elif (
+            check_sl_tp
+            and order_type in (ORDER_TYPE.LIMIT, ORDER_TYPE.STOPLOSS, ORDER_TYPE.TAKEPROF)
+            and order_open_indx != self.hist_id
+        ):
+            if (last_low > order_price and self.open_price < order_price) or (
+                last_high < order_price and self.open_price > order_price
+            ):
+                logger.opt(lazy=True).debug(
+                    "process order at open, and set price to {}",
+                    lambda: self.open_price,
+                )
+                triggered_price = self.open_price
+                triggered_side = order_side
+                triggered_date, triggered_id, triggered_vol = (
+                    self.time,
+                    self.hist_id,
+                    order_volume,
+                )
+            elif last_high >= order_price and last_low <= order_price:
+                logger.opt(lazy=True).debug(
+                    "process order (L:{} <= {:.2f} <= H:{})",
+                    lambda: last_low,
+                    lambda: order_price,
+                    lambda: last_high,
+                )
+                triggered_price = order_price
+                triggered_side = order_side
+                triggered_date, triggered_id, triggered_vol = (
+                    last_time,
+                    last_hist_id,
+                    order_volume,
+                )
+
+        return triggered_price, triggered_id, triggered_side, triggered_date, triggered_vol
+
     def update(self, check_sl_tp=True):
         closed_position = None
         last_low = self.hist_window["Low"][-2]
@@ -237,70 +307,25 @@ class SingleSymbolBroker:
         last_time = self.hist_window["Date"][-2]
         last_hist_id = self.hist_window["Id"][-2]
 
-        if self.active_position is not None and self.active_position.sl is not None:
-            self.active_orders.append(Order(
-                            price=self.active_position.sl,
-                            ticker=self.active_position.ticker,
-                            side=Side.reverse(self.active_position.side), 
-                            type=ORDER_TYPE.STOPLOSS,
-                            volume=self.active_position.volume,
-                            indx=self.active_position.open_indx, 
-                            time=self.active_position.open_date))
-
-        if self.active_position is not None and self.active_position.tp is not None:
-            self.active_orders.append(Order(
-                            price=self.active_position.tp, 
-                            ticker=self.active_position.ticker,
-                            side=Side.reverse(self.active_position.side), 
-                            type=ORDER_TYPE.TAKEPROF,
-                            volume=self.active_position.volume,
-                            indx=self.active_position.open_indx, 
-                            time=self.active_position.open_date))
-
         for i, order in enumerate(self.active_orders):
-            triggered_price: float = None
-            triggered_id = None
-            triggered_side: Optional[Side] = None
-            triggered_date: np.datetime64 = None
-            if order.type == ORDER_TYPE.MARKET and order.open_indx == self.hist_id:
-                logger.debug(
-                    f"process order {order.id}"
-                )
-                triggered_price = self.open_price
-                triggered_side = order.side
-                triggered_date, triggered_id, triggered_vol = (
-                    self.time,
-                    self.hist_id,
-                    order.volume,
-                )
-                # order.change(self.hist_id, self.open_price)
-            if (check_sl_tp and
-                order.type in (ORDER_TYPE.LIMIT, ORDER_TYPE.STOPLOSS, ORDER_TYPE.TAKEPROF) and
-                order.open_indx != self.hist_id):
-                if (last_low > order.price and self.open_price < order.price) or (
-                    last_high < order.price and self.open_price > order.price
-                ):
-                    logger.debug(
-                        f"process order {order.id}, and set price to {self.open_price}"
-                    )
-                    triggered_price = self.open_price
-                    triggered_side = order.side
-                    triggered_date, triggered_id, triggered_vol = (
-                        self.time,
-                        self.hist_id,
-                        order.volume,
-                    )
-                elif last_high >= order.price and last_low <= order.price:
-                    logger.debug(
-                        f"process order {order.id} (L:{last_low} <= {order.price:.2f} <= H:{last_high})"
-                    )
-                    triggered_price = order.price
-                    triggered_side = order.side
-                    triggered_date, triggered_id, triggered_vol = (
-                        last_time,
-                        last_hist_id,
-                        order.volume,
-                    )
+            (
+                triggered_price,
+                triggered_id,
+                triggered_side,
+                triggered_date,
+                triggered_vol,
+            ) = self._resolve_order_trigger(
+                order_type=order.type,
+                order_price=order.price,
+                order_open_indx=order.open_indx,
+                order_side=order.side,
+                order_volume=order.volume,
+                last_low=last_low,
+                last_high=last_high,
+                last_time=last_time,
+                last_hist_id=last_hist_id,
+                check_sl_tp=check_sl_tp,
+            )
 
             if triggered_price is not None and triggered_id is not None:
                 self.close_orders(triggered_id, i)
@@ -344,9 +369,36 @@ class SingleSymbolBroker:
                         sl=sl,
                     )
                     triggered_vol = 0
-        for order in self.active_orders:
-            if order.type in (ORDER_TYPE.STOPLOSS, ORDER_TYPE.TAKEPROF):
-                self.active_orders.remove(order)
+
+        # Evaluate synthetic SL/TP without allocating temporary Order objects.
+        if check_sl_tp and self.active_position is not None:
+            for order_type, order_price in (
+                (ORDER_TYPE.STOPLOSS, self.active_position.sl),
+                (ORDER_TYPE.TAKEPROF, self.active_position.tp),
+            ):
+                if order_price is None or self.active_position is None:
+                    continue
+                (
+                    triggered_price,
+                    triggered_id,
+                    _triggered_side,
+                    triggered_date,
+                    _triggered_vol,
+                ) = self._resolve_order_trigger(
+                    order_type=order_type,
+                    order_price=order_price,
+                    order_open_indx=self.active_position.open_indx,
+                    order_side=Side.reverse(self.active_position.side),
+                    order_volume=self.active_position.volume,
+                    last_low=last_low,
+                    last_high=last_high,
+                    last_time=last_time,
+                    last_hist_id=last_hist_id,
+                    check_sl_tp=check_sl_tp,
+                )
+                if triggered_price is not None and triggered_id is not None:
+                    closed_position = self.close_active_pos(triggered_price, triggered_date, triggered_id)
+                    break
 
         return closed_position
 

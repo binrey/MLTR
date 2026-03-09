@@ -62,9 +62,18 @@ class VolProf(DecisionMaker):
         lprice = potential_prices[np.argmax(upper_scores)]
         sprice = potential_prices[np.argmax(bottom_scores)]
 
-        logger.debug(f"check condition: sprice ({sprice:.2f}) < Open ({h['Open'][-1]:.2f}) < lprice ({lprice:.2f})")
+        logger.opt(lazy=True).debug(
+            "check condition: sprice ({:.2f}) < Open ({:.2f}) < lprice ({:.2f})",
+            lambda: sprice,
+            lambda: h["Open"][-1],
+            lambda: lprice,
+        )
         if sprice < h["Open"][-1] < lprice:
-            logger.debug(f"NEW entry points: long: {lprice:.2f}, short: {sprice:.2f}")
+            logger.opt(lazy=True).debug(
+                "NEW entry points: long: {:.2f}, short: {:.2f}",
+                lambda: lprice,
+                lambda: sprice,
+            )
             return lprice, sprice
         return None, None
 
@@ -76,15 +85,25 @@ class VolProf(DecisionMaker):
         if self.indicator.vol_hist[max_vol_id] / self.indicator.vol_hist.mean() > self.sharpness:
             self.lprice, self.sprice = self._find_prices_manual_levels(max_vol_id)
             if self.lprice is not None and self.sprice is not None:
-                logger.debug(f"NEW entry points: long: {self.lprice:.2f}, short: {self.sprice:.2f}")
+                logger.opt(lazy=True).debug(
+                    "NEW entry points: long: {:.2f}, short: {:.2f}",
+                    lambda: self.lprice,
+                    lambda: self.sprice,
+                )
                 self.sl_definer[Side.BUY] = self.sprice#min(self.sprice, h["Low"][-2])
                 self.sl_definer[Side.SELL] = self.lprice#max(self.lprice, h["High"][-2])
                 self.set_draw_objects(h["Date"][-2])
                 self.draw_items += self.indicator.vis_objects
                 
         strike = h["Close"][-2] - h["Open"][-2]
-        max_body = max(np.maximum(h["Open"][:-2], h["Close"][:-2]) - np.minimum(h["Open"][:-2], h["Close"][:-2]))
-        logger.debug(f"check condition curr. body ({abs(strike):.2f}) > max. body ({max_body:.3f})")
+        open_hist = h["Open"][:-2]
+        close_hist = h["Close"][:-2]
+        max_body = np.max(np.abs(open_hist - close_hist))
+        logger.opt(lazy=True).debug(
+            "check condition curr. body ({:.2f}) > max. body ({:.3f})",
+            lambda: abs(strike),
+            lambda: max_body,
+        )
         if abs(strike) > max_body:
             if self.lprice is not None:
                 if strike > 0 and h["Close"][-2] > self.sprice:
@@ -94,7 +113,7 @@ class VolProf(DecisionMaker):
                 if strike < 0 and h["Close"][-2] < self.lprice:
                     order_side = Side.SELL
 
-        logger.debug(f"order_side: {order_side}")
+        logger.opt(lazy=True).debug("order_side: {}", lambda: order_side)
         response = DecisionMaker.Response(side=order_side, target_volume_fraction=1)
         return response
 

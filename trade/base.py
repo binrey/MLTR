@@ -2,7 +2,6 @@ import json
 import os
 import pickle
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -35,7 +34,9 @@ class StepData:
     prev: Position | np.datetime64 | None = None
 
     def update(self, curr_value: Position | np.datetime64):
-        self.prev = deepcopy(self.curr)
+        # Keep reference to previous state to avoid expensive deep copies
+        # in per-candle hot paths.
+        self.prev = self.curr
         self.curr = curr_value
 
     def changed(self, no_none=False) -> bool:
@@ -185,8 +186,16 @@ class BaseTradeClass(ABC):
 
     def __get_hist(self):
         result = self.get_hist()
-        logger.debug(
-            f"get data: {result['Date'][-1]} | new: {result['Open'][-1]}, o:{result['Open'][-2]}, h:{result['High'][-2]}, l:{result['Low'][-2]}, c:{result['Close'][-2]}, v:{result['Volume'][-2]}")
+        logger.opt(lazy=True).debug(
+            "get data: {} | new: {}, o:{}, h:{}, l:{}, c:{}, v:{}",
+            lambda: result["Date"][-1],
+            lambda: result["Open"][-1],
+            lambda: result["Open"][-2],
+            lambda: result["High"][-2],
+            lambda: result["Low"][-2],
+            lambda: result["Close"][-2],
+            lambda: result["Volume"][-2],
+        )
         return result
 
     @abstractmethod
@@ -301,7 +310,10 @@ class BaseTradeClass(ABC):
     def _handle_trade_message(self):
         server_time = self.get_server_time()
         self.time.update(self.get_rounded_time(server_time))
-        logger.debug(f"\n> {date2str(server_time, 'ms')} -----------------------------")
+        logger.opt(lazy=True).debug(
+            "\n> {} -----------------------------",
+            lambda: date2str(server_time, "ms"),
+        )
 
         if self.time.changed(no_none=True):
             self.update()
@@ -312,8 +324,13 @@ class BaseTradeClass(ABC):
             self.config_logger.update_config(self.time.curr)
             if self.log_config:
                 self.config_logger.log_config()
-            msg = f"{self.exp.decision_maker.type}-{self.period.value}-{self.ticker}: {str(self.pos.curr) if self.pos.curr is not None else 'None'}"
-            logger.debug(msg)
+            logger.opt(lazy=True).debug(
+                "{}-{}-{}: {}",
+                lambda: self.exp.decision_maker.type,
+                lambda: self.period.value,
+                lambda: self.ticker,
+                lambda: str(self.pos.curr) if self.pos.curr is not None else "None",
+            )
             if self.telebot is not None:
                 # process = multiprocessing.Process(target=self.my_telebot.send_text,
                 #                                   args=[msg])
@@ -381,7 +398,7 @@ class BaseTradeClass(ABC):
     def update_market_state(self) -> None:
         self.deposit = self.get_deposit()
         self.pos.update(self.get_current_position())
-        logger.debug(f"update_market_state: {self.pos.curr}")
+        logger.opt(lazy=True).debug("update_market_state: {}", lambda: self.pos.curr)
 
     def vis(self):
         # return self.visualizer([self.pos.prev, self.pos.curr], self.exp)
