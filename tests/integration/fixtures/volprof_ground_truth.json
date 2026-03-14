@@ -1,0 +1,21 @@
+{
+  "BTCUSDT": {
+    "APR": -10.638449355679917,
+    "final_profit": -80.20137413563994,
+    "max_drawdown": 258.03580285708,
+    "ndeals": 78,
+    "recovery_factor": -0.31081490726332117
+  },
+  "ETHUSDT": {
+    "APR": 30.969324160171713,
+    "final_profit": 242.46685586308968,
+    "max_drawdown": 293.79985760092,
+    "ndeals": 46,
+    "recovery_factor": 0.8252790108307064
+  },
+  "_params": {
+    "date_end": "2026-01-01T00:00:00",
+    "date_start": "2025-01-01T00:00:00",
+    "findata": "/home/andrybin/dev/MLTR/fin_data"
+  }
+}
