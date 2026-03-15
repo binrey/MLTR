@@ -1,4 +1,4 @@
-"""Train/evaluate Linear Regression baseline for macross direction labels."""
+"""Train/evaluate a one-layer PyTorch classifier for macross direction labels."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ import os
 import sys
 from pathlib import Path
 
-import joblib
 import numpy as np
-from sklearn.linear_model import LinearRegression
+import torch
+from torch import nn
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
@@ -39,6 +39,15 @@ Logger(
 )
 
 
+class OneLayerClassifier(nn.Module):
+    def __init__(self, in_features: int):
+        super().__init__()
+        self.linear = nn.Linear(in_features, 1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.linear(x).squeeze(-1)
+
+
 def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     labels = [-1, 1]
     cm = confusion_matrix(y_true, y_pred, labels=labels)
@@ -54,9 +63,44 @@ def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     }
 
 
-def predict_direction(model: LinearRegression, X: np.ndarray) -> np.ndarray:
-    # Map continuous regression output back to direction labels {-1, 1}.
-    return np.where(model.predict(X) >= 0.0, 1, -1).astype(np.int64)
+def train_classifier(X_train: np.ndarray, y_train: np.ndarray) -> tuple[OneLayerClassifier, dict]:
+    # Convert labels from {-1, 1} to {0, 1} for BCE training.
+    y_train_binary = (y_train == 1).astype(np.float32)
+    X_tensor = torch.from_numpy(X_train.astype(np.float32))
+    y_tensor = torch.from_numpy(y_train_binary)
+
+    model = OneLayerClassifier(in_features=X_train.shape[1])
+    criterion = nn.BCEWithLogitsLoss()
+    learning_rate = float(os.environ.get("MACROSS_TORCH_LR", "0.02"))
+    num_epochs = int(os.environ.get("MACROSS_TORCH_EPOCHS", "800"))
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    model.train()
+    loss_value = 0.0
+    for _ in range(num_epochs):
+        optimizer.zero_grad()
+        logits = model(X_tensor)
+        loss = criterion(logits, y_tensor)
+        loss.backward()
+        optimizer.step()
+        loss_value = float(loss.item())
+
+    train_info = {
+        "optimizer": "Adam",
+        "loss": "BCEWithLogitsLoss",
+        "learning_rate": learning_rate,
+        "epochs": num_epochs,
+        "final_train_loss": loss_value,
+    }
+    return model, train_info
+
+
+def predict_direction(model: OneLayerClassifier, X: np.ndarray) -> np.ndarray:
+    model.eval()
+    with torch.no_grad():
+        logits = model(torch.from_numpy(X.astype(np.float32)))
+        probs = torch.sigmoid(logits).cpu().numpy()
+    return np.where(probs >= 0.5, 1, -1).astype(np.int64)
 
 
 def train_and_save(output_dir: Path) -> dict:
@@ -76,8 +120,7 @@ def train_and_save(output_dir: Path) -> dict:
     open_price_train = open_price[:train_size]
     open_price_test = open_price[train_size:]
 
-    model = LinearRegression()
-    model.fit(X_train, y_train)
+    model, train_info = train_classifier(X_train, y_train)
     y_pr_train = predict_direction(model, X_train)
     y_pr_test = predict_direction(model, X_test)
 
@@ -90,10 +133,14 @@ def train_and_save(output_dir: Path) -> dict:
             "train_size": train_size,
             "test_size": test_size,
         },
+        "training": train_info,
     }
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    joblib.dump(model, output_dir / "model.joblib")
+    torch.save(
+        {"state_dict": model.state_dict(), "in_features": int(X.shape[1]), "train_info": train_info},
+        output_dir / "model.pt",
+    )
     (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2, sort_keys=True) + "\n")
     visualizer = MacrossPredictionVisualizer()
     visualizer.save_predictions_plot(
@@ -120,8 +167,13 @@ def train_and_save(output_dir: Path) -> dict:
     logger.info(f"Profit plot saved to: {output_dir / 'profit_train_test.png'}")
     schema = {
         "feature_names": meta["feature_names"],
-        "model_type": "LinearRegression",
-        "model_params": model.get_params(),
+        "model_type": "OneLayerTorchBinaryClassifier",
+        "model_params": {
+            "in_features": int(X.shape[1]),
+            "out_features": 1,
+            "threshold": 0.5,
+            "train_info": train_info,
+        },
     }
     (output_dir / "schema.json").write_text(json.dumps(schema, indent=2, sort_keys=True) + "\n")
     return metrics
@@ -133,7 +185,7 @@ def main() -> int:
         return 1
     output_dir = Path(os.environ.get("ML_OUTPUT_DIR")).resolve() / "macross"
     metrics = train_and_save(output_dir)
-    logger.info(f"Linear regression artifacts saved to: {output_dir}")
+    logger.info(f"One-layer PyTorch classifier artifacts saved to: {output_dir}")
     logger.info(f"Train accuracy: {metrics['train']['accuracy']:.4f}")
     logger.info(f"Test accuracy: {metrics['test']['accuracy']:.4f}")
     logger.info(f"Test balanced accuracy: {metrics['test']['balanced_accuracy']:.4f}")
