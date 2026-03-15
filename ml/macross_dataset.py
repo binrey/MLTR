@@ -17,7 +17,7 @@ from data_processing.dataloading import MovingWindow
 
 DEFAULT_CONFIG = REPO_ROOT / "configs" / "macross" / "BTCUSDT.py"
 FEATURE_WINDOW = 30  # last L closes for features
-TRAIN_FRAC = 0.6
+TRAIN_FRAC = 0.75
 VAL_FRAC = 0.2
 
 
