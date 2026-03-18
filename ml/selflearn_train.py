@@ -1,4 +1,4 @@
-"""Train/evaluate a one-layer PyTorch classifier for macross direction labels."""
+"""Train a one-layer PyTorch strategy model and compare with buy-and-hold."""
 
 from __future__ import annotations
 
@@ -10,23 +10,16 @@ from pathlib import Path
 import numpy as np
 import torch
 from torch import nn
-from sklearn.metrics import (
-    accuracy_score,
-    balanced_accuracy_score,
-    confusion_matrix,
-    f1_score,
-    precision_score,
-    recall_score,
-)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from common.utils import Logger
-from ml.macross_dataset import TRAIN_FRAC, build_direction_dataset
-from ml.macross_visualization import MacrossPredictionVisualizer
+from ml.selflearn_dataset import TRAIN_FRAC, build_direction_dataset
+from ml.visualization import PredictionVisualizer
 from loguru import logger
+from tqdm import tqdm
 
 Logger(
     log_dir=os.environ.get("ML_LOG_DIR", str(REPO_ROOT / "logs")),
@@ -38,7 +31,6 @@ Logger(
     clear_logs=False,
 )
 
-
 class OneLayerClassifier(nn.Module):
     def __init__(self, in_features: int):
         super().__init__()
@@ -48,34 +40,31 @@ class OneLayerClassifier(nn.Module):
         return self.linear(x).squeeze(-1)
 
 
-def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
-    labels = [-1, 1]
-    cm = confusion_matrix(y_true, y_pred, labels=labels)
-    return {
-        "accuracy": float(accuracy_score(y_true, y_pred)),
-        "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
-        "precision_macro": float(precision_score(y_true, y_pred, average="macro", zero_division=0)),
-        "recall_macro": float(recall_score(y_true, y_pred, average="macro", zero_division=0)),
-        "f1_macro": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
-        "directional_hit_rate": float((y_true == y_pred).mean()),
-        "confusion_matrix_labels": labels,
-        "confusion_matrix": cm.tolist(),
-    }
+def resolve_device() -> torch.device:
+    requested = os.environ.get("DEVICE", "cpu").strip().lower()
+    if requested not in {"cpu", "cuda"}:
+        logger.warning(f"Unsupported DEVICE='{requested}', falling back to 'cpu'")
+        requested = "cpu"
+    if requested == "cuda" and not torch.cuda.is_available():
+        logger.warning("DEVICE='cuda' requested but CUDA is unavailable, falling back to 'cpu'")
+        requested = "cpu"
+    return torch.device(requested)
 
 
-def train_classifier(X_train: np.ndarray, open_price_train: np.ndarray) -> tuple[OneLayerClassifier, dict, dict]:
-    X_tensor = torch.from_numpy(X_train.astype(np.float32))
-    open_change = np.diff(open_price_train.astype(np.float32))
-    open_change_scale = float(np.std(open_change)) if open_change.size else 1.0
-    open_change_scale = max(open_change_scale, 1e-6)
-    open_change_norm = open_change / open_change_scale
-    open_change_tensor = torch.from_numpy(open_change_norm)
+def train_classifier(X_train: np.ndarray, 
+                     open_price_train: np.ndarray, 
+                     deposit_multp: np.ndarray,
+                     device: torch.device) -> tuple[OneLayerClassifier, dict, dict]:
+    X_tensor = torch.from_numpy(X_train.astype(np.float32)).to(device)
+    open_price_tensor = torch.from_numpy(open_price_train.astype(np.float32)).to(device)
+    open_change = torch.diff(open_price_tensor)
+    deposit_multp_tensor = torch.tensor(deposit_multp, dtype=torch.float32, device=device)
 
-    model = OneLayerClassifier(in_features=X_train.shape[1])
-    learning_rate = float(os.environ.get("MACROSS_TORCH_LR", "0.01"))
-    num_epochs = int(os.environ.get("MACROSS_TORCH_EPOCHS", "5000"))
-    logit_clip = float(os.environ.get("MACROSS_LOGIT_CLIP", "6.0"))
-    drawdown_lambda = float(os.environ.get("MACROSS_DRAWDOWN_LAMBDA", "0.001"))
+    model = OneLayerClassifier(in_features=X_train.shape[1]).to(device)
+    learning_rate = float(os.environ["LR"])
+    num_epochs = int(os.environ["EPOCHS"])
+    logit_clip = float(os.environ["LOGIT_CLIP"])
+    drawdown_lambda = float(os.environ["DRAWDOWN_LAMBDA"])
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     model.train()
@@ -88,28 +77,32 @@ def train_classifier(X_train: np.ndarray, open_price_train: np.ndarray) -> tuple
     weight_norm_history: list[float] = []
     weight_norm_change_history: list[float] = []
     drawdown_penalty_history: list[float] = []
+    use_drawdown_penalty = drawdown_lambda != 0.0
     prev_grad_norm = 0.0
     prev_weight_norm = 0.0
-    for _ in range(num_epochs):
+    for _ in tqdm(range(num_epochs), desc="Training"):
         optimizer.zero_grad()
         logits = model(X_tensor)
         # Soft-clamp logits to avoid hard zero gradients from torch.clamp outside bounds.
         logits_stable = logit_clip * torch.tanh(logits / max(logit_clip, 1e-6))
         # Differentiable trading direction in [-1, 1].
         direction = torch.tanh(logits_stable)
-        if open_change_tensor.numel() > 0:
+        if open_change.numel() > 0:
             # Direction at t is applied to open price change from t -> t+1.
-            step_pnl = open_change_tensor * direction[:-1]
+            step_pnl = open_change * direction[:-1] * deposit_multp_tensor[:-1]
             sequence_profit = torch.sum(step_pnl)
-            equity_curve = torch.cumsum(step_pnl, dim=0)
-            running_peak = torch.cummax(equity_curve, dim=0).values
-            drawdown = running_peak - equity_curve
-            drawdown_penalty = torch.mean(drawdown)
+            if use_drawdown_penalty:
+                equity_curve = torch.cumsum(step_pnl, dim=0)
+                running_peak = torch.cummax(equity_curve, dim=0).values
+                drawdown = running_peak - equity_curve
+                drawdown_penalty = torch.mean(drawdown)
+            else:
+                drawdown_penalty = torch.tensor(0.0, dtype=X_tensor.dtype, device=X_tensor.device)
         else:
             sequence_profit = torch.tensor(0.0, dtype=X_tensor.dtype, device=X_tensor.device)
             drawdown_penalty = torch.tensor(0.0, dtype=X_tensor.dtype, device=X_tensor.device)
         final_profit = sequence_profit
-        buy_and_hold_profit = torch.sum(open_change_tensor)
+        buy_and_hold_profit = torch.sum(open_change * deposit_multp_tensor[:-1])
         bh_denom = torch.clamp(torch.abs(buy_and_hold_profit), min=1e-6)
         relative_outperformance = (final_profit - buy_and_hold_profit) / bh_denom
         loss = -relative_outperformance + drawdown_lambda * drawdown_penalty
@@ -140,10 +133,10 @@ def train_classifier(X_train: np.ndarray, open_price_train: np.ndarray) -> tuple
 
     train_info = {
         "optimizer": "Adam",
+        "device": str(device),
         "loss": "neg_relative_outperformance_plus_drawdown_penalty",
         "learning_rate": learning_rate,
         "epochs": num_epochs,
-        "open_change_scale": open_change_scale,
         "logit_clip": logit_clip,
         "drawdown_lambda": drawdown_lambda,
         "final_train_loss": loss_value,
@@ -164,30 +157,34 @@ def train_classifier(X_train: np.ndarray, open_price_train: np.ndarray) -> tuple
     return model, train_info, train_history
 
 
-def predict_direction(model: OneLayerClassifier, X: np.ndarray) -> np.ndarray:
+def predict_direction(model: OneLayerClassifier, X: np.ndarray, device: torch.device) -> np.ndarray:
     model.eval()
     with torch.no_grad():
-        logits = model(torch.from_numpy(X.astype(np.float32)))
+        logits = model(torch.from_numpy(X.astype(np.float32)).to(device))
         probs = torch.sigmoid(logits).cpu().numpy()
     return np.where(probs >= 0.5, 1, -1).astype(np.int64)
 
 
-def train_and_save(output_dir: Path) -> dict:
-    X, y, meta = build_direction_dataset()
+def train_and_save(output_dir: Path, deposit: float = 1000.0) -> dict:
+    device = resolve_device()
+    X, meta = build_direction_dataset("configs/macross/BTCUSDT.py")
     timestamps = np.asarray(meta["timestamps"])
     open_price = np.asarray(meta["open_price"], dtype=np.float64)
+    deposit_multp = deposit / open_price
 
     n = X.shape[0]
     train_size = int(np.round(n * TRAIN_FRAC))
     train_size = max(1, min(train_size, n - 1))
     test_size = n - train_size
 
-    X_train, y_train = X[:train_size], y[:train_size]
-    X_test, y_test = X[train_size:], y[train_size:]
+    X_train = X[:train_size]
+    X_test = X[train_size:]
     timestamps_train = timestamps[:train_size]
     timestamps_test = timestamps[train_size:]
     open_price_train = open_price[:train_size]
     open_price_test = open_price[train_size:]
+    deposit_multp_train = deposit_multp[:train_size]
+    deposit_multp_test = deposit_multp[train_size:]
 
     # Standardize features using train statistics to prevent logit saturation.
     feat_mean = X_train.mean(axis=0, dtype=np.float64)
@@ -195,21 +192,46 @@ def train_and_save(output_dir: Path) -> dict:
     feat_std = np.where(feat_std < 1e-6, 1.0, feat_std)
     X_train_scaled = ((X_train - feat_mean) / feat_std).astype(np.float32)
     X_test_scaled = ((X_test - feat_mean) / feat_std).astype(np.float32)
+    X_scaled = ((X - feat_mean) / feat_std).astype(np.float32)
 
-    model, train_info, train_history = train_classifier(X_train_scaled, open_price_train)
-    y_pr_train = predict_direction(model, X_train_scaled)
-    y_pr_test = predict_direction(model, X_test_scaled)
+    model, train_info, train_history = train_classifier(X_train_scaled, open_price_train, deposit_multp=deposit_multp_train, device=device)
+    y_pr_train = predict_direction(model, X_train_scaled, device=device)
+    y_pr_test = predict_direction(model, X_test_scaled, device=device)
+    y_pr_all = predict_direction(model, X_scaled, device=device)
+    train_buy_and_hold_step_profit = np.diff(open_price_train) * deposit_multp_train[:-1]
+    test_buy_and_hold_step_profit = np.diff(open_price_test) * deposit_multp_test[:-1]
+    train_buy_and_hold_cum_profit = (
+        np.cumsum(train_buy_and_hold_step_profit)
+        if train_buy_and_hold_step_profit.size
+        else np.array([], dtype=np.float64)
+    )
+    test_buy_and_hold_cum_profit = (
+        np.cumsum(test_buy_and_hold_step_profit)
+        + (float(train_buy_and_hold_cum_profit[-1]) if train_buy_and_hold_cum_profit.size else 0.0)
+        if test_buy_and_hold_step_profit.size
+        else np.array([], dtype=np.float64)
+    )
+    train_strategy_step_profit = np.diff(open_price_train) * y_pr_train[:-1] * deposit_multp_train[:-1]
+    test_strategy_step_profit = np.diff(open_price_test) * y_pr_test[:-1] * deposit_multp_test[:-1]
+    strategy_step_profit = np.diff(open_price) * y_pr_all[:-1]
+    strategy_cum_profit = np.cumsum(strategy_step_profit) if strategy_step_profit.size else np.array([], dtype=np.float64)
+    strategy_final_profit = float(strategy_cum_profit[-1]) if strategy_cum_profit.size else 0.0
+    buy_and_hold_final_profit = float(meta["buy_and_hold_final_profit"])
 
     metrics = {
-        "train": evaluate(y_train, y_pr_train),
-        "test": evaluate(y_test, y_pr_test),
         "dataset": {
             "aligned_rows": meta["aligned_rows"],
-            "class_balance": meta["class_balance"],
             "train_size": train_size,
             "test_size": test_size,
         },
         "training": train_info,
+        "profit": {
+            "strategy_final_profit": strategy_final_profit,
+            "buy_and_hold_final_profit": buy_and_hold_final_profit,
+            "relative_outperformance_vs_buy_and_hold": float(
+                (strategy_final_profit - buy_and_hold_final_profit) / max(abs(buy_and_hold_final_profit), 1e-6)
+            ),
+        },
     }
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -224,29 +246,23 @@ def train_and_save(output_dir: Path) -> dict:
         output_dir / "model.pt",
     )
     (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2, sort_keys=True) + "\n")
-    visualizer = MacrossPredictionVisualizer()
-    visualizer.save_predictions_plot(
-        timestamps_train=timestamps_train,
-        y_gt_train=y_train,
-        y_pr_train=y_pr_train,
-        timestamps_test=timestamps_test,
-        y_gt_test=y_test,
-        y_pr_test=y_pr_test,
-        output_path=output_dir / "predictions_train_test.png",
-    )
-    logger.info(f"Predictions plot saved to: {output_dir / 'predictions_train_test.png'}")
-    visualizer.save_profit_plot(
+    visualizer = PredictionVisualizer(deposit=deposit, open_price_train=open_price_train, open_price_test=open_price_test)
+    visualizer.save_buy_and_hold_comparison_plot(
         timestamps_train=timestamps_train[:-1],
-        open_change_train=np.diff(open_price_train),
-        y_gt_train=y_train[:-1],
-        y_pr_train=y_pr_train[:-1],
+        buy_and_hold_cum_train=train_buy_and_hold_cum_profit,
+        strategy_cum_train=np.cumsum(train_strategy_step_profit) if train_strategy_step_profit.size else np.array([], dtype=np.float64),
         timestamps_test=timestamps_test[:-1],
-        open_change_test=np.diff(open_price_test),
-        y_gt_test=y_test[:-1],
-        y_pr_test=y_pr_test[:-1],
-        output_path=output_dir / "profit_train_test.png",
+        buy_and_hold_cum_test=test_buy_and_hold_cum_profit,
+        strategy_cum_test=(
+            np.cumsum(test_strategy_step_profit) + float(np.sum(train_strategy_step_profit))
+            if test_strategy_step_profit.size
+            else np.array([], dtype=np.float64)
+        ),
+        pred_sign_train=y_pr_train[:-1],
+        pred_sign_test=y_pr_test[:-1],
+        output_path=output_dir / "profit_vs_buy_and_hold_train_test.png",
     )
-    logger.info(f"Profit plot saved to: {output_dir / 'profit_train_test.png'}")
+    logger.info(f"Profit-vs-buy-and-hold plot saved to: {output_dir / 'profit_vs_buy_and_hold_train_test.png'}")
     visualizer.save_loss_change_plot(
         loss_values=np.asarray(train_history["loss"], dtype=np.float64),
         profit_values=np.asarray(train_history["final_profit"], dtype=np.float64),
@@ -286,11 +302,11 @@ def main() -> int:
         logger.error("ML_OUTPUT_DIR is not set")
         return 1
     output_dir = Path(os.environ.get("ML_OUTPUT_DIR")).resolve() / "macross"
-    metrics = train_and_save(output_dir)
+    metrics = train_and_save(output_dir, deposit=float(os.environ.get("DEPOSIT", "1000.0")))
     logger.info(f"One-layer PyTorch classifier artifacts saved to: {output_dir}")
-    logger.info(f"Train accuracy: {metrics['train']['accuracy']:.4f}")
-    logger.info(f"Test accuracy: {metrics['test']['accuracy']:.4f}")
-    logger.info(f"Test balanced accuracy: {metrics['test']['balanced_accuracy']:.4f}")
+    logger.info(f"Strategy final profit: {metrics['profit']['strategy_final_profit']:.6f}")
+    logger.info(f"Buy-and-hold final profit: {metrics['profit']['buy_and_hold_final_profit']:.6f}")
+    logger.info(f"Relative outperformance: {metrics['profit']['relative_outperformance_vs_buy_and_hold']:.6f}")
     return 0
 
 
