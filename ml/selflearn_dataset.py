@@ -72,9 +72,9 @@ def build_direction_dataset(config_path: str | Path | None = None) -> tuple[np.n
 
         k = 0
         for window in mw(output_time=False):
-            close_window = window["Close"]
+            close_window = window["Close"][:-1]
             for idx, period_name in enumerate(ma_divisors):
-                X[k, idx] = float(close_window[-ma_periods[period_name] :].mean())
+                X[k, idx] = float(close_window[-ma_periods[period_name] :].mean()) / close_window[-1]
             timestamps[k] = window["Date"][-1]
             open_price[k] = float(window["Open"][-1])
             k += 1

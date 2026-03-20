@@ -309,9 +309,9 @@ class MovingWindow():
 
         # Reuse a rolling structured buffer instead of allocating/copying
         # full window on every step.
-        left = self.id2start - self.size + 1
+        left = self.id2start - self.size
         right = self.id2start + 1
-        window = np.empty(self.size, dtype=self.hist.dtype)
+        window = np.empty(self.size + 1, dtype=self.hist.dtype)
         np.copyto(window, self.hist[left:right])
 
         for t in range(self.id2start, self.id2end + 1):
