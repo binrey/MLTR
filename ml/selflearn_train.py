@@ -21,6 +21,9 @@ from ml.visualization import PredictionVisualizer
 from loguru import logger
 from tqdm import tqdm
 
+AUTOREGRESSIVE_FEATURE_NAME = "prev_pred_label"
+AUTOREGRESSIVE_INITIAL_LABEL = 0.0
+
 Logger(
     log_dir=os.environ.get("ML_LOG_DIR", str(REPO_ROOT / "logs")),
     log_level=os.environ.get("ML_LOG_LEVEL", "INFO"),
@@ -34,10 +37,14 @@ Logger(
 class OneLayerClassifier(nn.Module):
     def __init__(self, in_features: int):
         super().__init__()
-        self.linear = nn.Linear(in_features, 1)
+        self.hidden = nn.Linear(in_features, in_features)
+        self.relu = nn.ReLU()
+        self.out = nn.Linear(in_features, 1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.linear(x).squeeze(-1)
+        x = self.hidden(x)
+        x = self.relu(x)
+        return self.out(x).squeeze(-1)
 
 
 def resolve_device() -> torch.device:
@@ -51,6 +58,29 @@ def resolve_device() -> torch.device:
     return torch.device(requested)
 
 
+def rollout_autoregressive_logits(
+    model: OneLayerClassifier,
+    X_tensor: torch.Tensor,
+    logit_clip: float,
+) -> torch.Tensor:
+    if X_tensor.shape[0] == 0:
+        return torch.empty(0, dtype=X_tensor.dtype, device=X_tensor.device)
+    logits: list[torch.Tensor] = []
+    prev_state = torch.tensor(
+        [AUTOREGRESSIVE_INITIAL_LABEL],
+        dtype=X_tensor.dtype,
+        device=X_tensor.device,
+    )
+    clip = max(float(logit_clip), 1e-6)
+    for idx in range(X_tensor.shape[0]):
+        step_input = torch.cat((X_tensor[idx], prev_state), dim=0).unsqueeze(0)
+        step_logit = model(step_input)[0]
+        logits.append(step_logit)
+        step_logit_stable = clip * torch.tanh(step_logit / clip)
+        prev_state = torch.tanh(step_logit_stable).view(1)
+    return torch.stack(logits)
+
+
 def train_classifier(X_train: np.ndarray, 
                      open_price_train: np.ndarray, 
                      deposit_multp: np.ndarray,
@@ -60,7 +90,7 @@ def train_classifier(X_train: np.ndarray,
     open_change = torch.diff(open_price_tensor)
     deposit_multp_tensor = torch.tensor(deposit_multp, dtype=torch.float32, device=device)
 
-    model = OneLayerClassifier(in_features=X_train.shape[1]).to(device)
+    model = OneLayerClassifier(in_features=X_train.shape[1] + 1).to(device)
     learning_rate = float(os.environ["LR"])
     num_epochs = int(os.environ["EPOCHS"])
     logit_clip = float(os.environ["LOGIT_CLIP"])
@@ -80,9 +110,10 @@ def train_classifier(X_train: np.ndarray,
     use_drawdown_penalty = drawdown_lambda != 0.0
     prev_grad_norm = 0.0
     prev_weight_norm = 0.0
-    for _ in tqdm(range(num_epochs), desc="Training"):
+    progress_bar = tqdm(range(num_epochs), desc="Training")
+    for _ in progress_bar:
         optimizer.zero_grad()
-        logits = model(X_tensor)
+        logits = rollout_autoregressive_logits(model, X_tensor, logit_clip)
         # Soft-clamp logits to avoid hard zero gradients from torch.clamp outside bounds.
         logits_stable = logit_clip * torch.tanh(logits / max(logit_clip, 1e-6))
         # Differentiable trading direction in [-1, 1].
@@ -102,11 +133,17 @@ def train_classifier(X_train: np.ndarray,
             sequence_profit = torch.tensor(0.0, dtype=X_tensor.dtype, device=X_tensor.device)
             drawdown_penalty = torch.tensor(0.0, dtype=X_tensor.dtype, device=X_tensor.device)
         final_profit = sequence_profit
-        buy_and_hold_profit = torch.sum(open_change * deposit_multp_tensor[:-1])
+        buy_and_hold_profit = torch.abs(torch.sum(open_change * deposit_multp_tensor[:-1]))
         bh_denom = torch.clamp(torch.abs(buy_and_hold_profit), min=1e-6)
         relative_outperformance = (final_profit - buy_and_hold_profit) / bh_denom
         loss = -relative_outperformance + drawdown_lambda * drawdown_penalty
+        progress_bar.set_postfix(
+            loss=f"{loss.item():.3f}",
+            rel_outperf=f"{relative_outperformance.item():.3f}",
+            drawdown=f"{drawdown_penalty.item():.3f}",
+        )
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         grad_sq_sum = 0.0
         for param in model.parameters():
             if param.grad is not None:
@@ -139,6 +176,9 @@ def train_classifier(X_train: np.ndarray,
         "epochs": num_epochs,
         "logit_clip": logit_clip,
         "drawdown_lambda": drawdown_lambda,
+        "autoregressive_prev_label": True,
+        "autoregressive_feature_name": AUTOREGRESSIVE_FEATURE_NAME,
+        "autoregressive_initial_prev_label": AUTOREGRESSIVE_INITIAL_LABEL,
         "final_train_loss": loss_value,
         "final_train_profit": final_profit_value,
         "final_drawdown_penalty": drawdown_penalty_history[-1] if drawdown_penalty_history else 0.0,
@@ -160,9 +200,12 @@ def train_classifier(X_train: np.ndarray,
 def predict_direction(model: OneLayerClassifier, X: np.ndarray, device: torch.device) -> np.ndarray:
     model.eval()
     with torch.no_grad():
-        logits = model(torch.from_numpy(X.astype(np.float32)).to(device))
-        probs = torch.sigmoid(logits).cpu().numpy()
-    return np.where(probs >= 0.5, 1, -1).astype(np.int64)
+        logits = rollout_autoregressive_logits(
+            model,
+            torch.from_numpy(X.astype(np.float32)).to(device),
+            logit_clip=float(os.environ["LOGIT_CLIP"]),
+        )
+    return np.where(logits.cpu().numpy() >= 0.0, 1, -1).astype(np.int64)
 
 
 def train_and_save(output_dir: Path, deposit: float = 1000.0) -> dict:
@@ -238,9 +281,13 @@ def train_and_save(output_dir: Path, deposit: float = 1000.0) -> dict:
     torch.save(
         {
             "state_dict": model.state_dict(),
-            "in_features": int(X.shape[1]),
+            "in_features": int(X.shape[1] + 1),
+            "base_feature_count": int(X.shape[1]),
             "feature_mean": feat_mean.tolist(),
             "feature_std": feat_std.tolist(),
+            "autoregressive_prev_label": True,
+            "autoregressive_feature_name": AUTOREGRESSIVE_FEATURE_NAME,
+            "autoregressive_initial_prev_label": AUTOREGRESSIVE_INITIAL_LABEL,
             "train_info": train_info,
         },
         output_dir / "model.pt",
@@ -282,14 +329,18 @@ def train_and_save(output_dir: Path, deposit: float = 1000.0) -> dict:
     )
     logger.info(f"Weights norm change plot saved to: {output_dir / 'weights_norm_change_train.png'}")
     schema = {
-        "feature_names": meta["feature_names"],
+        "feature_names": meta["feature_names"] + [AUTOREGRESSIVE_FEATURE_NAME],
         "model_type": "OneLayerTorchBinaryClassifier",
         "model_params": {
-            "in_features": int(X.shape[1]),
+            "in_features": int(X.shape[1] + 1),
+            "base_feature_count": int(X.shape[1]),
             "out_features": 1,
             "threshold": 0.5,
             "feature_mean": feat_mean.tolist(),
             "feature_std": feat_std.tolist(),
+            "autoregressive_prev_label": True,
+            "autoregressive_feature_name": AUTOREGRESSIVE_FEATURE_NAME,
+            "autoregressive_initial_prev_label": AUTOREGRESSIVE_INITIAL_LABEL,
             "train_info": train_info,
         },
     }
