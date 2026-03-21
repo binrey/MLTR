@@ -15,7 +15,6 @@ if str(REPO_ROOT) not in sys.path:
 from common.utils import PyConfig
 from data_processing.dataloading import MovingWindow
 
-DEFAULT_CONFIG = REPO_ROOT / "configs" / "macross" / "BTCUSDT.py"
 TRAIN_FRAC = 0.8
 
 
@@ -31,25 +30,13 @@ def build_direction_dataset(config_path: str | Path | None = None) -> tuple[np.n
     """
     if os.environ.get("FINDATA") is None:
             os.environ["FINDATA"] = str(REPO_ROOT / "fin_data")
-    config_path = Path(config_path)
-    if not config_path.is_absolute():
-        config_path = (REPO_ROOT / config_path).resolve()
-    else:
-        config_path = config_path.resolve()
-
-    pc = PyConfig(str(config_path))
-    cfg = pc.get_backtest()
-    raw_backtest = pc.base_config.backtest
+    cfg = PyConfig(str(config_path)).base_config.config
     hist_size = int(cfg["hist_size"])
-    dm = raw_backtest.get("decision_maker") or {}
-    # All MA periods are defined as fractions of hist_size: hist_size // divisor.
     ma_divisors = {
         "ma_slow_period": 1,
         "ma_10_period": 10,
-        "ma_20_period": 20,
-        "ma_40_period": 40,
-        "ma_40_period": 80,
-    }
+        "ma_20_period": 20,     
+        }
 
     ma_feature_names = [name[:-7] for name in ma_divisors]
     ma_periods = {

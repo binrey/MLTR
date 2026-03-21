@@ -208,9 +208,9 @@ def predict_direction(model: OneLayerClassifier, X: np.ndarray, device: torch.de
     return np.where(logits.cpu().numpy() >= 0.0, 1, -1).astype(np.int64)
 
 
-def train_and_save(output_dir: Path, deposit: float = 1000.0) -> dict:
+def train_and_save(config_path: str, output_dir: Path, deposit: float = 1000.0) -> dict:
     device = resolve_device()
-    X, meta = build_direction_dataset("configs/macross/BTCUSDT.py")
+    X, meta = build_direction_dataset(config_path)
     timestamps = np.asarray(meta["timestamps"])
     open_price = np.asarray(meta["open_price"], dtype=np.float64)
     deposit_multp = deposit / open_price
@@ -353,7 +353,9 @@ def main() -> int:
         logger.error("ML_OUTPUT_DIR is not set")
         return 1
     output_dir = Path(os.environ.get("ML_OUTPUT_DIR")).resolve() / "macross"
-    metrics = train_and_save(output_dir, deposit=float(os.environ.get("DEPOSIT", "1000.0")))
+    metrics = train_and_save(config_path=os.environ.get("CONFIG"),
+                               output_dir=Path(os.environ.get("ML_OUTPUT_DIR")).resolve(),
+                               deposit=float(os.environ.get("DEPOSIT")))
     logger.info(f"One-layer PyTorch classifier artifacts saved to: {output_dir}")
     logger.info(f"Strategy final profit: {metrics['profit']['strategy_final_profit']:.6f}")
     logger.info(f"Buy-and-hold final profit: {metrics['profit']['buy_and_hold_final_profit']:.6f}")

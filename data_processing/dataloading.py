@@ -317,7 +317,6 @@ class MovingWindow():
         for t in range(self.id2start, self.id2end + 1):
             t0 = perf_counter()
 
-            # Build synthetic last candle exactly as in __getitem__.
             close_last = window["Close"][-1]
             high_last = window["High"][-1]
             low_last = window["Low"][-1]
