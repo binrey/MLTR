@@ -17,6 +17,20 @@ def pull_bybit_data(symbol: Symbol, period: TimePeriod, date_start: Any, date_en
     return h
 
 
+def pull_yahoo_data(symbol: Symbol, date_start: Any, date_end: Any, yahoo_ticker: str | None = None, **kwargs):
+    from data_processing.datapulling import YahooDownloader
+
+    out = Path(os.getenv("FINDATA")) / f"yahoo/D/{symbol.ticker}.csv"
+    dl = YahooDownloader(
+        symbol=symbol,
+        period=TimePeriod.D,
+        init_data=out,
+        yahoo_ticker=yahoo_ticker,
+    )
+    return dl.get_history(date_start=date_start, date_end=date_end)
+
+
 PULLERS = {
-    "bybit": pull_bybit_data
+    "bybit": pull_bybit_data,
+    "yahoo": pull_yahoo_data,
 }
