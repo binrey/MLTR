@@ -175,7 +175,7 @@ class BybitTrading(BaseTradeClass):
                 message = self.session.get_kline(
                     category="linear",
                     symbol=self.ticker,
-                    interval=str(self.period.minutes),
+                    interval=self.period.bybit_interval,
                     start=0,
                     end=t.astype("datetime64[ms]").astype(int),
                     limit=self.hist_size
@@ -187,8 +187,9 @@ class BybitTrading(BaseTradeClass):
         return data
 
     def wait_until_next_update(self):
-        next_update_time = self.time.curr + np.timedelta64(self.period.minutes, "m")
-        total_seconds = self.period.to_timedelta().astype(int)*60
+        step = self.period.to_timedelta()
+        next_update_time = self.time.curr + step
+        total_seconds = max(1, int(step / np.timedelta64(1, "s")))
         remaining_seconds = (next_update_time - self.get_server_time()).astype(int)
         while remaining_seconds > 0:
             minutes, seconds = divmod(remaining_seconds, 60)

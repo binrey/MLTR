@@ -62,31 +62,53 @@ class Vis(Enum):
     
 
 class TimePeriod(Enum):
+    D = "D"
     M60 = "M60"
     M15 = "M15"
     M5 = "M5"
     M1 = "M1"
 
-    def to_timedelta(self):
-        return np.timedelta64(self.value[1:], self.value[0].lower())
-    
+    @staticmethod
+    def _daily_bar_days(value: str) -> int:
+        suffix = value[1:]
+        return int(suffix) if suffix else 1
+
+    def to_timedelta(self) -> np.timedelta64:
+        v = self.value
+        if v[0] == "D":
+            return np.timedelta64(self._daily_bar_days(v), "D")
+        if v[0] == "M":
+            return np.timedelta64(int(v[1:]), "m")
+        raise ValueError(f"Unsupported TimePeriod: {self!r}")
+
     @property
-    def minutes(self):
+    def minutes(self) -> int:
+        if self.value[0] == "D":
+            return self._daily_bar_days(self.value) * 24 * 60
         return int(self.value[1:])
-    
+
     @property
-    def hours(self):
-        return int(self.value[1:])/60
-    
+    def hours(self) -> float:
+        if self.value[0] == "D":
+            return float(self._daily_bar_days(self.value) * 24)
+        return int(self.value[1:]) / 60.0
+
     def to_days(self, value: float):
-        return value/self.hours/24
+        return value / self.hours / 24
+
+    @property
+    def bybit_interval(self) -> str:
+        """Bybit ``get_kline`` interval: minute bars use minute count as string; daily uses ``D``."""
+        if self.value[0] == "D":
+            return "D"
+        return str(self.minutes)
 
     def round_to_period(self, value: np.datetime64):
         if self.value == "M60":
-            rounded_value = value.astype("datetime64[h]").astype("datetime64[m]")
-        else:
-            rounded_value = value.astype("datetime64[m]")
-        return rounded_value
+            return value.astype("datetime64[h]").astype("datetime64[m]")
+        if self.value[0] == "D":
+            return value.astype("datetime64[D]").astype("datetime64[m]")
+        return value.astype("datetime64[m]")
 
 class RunType(Enum):
     BACKTEST = "backtest"

@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -36,7 +37,7 @@ class BybitDownloader:
         message = session.get_kline(
             category="linear",
             symbol=self.symbol,
-            interval=str(self.period.minutes),
+            interval=self.period.bybit_interval,
             start=start_date,
             end=end_date,
             limit=size
@@ -112,19 +113,46 @@ class BybitDownloader:
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
-    parser = ArgumentParser()
-    parser.add_argument("--symbol", type=str, default="BTCUSDT")
-    parser.add_argument("--period", type=int, default=1)
-    parser.add_argument("--start_date", type=str, default="2025-04-20")
-    parser.add_argument("--init_data", type=str, default=None)
+
+    from common.type import Symbols
+
+    period_names = [p.name for p in TimePeriod]
+
+    def resolve_symbol(name: str) -> Symbol:
+        if not hasattr(Symbols, name):
+            raise SystemExit(f"Unknown symbol {name!r}; use a name from Symbols (e.g. BTCUSDT).")
+        return getattr(Symbols, name)
+
+    parser = ArgumentParser(description="Download Bybit klines to CSV (same layout as DataParser).")
+    parser.add_argument("--symbol", type=str, default="BTCUSDT", help="Symbols attribute, e.g. BTCUSDT")
+    parser.add_argument(
+        "--period",
+        type=str,
+        default="D",
+        choices=period_names,
+        help=f"TimePeriod name: {', '.join(period_names)}",
+    )
+    parser.add_argument("--start_date", type=str, default="2018-01-01")
+    parser.add_argument("--end_date", type=str, default=None, help="Default: now")
+    parser.add_argument(
+        "--init_data",
+        type=str,
+        default=None,
+        help="Output CSV path; default FINDATA/bybit/<period>/<symbol>.csv",
+    )
     args = parser.parse_args()
 
-    bb_loader = BybitDownloader(symbol=args.symbol,
-                                period=args.period,
-                                start_date=args.start_date,
-                                init_data=args.init_data
-                                )
-    hist = bb_loader.get_history().to_csv(args.init_data)
+    symbol = resolve_symbol(args.symbol)
+    period = TimePeriod[args.period]
+    if args.init_data is not None:
+        init_data = Path(args.init_data)
+    else:
+        findata = os.environ.get("FINDATA")
+        if not findata:
+            raise SystemExit("Set FINDATA or pass --init_data (output CSV path).")
+        init_data = Path(findata) / "bybit" / period.value / f"{symbol.ticker}.csv"
 
-    print(hist)
-    mpf.plot(hist, type='line')
+    bb_loader = BybitDownloader(symbol=symbol, period=period, init_data=init_data)
+    hist = bb_loader.get_history(date_start=args.start_date, date_end=args.end_date)
+    print(hist.tail())
+    mpf.plot(hist, type="line")
