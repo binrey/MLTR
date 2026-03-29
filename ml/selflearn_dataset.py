@@ -47,7 +47,6 @@ def build_direction_dataset(config_path: str | Path | None = None) -> tuple[np.n
     cfg = PyConfig(str(config_path)).base_config.config
     hist_size = int(cfg["hist_size"])
     ma_divisors = {
-        "ma_slow_period": 1,
         "ma_10_period": 10,
         "ma_20_period": 20,
         }
@@ -58,7 +57,7 @@ def build_direction_dataset(config_path: str | Path | None = None) -> tuple[np.n
         for name, divisor in ma_divisors.items()
     }
     # Per period: mean(close)/last_close, std(close)/last_close, std(volume)/last_volume
-    n_features = len(ma_feature_names) * 3
+    n_features = len(ma_feature_names) * 3 + 2
     feature_names = [
         label
         for base in ma_feature_names
@@ -81,21 +80,27 @@ def build_direction_dataset(config_path: str | Path | None = None) -> tuple[np.n
         for window in mw(output_time=False):
             close_window = window["Close"][:-1]
             vol_window = window["Volume"][:-1]
-            close_last = float(close_window[-1])
-            denom_close = close_last if abs(close_last) > 1e-15 else 1.0
+            denom_price = close_window.mean()
+            denom_vol = vol_window.mean()
+            assert denom_price > 1e-15
+            assert denom_vol > 1e-15
             col = 0
             for period_name in ma_divisors:
                 p = ma_periods[period_name]
                 close_slice = close_window[-p:]
                 vol_slice = vol_window[-p:]
-                vol_last = float(vol_slice[-1])
-                denom_vol = vol_last if abs(vol_last) > 1e-15 else 1.0
-                X[k, col] = float(close_slice.mean()) / denom_close
+
+                X[k, col] = float(close_slice.mean()) / denom_price
                 col += 1
-                X[k, col] = float(np.std(close_slice, ddof=0)) / denom_close
+                X[k, col] = float(np.std(close_slice, ddof=0)) / denom_price
                 col += 1
-                X[k, col] = float(vol_slice.mean()) / denom_vol
+                X[k, col] = float(np.std(vol_slice, ddof=0)) / denom_vol
                 col += 1
+
+            X[k, col] = float(vol_slice[-1]) / denom_vol
+            col += 1
+            X[k, col] = float(close_slice[-1]) / denom_price
+            col += 1
             timestamps[k] = window["Date"][-1]
             open_price[k] = float(window["Open"][-1])
             k += 1
