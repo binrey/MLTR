@@ -3,6 +3,8 @@ runs/
 optimization/data/
 env/
 venv/
+logs/
+ml/artifacts/
 
 *.csv
 *.png
@@ -15,7 +17,6 @@ venv/
 *.pkl
 *.yaml
 *.log
-*.json
 
 .DS_Store
 .*

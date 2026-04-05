@@ -47,6 +47,7 @@ def init_target_from_cfg(cfg):
     Target = cfg.pop("type")
     return Target(**cfg)
 
+
 def init_modules(cfg):
     for name, submodule in cfg.items():
         if not isinstance(submodule, dict):
@@ -56,6 +57,13 @@ def init_modules(cfg):
                 cfg[name] = init_target_from_cfg(submodule)
     return cfg
 
+
+def resolve_findata_dir() -> Path:
+    """Output root: ``FINDATA`` env, else existing ``fin_data`` (repo or cwd), else ``<repo>/fin_data`` (created)."""
+    env = os.environ.get("FINDATA")
+    if env is None:
+        raise ValueError("FINDATA environment variable is not set. Please set it in your environment or .env file.")
+    return Path(env)
 
 class PyConfig():
     def __init__(self, config_file) -> None:
