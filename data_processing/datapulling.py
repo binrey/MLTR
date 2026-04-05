@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from dotenv import load_dotenv
 import mplfinance as mpf
 import pandas as pd
 from loguru import logger
@@ -10,6 +11,10 @@ from pybit.unified_trading import HTTP
 
 from common.type import Symbol, TimePeriod
 from data_processing.dataloading import get_bybit_hist
+
+
+load_dotenv(override=True)
+
 
 # Yahoo Finance uses hyphenated tickers (e.g. BTC-USD); there is no BTC/USDT symbol on Yahoo.
 YAHOO_CRYPTO_BYBIT = {
@@ -250,26 +255,9 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     from common.type import Symbols
+    from common.utils import resolve_findata_dir
 
     period_names = [p.name for p in TimePeriod]
-    _REPO_ROOT = Path(__file__).resolve().parent.parent
-
-    def resolve_symbol(name: str) -> Symbol:
-        if not hasattr(Symbols, name):
-            raise SystemExit(f"Unknown symbol {name!r}; use a name from Symbols (e.g. BTCUSDT).")
-        return getattr(Symbols, name)
-
-    def resolve_findata_dir() -> Path:
-        """Output root: ``FINDATA`` env, else existing ``fin_data`` (repo or cwd), else ``<repo>/fin_data`` (created)."""
-        env = os.environ.get("FINDATA")
-        if env:
-            return Path(env)
-        for candidate in (_REPO_ROOT / "fin_data", Path.cwd() / "fin_data"):
-            if candidate.is_dir():
-                return candidate
-        default = _REPO_ROOT / "fin_data"
-        default.mkdir(parents=True, exist_ok=True)
-        return default
 
     parser = ArgumentParser(
         description="Download market data to CSV. Output path is <FINDATA or fin_data>/<bybit|yahoo>/<period>/<symbol>.csv."
@@ -297,10 +285,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     data_type = "yahoo" if args.yahoo else "bybit"
 
-    findata = resolve_findata_dir()
-    symbol = resolve_symbol(args.symbol)
+    if not hasattr(Symbols, args.symbol):
+        raise SystemExit(f"Unknown symbol {args.symbol!r}; use a name from Symbols (e.g. BTCUSDT).")
+    symbol = getattr(Symbols, args.symbol)
     period = TimePeriod[args.period]  
-    init_data = findata / data_type / period.value / f"{symbol.ticker}.csv"
+    init_data = resolve_findata_dir() / data_type / period.value / f"{symbol.ticker}.csv"
 
   
     if args.yahoo:
@@ -316,7 +305,6 @@ if __name__ == "__main__":
         print(hist.tail())
         mpf.plot(hist, type="line")
     else:
-        symbol = resolve_symbol(args.symbol)
         period = TimePeriod[args.period]
 
         bb_loader = BybitDownloader(symbol=symbol, period=period, init_data=init_data)
