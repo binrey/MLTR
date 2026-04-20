@@ -45,31 +45,32 @@ Logger(
 )
 
 class OneLayerClassifier(nn.Module):
-    def __init__(self, in_features: int):
+    def __init__(self, in_features: int, logit_clip: float = 6.0):
         super().__init__()
         self.hidden = nn.Linear(in_features, in_features)
         self.relu = nn.ReLU()
         self.out = nn.Linear(in_features, 1)
+        self.logit_clip = logit_clip
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.hidden(x)
         x = self.relu(x)
-        return self.out(x).squeeze(-1)
+        x = self.out(x).squeeze(-1)
+        x = self.logit_clip * torch.tanh(x / self.logit_clip)
+        return torch.tanh(x)
 
 @dataclass
 class TrainArtifacts:
     """Saved training outputs for `SelfLearn.save()` (single, multi-run, or CV result handle)."""
 
     mode: Literal["single", "multi", "cv"]
-    X: np.ndarray | None = None
+    X_shape: np.ndarray | None = None
     timestamps_train: np.ndarray | None = None
     timestamps_test: np.ndarray | None = None
     open_price_train: np.ndarray | None = None
     open_price_test: np.ndarray | None = None
     train_info: dict | None = None
     train_history: dict | None = None
-    feat_mean: np.ndarray | None = None
-    feat_std: np.ndarray | None = None
     model: OneLayerClassifier | None = None
     metrics: dict | None = None
     y_pr_train: np.ndarray | None = None
@@ -83,6 +84,14 @@ class TrainArtifacts:
     run_timestamps_test_steps: list[np.ndarray] | None = None
     open_price: np.ndarray | None = None
     cv_test_strategy_step_profit: list[np.ndarray] | None = None
+
+
+@dataclass(frozen=True)
+class TimeSeriesSegments:
+    """Independent, strictly-increasing valid ranges in a flat dataset."""
+
+    segments: list[tuple[int, int]]
+    valid_rows: np.ndarray
 
 
 def resolve_device() -> torch.device:
@@ -122,40 +131,85 @@ def _cv_fold_stats(values: list[float]) -> dict:
     }
 
 
-def rollout_autoregressive_logits(
-    model: OneLayerClassifier,
-    X_tensor: torch.Tensor,
-    open_price_tensor: torch.Tensor,
-    deposit_multp_tensor: torch.Tensor,
-    logit_clip: float,
-    deposit: float,
-) -> torch.Tensor:
-    if X_tensor.shape[0] == 0:
-        return torch.empty(0, dtype=X_tensor.dtype, device=X_tensor.device)
-    logits: list[torch.Tensor] = []
-    prev_state = torch.tensor(
-        [AUTOREGRESSIVE_INITIAL_LABEL, AUTOREGRESSIVE_INITIAL_DRAWDOWN],
-        dtype=X_tensor.dtype,
-        device=X_tensor.device,
-    )
-    open_change = torch.diff(open_price_tensor)
-    running_total_profit = torch.tensor(0.0, dtype=X_tensor.dtype, device=X_tensor.device)
-    running_peak_profit = torch.tensor(0.0, dtype=X_tensor.dtype, device=X_tensor.device)
-    clip = max(float(logit_clip), 1e-6)
-    for idx in range(X_tensor.shape[0]):
-        step_input = torch.cat((X_tensor[idx], prev_state), dim=0).unsqueeze(0)
-        step_logit = model(step_input)[0]
-        logits.append(step_logit)
-        step_logit_stable = clip * torch.tanh(step_logit / clip)
-        prev_label = torch.tanh(step_logit_stable)
-        prev_drawdown = prev_state[1]
-        if idx < open_change.shape[0]:
-            current_profit = open_change[idx] * prev_label * deposit_multp_tensor[idx] / deposit
-            running_total_profit = running_total_profit + current_profit
-            running_peak_profit = torch.maximum(running_peak_profit, running_total_profit)
-            prev_drawdown = running_peak_profit - running_total_profit
-        prev_state = torch.stack((prev_label, prev_drawdown))
-    return torch.stack(logits)
+def _build_valid_panel_mask(X: np.ndarray, open_price: np.ndarray) -> np.ndarray:
+    """Build a validity mask for a panel of data."""
+    return np.isfinite(open_price) & np.all(np.isfinite(X), axis=2)
+
+
+def _default_segments(n_rows: int) -> list[tuple[int, int]]:
+    return [(0, int(n_rows))] if n_rows > 0 else []
+
+
+def _compute_step_profit_with_boundaries(
+    timestamps: np.ndarray,
+    open_price: np.ndarray,
+    direction: np.ndarray,
+    deposit_multp: np.ndarray,
+    valid_rows: np.ndarray,
+) -> np.ndarray:
+    """
+    Per-step pnl with boundary handling.
+
+    Returns length n-1 vector; invalid transitions or sequence boundaries are 0.
+    """
+    n = int(open_price.shape[1])
+    assert n > 1
+    step_profit = np.zeros((open_price.shape[0], n - 1), dtype=np.float64)
+
+    assert np.any(valid_rows)
+    open_change = np.diff(open_price, axis=-1)
+    n_steps = n - 1
+    for i in range(open_price.shape[0]):
+        vi = valid_rows[i]
+        ts_i = timestamps[i]
+        step_ok = vi[:-1] & vi[1:] & (ts_i[1:] > ts_i[:-1])
+        step_profit[i, step_ok] = (
+            open_change[i, step_ok] * direction[i, :n_steps][step_ok] * deposit_multp[i, :n_steps][step_ok]
+        )
+    return step_profit
+
+
+def _rollout_train_timesteps(model: OneLayerClassifier,
+                             X_tensor: torch.Tensor,
+                             open_price_tensor: torch.Tensor,
+                             deposit_multp_tensor: torch.Tensor,
+) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+    bsz, tlen, _ = X_tensor.shape
+    device = X_tensor.device
+    dtype = X_tensor.dtype
+    step_pnl_parts: list[torch.Tensor] = []
+    predicts: torch.Tensor = torch.zeros((bsz, tlen), dtype=dtype, device=device)
+    prev_state = torch.zeros((bsz, 2), dtype=dtype, device=device)
+    for t in range(tlen):
+        valid_t = torch.isfinite(open_price_tensor[:, t]) & torch.all(
+            torch.isfinite(X_tensor[:, t, :]), dim=1
+        )
+        if not torch.any(valid_t):
+            # No usable rows this timestep: reset hidden autoregressive state.
+            prev_state[:] = 0.0
+            continue
+        x_t = X_tensor[:, t, :][valid_t]
+        prev_t = prev_state[valid_t] * 0
+        step_input = torch.cat((x_t, prev_t), dim=1)
+        predicts_tensor = model(step_input)
+        predicts[valid_t, t] = predicts_tensor.squeeze().detach()
+        # Update autoregressive state only for active batch elements.
+        prev_state[valid_t, 0] = predicts_tensor
+        if t < tlen - 1:
+            valid_next = torch.isfinite(open_price_tensor[:, t + 1]) & torch.all(
+                torch.isfinite(X_tensor[:, t + 1, :]), dim=1
+            )
+            active = valid_t & valid_next
+            if torch.any(active):
+                open_change = (
+                    open_price_tensor[active, t + 1] - open_price_tensor[active, t]
+                )
+                dir_active = prev_state[active, 0]
+                step_pnl = open_change * dir_active * deposit_multp_tensor[active, t]
+                step_pnl_parts.append(step_pnl)
+        # Reset states for currently invalid rows (dynamic batch reduction).
+        prev_state[~valid_t] = 0.0
+    return predicts.cpu().numpy(), step_pnl_parts
 
 
 def train_classifier(X_train: np.ndarray, 
@@ -163,15 +217,19 @@ def train_classifier(X_train: np.ndarray,
                      deposit_multp: np.ndarray,
                      device: torch.device,
                      deposit: float,
-                     bar_description: str = "Training") -> tuple[OneLayerClassifier, dict, dict]:
+                     bar_description: str = "Training",
+                     segments: list[tuple[int, int]] | None = None) -> tuple[OneLayerClassifier, dict, dict]:
+    if X_train.ndim != 3:
+        raise ValueError(f"X_train must be 3D (B,T,F), got {X_train.shape}")
+    _, tlen, feat_n = X_train.shape
     X_tensor = torch.from_numpy(X_train.astype(np.float32)).to(device)
     open_price_tensor = torch.from_numpy(open_price_train.astype(np.float32)).to(device)
-    open_change = torch.diff(open_price_tensor)
     deposit_multp_tensor = torch.tensor(deposit_multp, dtype=torch.float32, device=device)
+    segments = segments if segments is not None else _default_segments(tlen)
+    if not segments:
+        raise ValueError("No valid segments available for training")
 
-    model = OneLayerClassifier(
-        in_features=X_train.shape[1] + len(AUTOREGRESSIVE_FEATURE_NAMES)
-    ).to(device)
+    model = OneLayerClassifier(in_features=feat_n + len(AUTOREGRESSIVE_FEATURE_NAMES)).to(device)
     learning_rate = float(os.environ["LR"])
     num_epochs = int(os.environ["EPOCHS"])
     logit_clip = float(os.environ["LOGIT_CLIP"])
@@ -185,59 +243,32 @@ def train_classifier(X_train: np.ndarray,
     loss_history: list[float] = []
     profit_history: list[float] = []
     grad_norm_history: list[float] = []
-    grad_norm_change_history: list[float] = []
     weight_norm_history: list[float] = []
     weight_norm_change_history: list[float] = []
-    drawdown_penalty_history: list[float] = []
     l2_penalty_history: list[float] = []
-    use_drawdown_penalty = drawdown_lambda != 0.0
     use_l2 = l2_lambda != 0.0
-    prev_grad_norm = 0.0
     prev_weight_norm = 0.0
     progress_bar = tqdm(range(num_epochs), desc=bar_description)
     for _ in progress_bar:
         optimizer.zero_grad()
-        logits = rollout_autoregressive_logits(
+        _, step_pnl_parts = _rollout_train_timesteps(
             model,
             X_tensor,
             open_price_tensor,
             deposit_multp_tensor,
-            logit_clip,
-            deposit,
         )
-        # Soft-clamp logits to avoid hard zero gradients from torch.clamp outside bounds.
-        logits_stable = logit_clip * torch.tanh(logits / max(logit_clip, 1e-6))
-        # Differentiable trading direction in [-1, 1].
-        direction = torch.tanh(logits_stable)
-        if open_change.numel() > 0:
-            # Direction at t is applied to open price change from t -> t+1.
-            step_pnl = open_change * direction[:-1] * deposit_multp_tensor[:-1]
-            sequence_profit = torch.sum(step_pnl)
-            if use_drawdown_penalty:
-                equity_curve = torch.cumsum(step_pnl, dim=0)
-                running_peak = torch.cummax(equity_curve, dim=0).values
-                drawdown = running_peak - equity_curve
-                drawdown_penalty = torch.mean(drawdown)
-            else:
-                drawdown_penalty = torch.tensor(0.0, dtype=X_tensor.dtype, device=X_tensor.device)
-        else:
-            sequence_profit = torch.tensor(0.0, dtype=X_tensor.dtype, device=X_tensor.device)
-            drawdown_penalty = torch.tensor(0.0, dtype=X_tensor.dtype, device=X_tensor.device)
-        final_profit = sequence_profit
-        relative_outperformance = final_profit / deposit
+
+        step_pnl = torch.cat(step_pnl_parts)
+        sequence_profit = torch.sum(step_pnl)
+        relative_outperformance = sequence_profit / deposit / tlen * 100
         if use_l2:
             l2_penalty = sum((p * p).sum() for p in model.parameters())
         else:
             l2_penalty = torch.tensor(0.0, dtype=X_tensor.dtype, device=X_tensor.device)
-        loss = (
-            -relative_outperformance
-            + drawdown_lambda * drawdown_penalty
-            + l2_lambda * l2_penalty
-        )
+        loss = (-relative_outperformance + l2_lambda * l2_penalty)
         postfix: dict[str, str] = {
             "loss": f"{loss.item():.3f}",
             "rel_outperf": f"{relative_outperformance.item():.3f}",
-            "drawdown": f"{drawdown_penalty.item():.3f}",
         }
         if use_l2:
             postfix["l2"] = f"{l2_penalty.item():.3f}"
@@ -249,8 +280,6 @@ def train_classifier(X_train: np.ndarray,
             if param.grad is not None:
                 grad_sq_sum += float(torch.sum(param.grad.detach() ** 2).item())
         grad_norm = grad_sq_sum**0.5
-        grad_norm_change = grad_norm - prev_grad_norm
-        prev_grad_norm = grad_norm
         optimizer.step()
         weight_sq_sum = 0.0
         for param in model.parameters():
@@ -259,14 +288,12 @@ def train_classifier(X_train: np.ndarray,
         weight_norm_change = weight_norm - prev_weight_norm
         prev_weight_norm = weight_norm
         loss_value = float(loss.item())
-        final_profit_value = float(final_profit.item())
+        final_profit_value = float(relative_outperformance.item())
         loss_history.append(loss_value)
         profit_history.append(final_profit_value)
         grad_norm_history.append(grad_norm)
-        grad_norm_change_history.append(grad_norm_change)
         weight_norm_history.append(weight_norm)
         weight_norm_change_history.append(weight_norm_change)
-        drawdown_penalty_history.append(float(drawdown_penalty.item()))
         l2_penalty_history.append(float(l2_penalty.item()))
 
     train_info = {
@@ -286,7 +313,6 @@ def train_classifier(X_train: np.ndarray,
         "autoregressive_initial_prev_drawdown": AUTOREGRESSIVE_INITIAL_DRAWDOWN,
         "final_train_loss": loss_value,
         "final_train_profit": final_profit_value,
-        "final_drawdown_penalty": drawdown_penalty_history[-1] if drawdown_penalty_history else 0.0,
         "final_l2_penalty": l2_penalty_history[-1] if l2_penalty_history else 0.0,
         "final_grad_norm": grad_norm_history[-1] if grad_norm_history else 0.0,
         "final_weight_norm": weight_norm_history[-1] if weight_norm_history else 0.0,
@@ -295,10 +321,8 @@ def train_classifier(X_train: np.ndarray,
         "loss": loss_history,
         "final_profit": profit_history,
         "grad_norm": grad_norm_history,
-        "grad_norm_change": grad_norm_change_history,
         "weight_norm": weight_norm_history,
         "weight_norm_change": weight_norm_change_history,
-        "drawdown_penalty": drawdown_penalty_history,
         "l2_penalty": l2_penalty_history,
     }
     return model, train_info, train_history
@@ -309,20 +333,24 @@ def predict_direction(
     X: np.ndarray,
     open_price: np.ndarray,
     deposit_multp: np.ndarray,
-    deposit: float,
     device: torch.device,
+    score_threshold: float = 0.,
 ) -> np.ndarray:
+    bsz, tlen, _ = X.shape
+    score_thresholds = np.ones((bsz, 1)) * score_threshold
+    X_tensor = torch.from_numpy(X.astype(np.float32)).to(device)
+    open_price_tensor = torch.from_numpy(open_price.astype(np.float32)).to(device)
+    deposit_multp_tensor = torch.from_numpy(deposit_multp.astype(np.float32)).to(device)
     model.eval()
     with torch.no_grad():
-        logits = rollout_autoregressive_logits(
+        predicts, _ = _rollout_train_timesteps(
             model,
-            torch.from_numpy(X.astype(np.float32)).to(device),
-            torch.from_numpy(open_price.astype(np.float32)).to(device),
-            torch.from_numpy(deposit_multp.astype(np.float32)).to(device),
-            logit_clip=float(os.environ["LOGIT_CLIP"]),
-            deposit=deposit,
+            X_tensor,
+            open_price_tensor,
+            deposit_multp_tensor,
         )
-    return np.where(logits.cpu().numpy() >= 0.0, 1, -1).astype(np.int64)
+        position_dirs = np.where(predicts >= score_thresholds, 1, -1).astype(np.int64)
+    return position_dirs
 
 
 class SelfLearn:
@@ -341,95 +369,94 @@ class SelfLearn:
         open_price: np.ndarray,
         train_size: int | None = None,
     ) -> TrainArtifacts:
-        deposit_multp = self.deposit / open_price
-
-        n = X.shape[0]
+        bsz, tlen, n_features = X.shape
         if train_size is None:
-            train_size = int(np.round(n * TRAIN_FRAC))
-        train_size = max(1, min(train_size, n - 1))
-        test_size = n - train_size
+            train_size = int(np.round(tlen * TRAIN_FRAC))
+        train_size = max(1, min(train_size, tlen - 1))
+        test_size = tlen - train_size
 
-        X_train = X[:train_size]
-        X_test = X[train_size:]
-        timestamps_train = timestamps[:train_size]
-        timestamps_test = timestamps[train_size:]
-        open_price_train = open_price[:train_size]
-        open_price_test = open_price[train_size:]
-        deposit_multp_train = deposit_multp[:train_size]
-        deposit_multp_test = deposit_multp[train_size:]
+        X_train = X[:, :train_size, :]
+        X_test = X[:, train_size:, :]
+        timestamps_train = timestamps[:, :train_size]
+        timestamps_test = timestamps[:, train_size:]
+        open_price_train = open_price[:, :train_size]
+        open_price_test = open_price[:, train_size:]
 
-        feat_mean = X_train.mean(axis=0, dtype=np.float64)
-        feat_std = X_train.std(axis=0, dtype=np.float64)
-        feat_std = np.where(feat_std < 1e-6, 1.0, feat_std)
-        X_train_scaled = ((X_train - feat_mean) / feat_std).astype(np.float32)
-        X_test_scaled = ((X_test - feat_mean) / feat_std).astype(np.float32)
-        X_scaled = ((X - feat_mean) / feat_std).astype(np.float32)
+        valid_train_panel = _build_valid_panel_mask(X_train, open_price_train)
+        valid_test_panel = _build_valid_panel_mask(X_test, open_price_test)
+
+        if not np.any(valid_train_panel):
+            raise ValueError("No valid training rows after NaN filtering")
+        deposit_multp = np.zeros_like(open_price, dtype=np.float64)
+        pos_mask = np.isfinite(open_price) & (open_price > 0.0)
+        deposit_multp[pos_mask] = self.deposit / open_price[pos_mask]
+        deposit_multp_train = deposit_multp[:, :train_size]
+        deposit_multp_test = deposit_multp[:, train_size:]
 
         model, train_info, train_history = train_classifier(
-            X_train_scaled,
+            X_train,
             open_price_train,
             deposit_multp=deposit_multp_train,
             device=self.device,
             deposit=self.deposit,
-            bar_description=f"Training: "
+            bar_description="Training: ",
         )
-        y_pr_train = predict_direction(
+        y_pr_train_panel = predict_direction(
             model,
-            X_train_scaled,
+            X_train,
             open_price_train,
             deposit_multp_train,
             device=self.device,
-            deposit=self.deposit,
         )
-        y_pr_test = predict_direction(
+        y_pr_test_panel = predict_direction(
             model,
-            X_test_scaled,
+            X_test,
             open_price_test,
             deposit_multp_test,
             device=self.device,
-            deposit=self.deposit,
         )
-        y_pr_all = predict_direction(
-            model,
-            X_scaled,
-            open_price,
-            deposit_multp,
-            device=self.device,
-            deposit=self.deposit,
+
+        train_strategy_step_profit = _compute_step_profit_with_boundaries(
+            timestamps=timestamps_train,
+            open_price=open_price_train,
+            direction=y_pr_train_panel,
+            deposit_multp=deposit_multp_train,
+            valid_rows=valid_train_panel,
         )
-        train_strategy_step_profit = np.diff(open_price_train) * y_pr_train[:-1] * deposit_multp_train[:-1]
-        test_strategy_step_profit = np.diff(open_price_test) * y_pr_test[:-1] * deposit_multp_test[:-1]
-        strategy_step_profit = np.diff(open_price) * y_pr_all[:-1]
-        strategy_cum_profit = np.cumsum(strategy_step_profit) if strategy_step_profit.size else np.array([], dtype=np.float64)
-        strategy_final_profit = float(strategy_cum_profit[-1]) if strategy_cum_profit.size else 0.0
+        test_strategy_step_profit = _compute_step_profit_with_boundaries(
+            timestamps=timestamps_test,
+            open_price=open_price_test,
+            direction=y_pr_test_panel,
+            deposit_multp=deposit_multp_test,
+            valid_rows=valid_test_panel,
+        )
 
         metrics = {
             "dataset": {
-                "aligned_rows": int(n),
+                "aligned_rows": int(bsz * tlen),
+                "batch_size": int(bsz),
+                "timesteps": int(tlen),
                 "train_size": train_size,
                 "test_size": test_size,
+                "valid_rows_train": np.sum(valid_train_panel, axis=1).tolist(),
+                "valid_rows_test": np.sum(valid_test_panel, axis=1).tolist(),
             },
             "training": train_info,
-            "profit": {
-                "strategy_final_profit": strategy_final_profit,
-            },
         }
 
         return TrainArtifacts(
             mode="single",
-            X=X,
+            X_shape=X.shape,
             timestamps_train=timestamps_train,
             timestamps_test=timestamps_test,
             open_price_train=open_price_train,
             open_price_test=open_price_test,
             train_info=train_info,
             train_history=train_history,
-            feat_mean=feat_mean,
-            feat_std=feat_std,
             model=model,
             metrics=metrics,
-            y_pr_train=y_pr_train,
-            y_pr_test=y_pr_test,
+            y_pr_train=y_pr_train_panel,
+            y_pr_test=y_pr_test_panel,
             train_strategy_step_profit=train_strategy_step_profit,
             test_strategy_step_profit=test_strategy_step_profit,
         )
@@ -457,12 +484,13 @@ class SelfLearn:
         self._meta = meta
         timestamps = np.asarray(meta.timestamps)
         open_price = np.asarray(meta.open_price, dtype=np.float64)
-        n = X.shape[0]
-        if n < 4:
-            raise ValueError("Not enough rows for train_multip; need at least 4 aligned rows")
+        X_panel, ts_panel, open_panel = _ensure_panel_from_flat_dataset(X, timestamps, open_price)
+        _, n_times, _ = X_panel.shape
+        if n_times < 4:
+            raise ValueError("Not enough timesteps for train_multip; need at least 4")
 
-        full_train_size = int(np.round(n * TRAIN_FRAC))
-        full_train_size = max(1, min(full_train_size, n - 1))
+        full_train_size = int(np.round(n_times * TRAIN_FRAC))
+        full_train_size = max(1, min(full_train_size, n_times - 1))
         fixed_test_start_idx = full_train_size
         train_pool_len = full_train_size
 
@@ -487,18 +515,18 @@ class SelfLearn:
                 train_global_start = 0
                 train_global_end = train_pool_len
 
-            X_train_seg = X[train_global_start:train_global_end]
-            X_test_seg = X[fixed_test_start_idx:n]
-            X_window = np.concatenate([X_train_seg, X_test_seg], axis=0)
+            X_train_seg = X_panel[:, train_global_start:train_global_end, :]
+            X_test_seg = X_panel[:, fixed_test_start_idx:n_times, :]
+            X_window = np.concatenate([X_train_seg, X_test_seg], axis=1)
             timestamps_window = np.concatenate(
-                [timestamps[train_global_start:train_global_end], timestamps[fixed_test_start_idx:n]],
-                axis=0,
+                [ts_panel[:, train_global_start:train_global_end], ts_panel[:, fixed_test_start_idx:n_times]],
+                axis=1,
             )
             open_price_window = np.concatenate(
-                [open_price[train_global_start:train_global_end], open_price[fixed_test_start_idx:n]],
-                axis=0,
+                [open_panel[:, train_global_start:train_global_end], open_panel[:, fixed_test_start_idx:n_times]],
+                axis=1,
             )
-            train_rows = int(X_train_seg.shape[0])
+            train_rows = int(X_train_seg.shape[1])
 
             artifacts = self._train_from_window(
                 X=X_window,
@@ -558,9 +586,9 @@ class SelfLearn:
             "runs": runs,
             "seed": seed,
             "max_cut_frac": max_cut_frac,
-            "base_aligned_rows": n,
+            "base_aligned_rows": int(X_panel.shape[0] * X_panel.shape[1]),
             "fixed_test_start_idx": int(fixed_test_start_idx),
-            "fixed_test_rows": int(n - fixed_test_start_idx),
+            "fixed_test_rows": int(n_times - fixed_test_start_idx),
             "train_pool_rows": int(train_pool_len),
             "strategy_final_profit": _stats(strategy_profit_arr),
             "final_train_loss": _stats(final_loss_arr),
@@ -576,7 +604,7 @@ class SelfLearn:
             run_test_strategy_cum_profit=run_test_strategy_cum_profit,
             run_timestamps_train_steps=run_timestamps_train_steps,
             run_timestamps_test_steps=run_timestamps_test_steps,
-            open_price=open_price,
+            open_price=open_panel.reshape(-1),
         )
         return result
 
@@ -585,10 +613,11 @@ class SelfLearn:
         self._meta = meta
         timestamps = np.asarray(meta.timestamps)
         open_price = np.asarray(meta.open_price, dtype=np.float64)
-        n = int(X.shape[0])
+        n = int(X_panel.shape[0] * X_panel.shape[1])
+        n_times = int(X_panel.shape[1])
 
-        if n < 2:
-            logger.warning("Not enough rows for cross_validation; need at least 2 aligned rows")
+        if n_times < 2:
+            logger.warning("Not enough timesteps for cross_validation; need at least 2")
             result = {
                 "folds": [],
                 "summary": {
@@ -601,13 +630,13 @@ class SelfLearn:
             self._artifacts = TrainArtifacts(
                 mode="cv",
                 result=result,
-                open_price=open_price,
+                open_price=open_panel.reshape(-1),
                 run_timestamps_test_steps=[],
                 cv_test_strategy_step_profit=[],
             )
             return result
 
-        years = calendar_years_from_timestamps(timestamps)
+        years = calendar_years_from_timestamps(ts_panel[0])
         unique_years = np.unique(years)
 
         folds: list[dict] = []
@@ -625,12 +654,12 @@ class SelfLearn:
                 )
                 continue
 
-            X_window = np.concatenate([X[idx_train], X[idx_test]], axis=0)
+            X_window = np.concatenate([X_panel[:, idx_train, :], X_panel[:, idx_test, :]], axis=1)
             timestamps_window = np.concatenate(
-                [timestamps[idx_train], timestamps[idx_test]], axis=0
+                [ts_panel[:, idx_train], ts_panel[:, idx_test]], axis=1
             )
             open_price_window = np.concatenate(
-                [open_price[idx_train], open_price[idx_test]], axis=0
+                [open_panel[:, idx_train], open_panel[:, idx_test]], axis=1
             )
             train_rows = int(idx_train.size)
 
@@ -679,7 +708,7 @@ class SelfLearn:
         self._artifacts = TrainArtifacts(
             mode="cv",
             result=result,
-            open_price=open_price,
+            open_price=open_panel.reshape(-1),
             run_timestamps_test_steps=cv_ts_steps,
             cv_test_strategy_step_profit=cv_strat_steps,
         )
@@ -760,15 +789,13 @@ class SelfLearn:
         a = self._artifacts
         meta = self._meta
         assert a is not None and meta is not None
-        X = a.X
+        X_shape = a.X_shape
         timestamps_train = a.timestamps_train
         timestamps_test = a.timestamps_test
         open_price_train = a.open_price_train
         open_price_test = a.open_price_test
         train_info = a.train_info
         train_history = a.train_history
-        feat_mean = a.feat_mean
-        feat_std = a.feat_std
         model = a.model
         metrics = a.metrics
         y_pr_train = a.y_pr_train
@@ -780,10 +807,8 @@ class SelfLearn:
         torch.save(
             {
                 "state_dict": model.state_dict(),
-                "in_features": int(X.shape[1] + len(AUTOREGRESSIVE_FEATURE_NAMES)),
-                "base_feature_count": int(X.shape[1]),
-                "feature_mean": feat_mean.tolist(),
-                "feature_std": feat_std.tolist(),
+                "in_features": int(X_shape[1] + len(AUTOREGRESSIVE_FEATURE_NAMES)),
+                "base_feature_count": int(X_shape[1]),
                 "autoregressive_prev_label": True,
                 "autoregressive_prev_drawdown": True,
                 "autoregressive_feature_name": AUTOREGRESSIVE_PREV_LABEL_FEATURE_NAME,
@@ -800,19 +825,16 @@ class SelfLearn:
             open_price_train=open_price_train,
             open_price_test=open_price_test,
         )
-        visualizer.save_strategy_train_test_profit_plot(
-            timestamps_train=timestamps_train[:-1],
-            strategy_cum_train=np.cumsum(train_strategy_step_profit) if train_strategy_step_profit.size else np.array([], dtype=np.float64),
-            timestamps_test=timestamps_test[:-1],
-            strategy_cum_test=(
-                np.cumsum(test_strategy_step_profit) + float(np.sum(train_strategy_step_profit))
-                if test_strategy_step_profit.size
-                else np.array([], dtype=np.float64)
-            ),
-            pred_sign_train=y_pr_train[:-1],
-            pred_sign_test=y_pr_test[:-1],
-            output_path=self.output_dir / "strategy_profit_train_test.png",
-        )
+        for i, symbol in enumerate(meta.symbols):
+            visualizer.save_strategy_train_test_profit_plot(
+                timestamps_train=timestamps_train[i][:-1],
+                strategy_cum_train=np.cumsum(train_strategy_step_profit[i]) if train_strategy_step_profit[i].size else np.array([], dtype=np.float64),
+                timestamps_test=timestamps_test[i][:-1],
+                strategy_cum_test=np.cumsum(test_strategy_step_profit[i]) if test_strategy_step_profit[i].size else np.array([], dtype=np.float64),
+                pred_sign_train=y_pr_train[i][:-1],
+                pred_sign_test=y_pr_test[i][:-1],
+                output_path=self.output_dir / f"strategy_profit_train_test_{symbol.ticker}.png",
+            )
         logger.info(f"Strategy profit plot saved to: {self.output_dir / 'strategy_profit_train_test.png'}")
         visualizer.save_loss_change_plot(
             loss_values=np.asarray(train_history["loss"], dtype=np.float64),
@@ -822,10 +844,9 @@ class SelfLearn:
         logger.info(f"Loss change plot saved to: {self.output_dir / 'loss_change_train.png'}")
         visualizer.save_gradient_change_plot(
             grad_norm_values=np.asarray(train_history["grad_norm"], dtype=np.float64),
-            grad_change_values=np.asarray(train_history["grad_norm_change"], dtype=np.float64),
             output_path=self.output_dir / "gradient_change_train.png",
         )
-        logger.info(f"Gradient change plot saved to: {self.output_dir / 'gradient_change_train.png'}")
+        logger.info(f"Gradient norm plot saved to: {self.output_dir / 'gradient_change_train.png'}")
         visualizer.save_weight_norm_change_plot(
             weight_norm_values=np.asarray(train_history["weight_norm"], dtype=np.float64),
             weight_change_values=np.asarray(train_history["weight_norm_change"], dtype=np.float64),
@@ -836,12 +857,10 @@ class SelfLearn:
             "feature_names": meta.feature_names + AUTOREGRESSIVE_FEATURE_NAMES,
             "model_type": "OneLayerTorchBinaryClassifier",
             "model_params": {
-                "in_features": int(X.shape[1] + len(AUTOREGRESSIVE_FEATURE_NAMES)),
-                "base_feature_count": int(X.shape[1]),
+                "in_features": int(X_shape[1] + len(AUTOREGRESSIVE_FEATURE_NAMES)),
+                "base_feature_count": int(X_shape[1]),
                 "out_features": 1,
                 "threshold": 0.5,
-                "feature_mean": feat_mean.tolist(),
-                "feature_std": feat_std.tolist(),
                 "autoregressive_prev_label": True,
                 "autoregressive_prev_drawdown": True,
                 "autoregressive_feature_name": AUTOREGRESSIVE_PREV_LABEL_FEATURE_NAME,
