@@ -55,8 +55,8 @@ class OneLayerClassifier(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.hidden(x)
         x = self.relu(x)
-        x = self.out(x).squeeze(-1)
-        x = self.logit_clip * torch.tanh(x / self.logit_clip)
+        x = self.out(x)
+        # x = self.logit_clip * torch.tanh(x / self.logit_clip)
         return torch.tanh(x)
 
 @dataclass
@@ -189,10 +189,10 @@ def _rollout_train_timesteps(model: OneLayerClassifier,
             prev_state[:] = 0.0
             continue
         x_t = X_tensor[:, t, :][valid_t]
-        prev_t = prev_state[valid_t] * 0
+        prev_t = prev_state[valid_t]
         step_input = torch.cat((x_t, prev_t), dim=1)
-        predicts_tensor = model(step_input)
-        predicts[valid_t, t] = predicts_tensor.squeeze().detach()
+        predicts_tensor = model(step_input).squeeze(-1)
+        predicts[valid_t, t] = predicts_tensor.detach()
         # Update autoregressive state only for active batch elements.
         prev_state[valid_t, 0] = predicts_tensor
         if t < tlen - 1:
@@ -221,7 +221,7 @@ def train_classifier(X_train: np.ndarray,
                      segments: list[tuple[int, int]] | None = None) -> tuple[OneLayerClassifier, dict, dict]:
     if X_train.ndim != 3:
         raise ValueError(f"X_train must be 3D (B,T,F), got {X_train.shape}")
-    _, tlen, feat_n = X_train.shape
+    bsz, tlen, feat_n = X_train.shape
     X_tensor = torch.from_numpy(X_train.astype(np.float32)).to(device)
     open_price_tensor = torch.from_numpy(open_price_train.astype(np.float32)).to(device)
     deposit_multp_tensor = torch.tensor(deposit_multp, dtype=torch.float32, device=device)
@@ -229,10 +229,10 @@ def train_classifier(X_train: np.ndarray,
     if not segments:
         raise ValueError("No valid segments available for training")
 
-    model = OneLayerClassifier(in_features=feat_n + len(AUTOREGRESSIVE_FEATURE_NAMES)).to(device)
+    model = OneLayerClassifier(in_features=feat_n + len(AUTOREGRESSIVE_FEATURE_NAMES), 
+                               logit_clip=float(os.environ["LOGIT_CLIP"])).to(device)
     learning_rate = float(os.environ["LR"])
     num_epochs = int(os.environ["EPOCHS"])
-    logit_clip = float(os.environ["LOGIT_CLIP"])
     drawdown_lambda = float(os.environ["DRAWDOWN_LAMBDA"])
     l2_lambda = float(os.environ.get("L2_LAMBDA", "0"))
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -258,9 +258,8 @@ def train_classifier(X_train: np.ndarray,
             deposit_multp_tensor,
         )
 
-        step_pnl = torch.cat(step_pnl_parts)
-        sequence_profit = torch.sum(step_pnl)
-        relative_outperformance = sequence_profit / deposit / tlen * 100
+        sequence_profit = torch.sum(torch.cat(step_pnl_parts))
+        relative_outperformance = sequence_profit / deposit / bsz * 100
         if use_l2:
             l2_penalty = sum((p * p).sum() for p in model.parameters())
         else:
@@ -302,7 +301,6 @@ def train_classifier(X_train: np.ndarray,
         "loss": "neg_relative_outperformance_plus_drawdown_penalty_plus_optional_l2",
         "learning_rate": learning_rate,
         "epochs": num_epochs,
-        "logit_clip": logit_clip,
         "drawdown_lambda": drawdown_lambda,
         "l2_lambda": l2_lambda,
         "autoregressive_prev_label": True,
