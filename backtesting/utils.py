@@ -144,7 +144,7 @@ class BackTestResults:
         daily_hist = self.resample_hist(hist, "D", func="last")
         daily_hist["profit_csum"] = daily_hist["profit_csum_nofees"] - daily_hist["fees_csum"]
         daily_hist["finres"] = daily_hist["profit_csum"].diff().fillna(0)
-        monthly_hist = self.resample_hist(daily_hist, "M")
+        monthly_hist = self.resample_hist(daily_hist, "ME")
         return daily_hist, monthly_hist
 
     def resample_hist(self, hist, period="D", func="sum"):
