@@ -218,12 +218,12 @@ class BaseTradeClass(ABC):
         if self.pos.curr.side is Side.BUY:
             min_sl = Symbol.round_stops(self.stops_step, price * (1 - self.traid_stops_min_size/100))
             if sl > min_sl:
-                logger.warning(f"SL is too high: {sl} > {min_sl}, setting to {min_sl}")
+                # logger.warning(f"SL is too high: {sl} > {min_sl}, setting to {min_sl}")
                 sl = min_sl
         else:
             max_sl = Symbol.round_stops(self.stops_step, price * (1 + self.traid_stops_min_size/100))
             if sl < max_sl:
-                logger.warning(f"SL is too low: {sl} < {max_sl}, setting to {max_sl}")
+                # logger.warning(f"SL is too low: {sl} < {max_sl}, setting to {max_sl}")
                 sl = max_sl
 
         self._modify_sl(sl)
