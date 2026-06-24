@@ -191,6 +191,31 @@ def _compute_buy_hold_step_profit(
     return step_profit
 
 
+def _compute_benchmark_step_pnl_parts(
+    X_tensor: torch.Tensor,
+    open_price_tensor: torch.Tensor,
+    deposit_multp_tensor: torch.Tensor,
+) -> list[torch.Tensor]:
+    """Buy-and-hold (+1 direction) PnL using the same step logic as training rollout."""
+    bsz, tlen, _ = X_tensor.shape
+    step_pnl_parts: list[torch.Tensor] = []
+    for t in range(tlen):
+        valid_t = torch.isfinite(open_price_tensor[:, t]) & torch.all(
+            torch.isfinite(X_tensor[:, t, :]), dim=1
+        )
+        if t < tlen - 1:
+            valid_next = torch.isfinite(open_price_tensor[:, t + 1]) & torch.all(
+                torch.isfinite(X_tensor[:, t + 1, :]), dim=1
+            )
+            active = valid_t & valid_next
+            if torch.any(active):
+                open_change = (
+                    open_price_tensor[active, t + 1] - open_price_tensor[active, t]
+                )
+                step_pnl_parts.append(open_change * deposit_multp_tensor[active, t])
+    return step_pnl_parts
+
+
 def _compute_soft_deal_crossings(
     predicts: torch.Tensor,
     valid_mask: torch.Tensor,
@@ -315,8 +340,20 @@ def train_classifier(X_train: np.ndarray,
     weight_norm_change_history: list[float] = []
     deals_penalty_history: list[float] = []
     deal_crossings_history: list[float] = []
-    lr_history: list[float] = []
+    strategy_profit_history: list[float] = []
+    benchmark_profit_history: list[float] = []
     prev_weight_norm = 0.0
+    benchmark_step_pnl_parts = _compute_benchmark_step_pnl_parts(
+        X_tensor,
+        open_price_tensor,
+        deposit_multp_tensor,
+    )
+    if benchmark_step_pnl_parts:
+        benchmark_profit_total = torch.sum(torch.cat(benchmark_step_pnl_parts))
+    else:
+        benchmark_profit_total = torch.zeros((), dtype=X_tensor.dtype, device=device)
+    benchmark_profit_pct = benchmark_profit_total / deposit / bsz * 100
+
     progress_bar = tqdm(range(num_epochs), desc=bar_description)
     for _ in progress_bar:
         optimizer.zero_grad()
@@ -329,14 +366,15 @@ def train_classifier(X_train: np.ndarray,
         )
 
         sequence_profit = torch.sum(torch.cat(step_pnl_parts))
-        relative_outperformance = sequence_profit / deposit / bsz * 100
+        strategy_profit_pct = sequence_profit / deposit / bsz * 100
+        excess_profit_pct = strategy_profit_pct - benchmark_profit_pct
         deal_crossings = _compute_soft_deal_crossings(predicts, valid_mask)
         deals_penalty = _compute_deals_penalty(deal_crossings, deals_lambda)
-        loss = -relative_outperformance + deals_penalty
+        loss = -excess_profit_pct + deals_penalty
         postfix: dict[str, str] = {
-            "loss": f"{loss.item():.3f}",
-            "rel_outperf": f"{relative_outperformance.item():.3f}",
-            "lr": f"{optimizer.param_groups[0]['lr']:.2e}",
+            "loss": f"{loss.item():.2f}",
+            "outperf": f"{excess_profit_pct.item():.2f}",
+            "lr": f"{scheduler.get_last_lr()[0]:.2e}",
         }
         if deals_lambda != 0.0:
             postfix["deals"] = f"{deal_crossings.item():.1f}"
@@ -351,7 +389,6 @@ def train_classifier(X_train: np.ndarray,
         grad_norm = grad_sq_sum**0.5
         optimizer.step()
         scheduler.step()
-        current_lr = float(optimizer.param_groups[0]["lr"])
         weight_sq_sum = 0.0
         for param in model.parameters():
             weight_sq_sum += float(torch.sum(param.detach() ** 2).item())
@@ -359,7 +396,7 @@ def train_classifier(X_train: np.ndarray,
         weight_norm_change = weight_norm - prev_weight_norm
         prev_weight_norm = weight_norm
         loss_value = float(loss.item())
-        final_profit_value = float(relative_outperformance.item())
+        final_profit_value = float(excess_profit_pct.item())
         loss_history.append(loss_value)
         profit_history.append(final_profit_value)
         grad_norm_history.append(grad_norm)
@@ -367,19 +404,21 @@ def train_classifier(X_train: np.ndarray,
         weight_norm_change_history.append(weight_norm_change)
         deals_penalty_history.append(float(deals_penalty.item()))
         deal_crossings_history.append(float(deal_crossings.item()))
-        lr_history.append(current_lr)
+        strategy_profit_history.append(float(strategy_profit_pct.item()))
+        benchmark_profit_history.append(float(benchmark_profit_pct.item()))
 
     train_info = {
         "optimizer": "AdamW",
         "lr_scheduler": "CosineAnnealingWarmRestarts",
         "device": str(device),
-        "loss": "neg_relative_outperformance_plus_deals_penalty",
+        "loss": "neg_excess_vs_buyhold_plus_deals_penalty",
         "learning_rate": learning_rate,
         "lr_restart_period": lr_restart_period,
         "lr_min": lr_min,
         "epochs": num_epochs,
         "drawdown_lambda": drawdown_lambda,
         "deals_lambda": deals_lambda,
+        "benchmark": "buy_and_hold_plus_one",
         "model_type": "GruPolicy",
         "gru_hidden_size": hidden_size,
         "autoregressive_prev_label": True,
@@ -390,21 +429,23 @@ def train_classifier(X_train: np.ndarray,
         "autoregressive_initial_prev_drawdown": AUTOREGRESSIVE_INITIAL_DRAWDOWN,
         "final_train_loss": loss_value,
         "final_train_profit": final_profit_value,
+        "final_train_strategy_profit": strategy_profit_history[-1] if strategy_profit_history else 0.0,
+        "final_benchmark_profit": benchmark_profit_history[-1] if benchmark_profit_history else 0.0,
         "final_deals_penalty": deals_penalty_history[-1] if deals_penalty_history else 0.0,
         "final_deal_crossings": deal_crossings_history[-1] if deal_crossings_history else 0.0,
         "final_grad_norm": grad_norm_history[-1] if grad_norm_history else 0.0,
         "final_weight_norm": weight_norm_history[-1] if weight_norm_history else 0.0,
-        "final_lr": lr_history[-1] if lr_history else learning_rate,
     }
     train_history = {
         "loss": loss_history,
         "final_profit": profit_history,
+        "strategy_profit": strategy_profit_history,
+        "benchmark_profit": benchmark_profit_history,
         "grad_norm": grad_norm_history,
         "weight_norm": weight_norm_history,
         "weight_norm_change": weight_norm_change_history,
         "deals_penalty": deals_penalty_history,
         "deal_crossings": deal_crossings_history,
-        "lr": lr_history,
     }
     return model, train_info, train_history
 
