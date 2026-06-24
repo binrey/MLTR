@@ -14,7 +14,11 @@ import matplotlib.pyplot as plt
 
 class PredictionVisualizer:
     """Creates and saves prediction-vs-ground-truth plots."""
-    def __init__(self, deposit: float = 1000.0, open_price_train: np.ndarray = None, open_price_test: np.ndarray = None):
+    def __init__(self, 
+                 deposit: float = 1000.0, 
+                 open_price_train: np.ndarray = None, 
+                 open_price_test: np.ndarray = None
+                 ) -> None:
         self.deposit_train = deposit / open_price_train if open_price_train is not None else None
         self.deposit_test = deposit / open_price_test if open_price_test is not None else None
 
@@ -28,7 +32,7 @@ class PredictionVisualizer:
         linewidth: float = 1.0,
         alpha: float = 1.0,
         linestyle: str = "-",
-    ):
+    ) -> matplotlib.lines.Line2D:
         return ax.plot(
             x,
             y,
@@ -64,6 +68,8 @@ class PredictionVisualizer:
         pred_sign_train: np.ndarray | None,
         pred_sign_test: np.ndarray | None,
         output_path: Path,
+        buy_hold_cum_train: np.ndarray | None = None,
+        buy_hold_cum_test: np.ndarray | None = None,
     ) -> None:
         fig, (ax_profit, ax_sign) = plt.subplots(
             nrows=2,
@@ -88,6 +94,26 @@ class PredictionVisualizer:
             color="tab:red",
             linewidth=1.8,
         )
+        if buy_hold_cum_train is not None and buy_hold_cum_train.size > 0:
+            self._plot_series(
+                ax_profit,
+                timestamps_train,
+                buy_hold_cum_train,
+                label="buy_hold_train_cumsum",
+                color="tab:blue",
+                linewidth=1.4,
+                linestyle="--",
+            )
+        if buy_hold_cum_test is not None and buy_hold_cum_test.size > 0:
+            self._plot_series(
+                ax_profit,
+                timestamps_test,
+                buy_hold_cum_test,
+                label="buy_hold_test_cumsum",
+                color="tab:green",
+                linewidth=1.4,
+                linestyle="--",
+            )
         if timestamps_test.size > 0:
             self._draw_split_marker(ax_profit, timestamps_test[0], with_label=True)
         self._style_profit_axis(ax_profit, "Strategy cumulative profit (train / test)")
