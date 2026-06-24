@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import nn
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -44,20 +45,20 @@ Logger(
     clear_logs=False,
 )
 
-class OneLayerClassifier(nn.Module):
-    def __init__(self, in_features: int, logit_clip: float = 6.0):
+class GruPolicy(nn.Module):
+    def __init__(self, in_features: int, hidden_size: int = 16, logit_clip: float = 6.0):
         super().__init__()
-        self.hidden = nn.Linear(in_features, in_features)
-        self.relu = nn.ReLU()
-        self.out = nn.Linear(in_features, 1)
+        self.in_features = in_features
+        self.hidden_size = hidden_size
+        self.gru = nn.GRUCell(in_features, hidden_size)
+        self.out = nn.Linear(hidden_size, 1)
         self.logit_clip = logit_clip
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.hidden(x)
-        x = self.relu(x)
-        x = self.out(x)
+    def forward(self, x: torch.Tensor, hidden: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        hidden = self.gru(x, hidden)
+        x = self.out(hidden)
         # x = self.logit_clip * torch.tanh(x / self.logit_clip)
-        return torch.tanh(x)
+        return torch.tanh(x), hidden
 
 @dataclass
 class TrainArtifacts:
@@ -71,7 +72,7 @@ class TrainArtifacts:
     open_price_test: np.ndarray | None = None
     train_info: dict | None = None
     train_history: dict | None = None
-    model: OneLayerClassifier | None = None
+    model: GruPolicy | None = None
     metrics: dict | None = None
     y_pr_train: np.ndarray | None = None
     y_pr_test: np.ndarray | None = None
@@ -140,13 +141,12 @@ def _default_segments(n_rows: int) -> list[tuple[int, int]]:
     return [(0, int(n_rows))] if n_rows > 0 else []
 
 
-def _compute_step_profit_with_boundaries(
-    timestamps: np.ndarray,
-    open_price: np.ndarray,
-    direction: np.ndarray,
-    deposit_multp: np.ndarray,
-    valid_rows: np.ndarray,
-) -> np.ndarray:
+def _compute_step_profit_with_boundaries(timestamps: np.ndarray,
+                                         open_price: np.ndarray,
+                                         direction: np.ndarray,
+                                         deposit_multp: np.ndarray,
+                                         valid_rows: np.ndarray
+                                         ) -> np.ndarray:
     """
     Per-step pnl with boundary handling.
 
@@ -169,32 +169,86 @@ def _compute_step_profit_with_boundaries(
     return step_profit
 
 
-def _rollout_train_timesteps(model: OneLayerClassifier,
+def _compute_buy_hold_step_profit(
+    timestamps: np.ndarray,
+    open_price: np.ndarray,
+    deposit: float,
+) -> np.ndarray:
+    """Buy-and-hold PnL for one symbol, using first valid open as entry."""
+    n = int(open_price.shape[0])
+    if n <= 1:
+        return np.array([], dtype=np.float64)
+
+    step_profit = np.zeros(n - 1, dtype=np.float64)
+    valid_rows = np.isfinite(open_price) & (open_price > 0.0)
+    valid_idx = np.flatnonzero(valid_rows)
+    if valid_idx.size == 0:
+        return step_profit
+
+    units = deposit / float(open_price[valid_idx[0]])
+    step_ok = valid_rows[:-1] & valid_rows[1:] & (timestamps[1:] > timestamps[:-1])
+    step_profit[step_ok] = np.diff(open_price)[step_ok] * units
+    return step_profit
+
+
+def _compute_soft_deal_crossings(
+    predicts: torch.Tensor,
+    valid_mask: torch.Tensor,
+) -> torch.Tensor:
+    """Differentiable proxy for direction flips; zero when direction never changes sign."""
+    pair_valid = valid_mask[:, :-1] & valid_mask[:, 1:]
+    if not torch.any(pair_valid):
+        return torch.zeros((), dtype=predicts.dtype, device=predicts.device)
+    crossings = torch.relu(-predicts[:, :-1] * predicts[:, 1:])
+    return crossings[pair_valid].sum()
+
+
+def _compute_deals_penalty(deal_crossings: torch.Tensor, deals_lambda: float) -> torch.Tensor:
+    if deals_lambda == 0.0:
+        return torch.zeros((), dtype=deal_crossings.dtype, device=deal_crossings.device)
+    return deal_crossings.new_tensor(deals_lambda) / (deal_crossings + 1.0)
+
+
+def _rollout_train_timesteps(model: GruPolicy,
                              X_tensor: torch.Tensor,
                              open_price_tensor: torch.Tensor,
                              deposit_multp_tensor: torch.Tensor,
-) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+                             detach_predictions: bool = True,
+                             ) -> tuple[torch.Tensor | np.ndarray, list[torch.Tensor], torch.Tensor]:
     bsz, tlen, _ = X_tensor.shape
     device = X_tensor.device
     dtype = X_tensor.dtype
     step_pnl_parts: list[torch.Tensor] = []
     predicts: torch.Tensor = torch.zeros((bsz, tlen), dtype=dtype, device=device)
+    valid_mask = torch.zeros((bsz, tlen), dtype=torch.bool, device=device)
     prev_state = torch.zeros((bsz, 2), dtype=dtype, device=device)
+    hidden = torch.zeros((bsz, model.hidden_size), dtype=dtype, device=device)
     for t in range(tlen):
         valid_t = torch.isfinite(open_price_tensor[:, t]) & torch.all(
             torch.isfinite(X_tensor[:, t, :]), dim=1
         )
         if not torch.any(valid_t):
             # No usable rows this timestep: reset hidden autoregressive state.
-            prev_state[:] = 0.0
+            prev_state = prev_state * 0.0
+            hidden = hidden * 0.0
             continue
+        valid_mask[:, t] = valid_t
         x_t = X_tensor[:, t, :][valid_t]
         prev_t = prev_state[valid_t]
         step_input = torch.cat((x_t, prev_t), dim=1)
-        predicts_tensor = model(step_input).squeeze(-1)
-        predicts[valid_t, t] = predicts_tensor.detach()
+        predicts_tensor, hidden_t = model(step_input, hidden[valid_t])
+        predicts_tensor = predicts_tensor.squeeze(-1)
+        if detach_predictions:
+            predicts[valid_t, t] = predicts_tensor.detach()
+        else:
+            predicts[valid_t, t] = predicts_tensor
         # Update autoregressive state only for active batch elements.
-        prev_state[valid_t, 0] = predicts_tensor
+        next_prev_state = prev_state.clone()
+        next_prev_state[valid_t, 0] = predicts_tensor
+        prev_state = next_prev_state
+        next_hidden = hidden.clone()
+        next_hidden[valid_t] = hidden_t
+        hidden = next_hidden
         if t < tlen - 1:
             valid_next = torch.isfinite(open_price_tensor[:, t + 1]) & torch.all(
                 torch.isfinite(X_tensor[:, t + 1, :]), dim=1
@@ -208,8 +262,11 @@ def _rollout_train_timesteps(model: OneLayerClassifier,
                 step_pnl = open_change * dir_active * deposit_multp_tensor[active, t]
                 step_pnl_parts.append(step_pnl)
         # Reset states for currently invalid rows (dynamic batch reduction).
-        prev_state[~valid_t] = 0.0
-    return predicts.cpu().numpy(), step_pnl_parts
+        prev_state = prev_state * valid_t[:, None].to(dtype)
+        hidden = hidden * valid_t[:, None].to(dtype)
+    if detach_predictions:
+        return predicts.detach().cpu().numpy(), step_pnl_parts, valid_mask
+    return predicts, step_pnl_parts, valid_mask
 
 
 def train_classifier(X_train: np.ndarray, 
@@ -218,7 +275,8 @@ def train_classifier(X_train: np.ndarray,
                      device: torch.device,
                      deposit: float,
                      bar_description: str = "Training",
-                     segments: list[tuple[int, int]] | None = None) -> tuple[OneLayerClassifier, dict, dict]:
+                     segments: list[tuple[int, int]] | None = None
+                    ) -> tuple[GruPolicy, dict, dict]:
     if X_train.ndim != 3:
         raise ValueError(f"X_train must be 3D (B,T,F), got {X_train.shape}")
     bsz, tlen, feat_n = X_train.shape
@@ -229,13 +287,23 @@ def train_classifier(X_train: np.ndarray,
     if not segments:
         raise ValueError("No valid segments available for training")
 
-    model = OneLayerClassifier(in_features=feat_n + len(AUTOREGRESSIVE_FEATURE_NAMES), 
-                               logit_clip=float(os.environ["LOGIT_CLIP"])).to(device)
+    hidden_size = int(os.environ.get("GRU_HIDDEN_SIZE", "16"))
+    model = GruPolicy(in_features=feat_n + len(AUTOREGRESSIVE_FEATURE_NAMES),
+                      hidden_size=hidden_size,
+                      logit_clip=float(os.environ["LOGIT_CLIP"])).to(device)
     learning_rate = float(os.environ["LR"])
     num_epochs = int(os.environ["EPOCHS"])
     drawdown_lambda = float(os.environ["DRAWDOWN_LAMBDA"])
-    l2_lambda = float(os.environ.get("L2_LAMBDA", "0"))
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    deals_lambda = float(os.environ.get("DEALS_LAMBDA", "0"))
+    lr_restart_period = int(os.environ.get("LR_RESTART_PERIOD", "50"))
+    lr_min = float(os.environ.get("LR_MIN", "1e-6"))
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    scheduler = CosineAnnealingWarmRestarts(
+        optimizer,
+        T_0=lr_restart_period,
+        T_mult=1,
+        eta_min=lr_min,
+    )
 
     model.train()
     loss_value = 0.0
@@ -245,32 +313,34 @@ def train_classifier(X_train: np.ndarray,
     grad_norm_history: list[float] = []
     weight_norm_history: list[float] = []
     weight_norm_change_history: list[float] = []
-    l2_penalty_history: list[float] = []
-    use_l2 = l2_lambda != 0.0
+    deals_penalty_history: list[float] = []
+    deal_crossings_history: list[float] = []
+    lr_history: list[float] = []
     prev_weight_norm = 0.0
     progress_bar = tqdm(range(num_epochs), desc=bar_description)
     for _ in progress_bar:
         optimizer.zero_grad()
-        _, step_pnl_parts = _rollout_train_timesteps(
+        predicts, step_pnl_parts, valid_mask = _rollout_train_timesteps(
             model,
             X_tensor,
             open_price_tensor,
             deposit_multp_tensor,
+            detach_predictions=False,
         )
 
         sequence_profit = torch.sum(torch.cat(step_pnl_parts))
         relative_outperformance = sequence_profit / deposit / bsz * 100
-        if use_l2:
-            l2_penalty = sum((p * p).sum() for p in model.parameters())
-        else:
-            l2_penalty = torch.tensor(0.0, dtype=X_tensor.dtype, device=X_tensor.device)
-        loss = (-relative_outperformance + l2_lambda * l2_penalty)
+        deal_crossings = _compute_soft_deal_crossings(predicts, valid_mask)
+        deals_penalty = _compute_deals_penalty(deal_crossings, deals_lambda)
+        loss = -relative_outperformance + deals_penalty
         postfix: dict[str, str] = {
             "loss": f"{loss.item():.3f}",
             "rel_outperf": f"{relative_outperformance.item():.3f}",
+            "lr": f"{optimizer.param_groups[0]['lr']:.2e}",
         }
-        if use_l2:
-            postfix["l2"] = f"{l2_penalty.item():.3f}"
+        if deals_lambda != 0.0:
+            postfix["deals"] = f"{deal_crossings.item():.1f}"
+            postfix["deals_pen"] = f"{deals_penalty.item():.3f}"
         progress_bar.set_postfix(**postfix)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=float(os.environ["GRAD_MAX_NORM"]))
@@ -280,6 +350,8 @@ def train_classifier(X_train: np.ndarray,
                 grad_sq_sum += float(torch.sum(param.grad.detach() ** 2).item())
         grad_norm = grad_sq_sum**0.5
         optimizer.step()
+        scheduler.step()
+        current_lr = float(optimizer.param_groups[0]["lr"])
         weight_sq_sum = 0.0
         for param in model.parameters():
             weight_sq_sum += float(torch.sum(param.detach() ** 2).item())
@@ -293,16 +365,23 @@ def train_classifier(X_train: np.ndarray,
         grad_norm_history.append(grad_norm)
         weight_norm_history.append(weight_norm)
         weight_norm_change_history.append(weight_norm_change)
-        l2_penalty_history.append(float(l2_penalty.item()))
+        deals_penalty_history.append(float(deals_penalty.item()))
+        deal_crossings_history.append(float(deal_crossings.item()))
+        lr_history.append(current_lr)
 
     train_info = {
-        "optimizer": "Adam",
+        "optimizer": "AdamW",
+        "lr_scheduler": "CosineAnnealingWarmRestarts",
         "device": str(device),
-        "loss": "neg_relative_outperformance_plus_drawdown_penalty_plus_optional_l2",
+        "loss": "neg_relative_outperformance_plus_deals_penalty",
         "learning_rate": learning_rate,
+        "lr_restart_period": lr_restart_period,
+        "lr_min": lr_min,
         "epochs": num_epochs,
         "drawdown_lambda": drawdown_lambda,
-        "l2_lambda": l2_lambda,
+        "deals_lambda": deals_lambda,
+        "model_type": "GruPolicy",
+        "gru_hidden_size": hidden_size,
         "autoregressive_prev_label": True,
         "autoregressive_prev_drawdown": True,
         "autoregressive_feature_name": AUTOREGRESSIVE_PREV_LABEL_FEATURE_NAME,
@@ -311,9 +390,11 @@ def train_classifier(X_train: np.ndarray,
         "autoregressive_initial_prev_drawdown": AUTOREGRESSIVE_INITIAL_DRAWDOWN,
         "final_train_loss": loss_value,
         "final_train_profit": final_profit_value,
-        "final_l2_penalty": l2_penalty_history[-1] if l2_penalty_history else 0.0,
+        "final_deals_penalty": deals_penalty_history[-1] if deals_penalty_history else 0.0,
+        "final_deal_crossings": deal_crossings_history[-1] if deal_crossings_history else 0.0,
         "final_grad_norm": grad_norm_history[-1] if grad_norm_history else 0.0,
         "final_weight_norm": weight_norm_history[-1] if weight_norm_history else 0.0,
+        "final_lr": lr_history[-1] if lr_history else learning_rate,
     }
     train_history = {
         "loss": loss_history,
@@ -321,13 +402,15 @@ def train_classifier(X_train: np.ndarray,
         "grad_norm": grad_norm_history,
         "weight_norm": weight_norm_history,
         "weight_norm_change": weight_norm_change_history,
-        "l2_penalty": l2_penalty_history,
+        "deals_penalty": deals_penalty_history,
+        "deal_crossings": deal_crossings_history,
+        "lr": lr_history,
     }
     return model, train_info, train_history
 
 
 def predict_direction(
-    model: OneLayerClassifier,
+    model: GruPolicy,
     X: np.ndarray,
     open_price: np.ndarray,
     deposit_multp: np.ndarray,
@@ -341,7 +424,7 @@ def predict_direction(
     deposit_multp_tensor = torch.from_numpy(deposit_multp.astype(np.float32)).to(device)
     model.eval()
     with torch.no_grad():
-        predicts, _ = _rollout_train_timesteps(
+        predicts, _, _ = _rollout_train_timesteps(
             model,
             X_tensor,
             open_price_tensor,
@@ -802,11 +885,16 @@ class SelfLearn:
         test_strategy_step_profit = a.test_strategy_step_profit
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        base_feature_count = int(X_shape[2])
+        in_features = base_feature_count + len(AUTOREGRESSIVE_FEATURE_NAMES)
+        gru_hidden_size = int(train_info["gru_hidden_size"])
         torch.save(
             {
                 "state_dict": model.state_dict(),
-                "in_features": int(X_shape[1] + len(AUTOREGRESSIVE_FEATURE_NAMES)),
-                "base_feature_count": int(X_shape[1]),
+                "model_type": "GruPolicy",
+                "in_features": in_features,
+                "base_feature_count": base_feature_count,
+                "gru_hidden_size": gru_hidden_size,
                 "autoregressive_prev_label": True,
                 "autoregressive_prev_drawdown": True,
                 "autoregressive_feature_name": AUTOREGRESSIVE_PREV_LABEL_FEATURE_NAME,
@@ -824,6 +912,17 @@ class SelfLearn:
             open_price_test=open_price_test,
         )
         for i, symbol in enumerate(meta.symbols):
+            output_path = self.output_dir / f"strategy_profit_train_test_{symbol.ticker}.png"
+            buy_hold_train = _compute_buy_hold_step_profit(
+                timestamps=timestamps_train[i],
+                open_price=open_price_train[i],
+                deposit=self.deposit,
+            )
+            buy_hold_test = _compute_buy_hold_step_profit(
+                timestamps=timestamps_test[i],
+                open_price=open_price_test[i],
+                deposit=self.deposit,
+            )
             visualizer.save_strategy_train_test_profit_plot(
                 timestamps_train=timestamps_train[i][:-1],
                 strategy_cum_train=np.cumsum(train_strategy_step_profit[i]) if train_strategy_step_profit[i].size else np.array([], dtype=np.float64),
@@ -831,9 +930,12 @@ class SelfLearn:
                 strategy_cum_test=np.cumsum(test_strategy_step_profit[i]) if test_strategy_step_profit[i].size else np.array([], dtype=np.float64),
                 pred_sign_train=y_pr_train[i][:-1],
                 pred_sign_test=y_pr_test[i][:-1],
-                output_path=self.output_dir / f"strategy_profit_train_test_{symbol.ticker}.png",
+                output_path=output_path,
+                buy_hold_cum_train=np.cumsum(buy_hold_train),
+                buy_hold_cum_test=np.cumsum(buy_hold_test),
             )
-        logger.info(f"Strategy profit plot saved to: {self.output_dir / 'strategy_profit_train_test.png'}")
+            logger.info(f"Strategy profit plot saved to: {output_path}")
+
         visualizer.save_loss_change_plot(
             loss_values=np.asarray(train_history["loss"], dtype=np.float64),
             profit_values=np.asarray(train_history["final_profit"], dtype=np.float64),
@@ -853,10 +955,11 @@ class SelfLearn:
         logger.info(f"Weights norm change plot saved to: {self.output_dir / 'weights_norm_change_train.png'}")
         schema = {
             "feature_names": meta.feature_names + AUTOREGRESSIVE_FEATURE_NAMES,
-            "model_type": "OneLayerTorchBinaryClassifier",
+            "model_type": "GruPolicy",
             "model_params": {
-                "in_features": int(X_shape[1] + len(AUTOREGRESSIVE_FEATURE_NAMES)),
-                "base_feature_count": int(X_shape[1]),
+                "in_features": in_features,
+                "base_feature_count": base_feature_count,
+                "gru_hidden_size": gru_hidden_size,
                 "out_features": 1,
                 "threshold": 0.5,
                 "autoregressive_prev_label": True,
