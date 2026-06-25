@@ -72,6 +72,7 @@ class TrainArtifacts:
     open_price_test: np.ndarray | None = None
     train_info: dict | None = None
     train_history: dict | None = None
+    training_checkpoint: dict | None = None
     model: GruPolicy | None = None
     metrics: dict | None = None
     y_pr_train: np.ndarray | None = None
@@ -104,6 +105,74 @@ def resolve_device() -> torch.device:
         logger.warning("DEVICE='cuda' requested but CUDA is unavailable, falling back to 'cpu'")
         requested = "cpu"
     return torch.device(requested)
+
+
+def resolve_resume_checkpoint(
+    output_dir: Path,
+    cli_path: str | None = None,
+) -> Path | None:
+    """Resolve checkpoint path from CLI, RESUME_CHECKPOINT, or RESUME=1 -> output_dir/model.pt."""
+    if cli_path is not None:
+        path = (output_dir / "model.pt") if cli_path == "" else Path(cli_path).expanduser()
+        path = path.resolve()
+        if not path.is_file():
+            raise FileNotFoundError(f"Resume checkpoint not found: {path}")
+        return path
+
+    explicit = os.environ.get("RESUME_CHECKPOINT", "").strip()
+    if explicit:
+        path = Path(explicit).expanduser().resolve()
+        if not path.is_file():
+            raise FileNotFoundError(f"Resume checkpoint not found: {path}")
+        return path
+
+    resume = os.environ.get("RESUME", "").strip().lower()
+    if resume in {"1", "true", "yes", "on"}:
+        path = (output_dir / "model.pt").resolve()
+        if path.is_file():
+            return path
+        logger.warning(f"RESUME enabled but checkpoint missing: {path}")
+    return None
+
+
+def load_training_checkpoint(path: Path, device: torch.device) -> dict:
+    checkpoint = torch.load(path, map_location=device, weights_only=False)
+    if not isinstance(checkpoint, dict) or "state_dict" not in checkpoint:
+        raise ValueError(f"Invalid training checkpoint: {path}")
+    return checkpoint
+
+
+def _history_list(checkpoint: dict | None, key: str) -> list[float]:
+    if checkpoint is None:
+        return []
+    train_history = checkpoint.get("train_history")
+    if not isinstance(train_history, dict):
+        return []
+    values = train_history.get(key, [])
+    return [float(v) for v in values]
+
+
+def _build_model_from_checkpoint(
+    checkpoint: dict,
+    feat_n: int,
+    device: torch.device,
+    logit_clip: float,
+) -> GruPolicy:
+    expected_in_features = feat_n + len(AUTOREGRESSIVE_FEATURE_NAMES)
+    in_features = int(checkpoint.get("in_features", expected_in_features))
+    if in_features != expected_in_features:
+        raise ValueError(
+            f"Checkpoint in_features={in_features} does not match dataset "
+            f"({expected_in_features})"
+        )
+    hidden_size = int(checkpoint.get("gru_hidden_size", os.environ.get("GRU_HIDDEN_SIZE", "16")))
+    model = GruPolicy(
+        in_features=in_features,
+        hidden_size=hidden_size,
+        logit_clip=logit_clip,
+    ).to(device)
+    model.load_state_dict(checkpoint["state_dict"])
+    return model
 
 
 def calendar_years_from_timestamps(timestamps: np.ndarray) -> np.ndarray:
@@ -300,8 +369,9 @@ def train_classifier(X_train: np.ndarray,
                      device: torch.device,
                      deposit: float,
                      bar_description: str = "Training",
-                     segments: list[tuple[int, int]] | None = None
-                    ) -> tuple[GruPolicy, dict, dict]:
+                     segments: list[tuple[int, int]] | None = None,
+                     resume_checkpoint: Path | None = None,
+                    ) -> tuple[GruPolicy, dict, dict, dict]:
     if X_train.ndim != 3:
         raise ValueError(f"X_train must be 3D (B,T,F), got {X_train.shape}")
     bsz, tlen, feat_n = X_train.shape
@@ -313,15 +383,29 @@ def train_classifier(X_train: np.ndarray,
         raise ValueError("No valid segments available for training")
 
     hidden_size = int(os.environ.get("GRU_HIDDEN_SIZE", "16"))
-    model = GruPolicy(in_features=feat_n + len(AUTOREGRESSIVE_FEATURE_NAMES),
-                      hidden_size=hidden_size,
-                      logit_clip=float(os.environ["LOGIT_CLIP"])).to(device)
+    logit_clip = float(os.environ["LOGIT_CLIP"])
     learning_rate = float(os.environ["LR"])
     num_epochs = int(os.environ["EPOCHS"])
     drawdown_lambda = float(os.environ["DRAWDOWN_LAMBDA"])
     deals_lambda = float(os.environ.get("DEALS_LAMBDA", "0"))
     lr_restart_period = int(os.environ.get("LR_RESTART_PERIOD", "50"))
     lr_min = float(os.environ.get("LR_MIN", "1e-6"))
+
+    checkpoint: dict | None = None
+    if resume_checkpoint is not None:
+        checkpoint = load_training_checkpoint(resume_checkpoint, device)
+        hidden_size = int(checkpoint.get("gru_hidden_size", hidden_size))
+        logger.info(f"Resuming training from checkpoint: {resume_checkpoint}")
+
+    model = (
+        _build_model_from_checkpoint(checkpoint, feat_n, device, logit_clip)
+        if checkpoint is not None
+        else GruPolicy(
+            in_features=feat_n + len(AUTOREGRESSIVE_FEATURE_NAMES),
+            hidden_size=hidden_size,
+            logit_clip=logit_clip,
+        ).to(device)
+    )
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     scheduler = CosineAnnealingWarmRestarts(
         optimizer,
@@ -329,20 +413,33 @@ def train_classifier(X_train: np.ndarray,
         T_mult=1,
         eta_min=lr_min,
     )
+    if checkpoint is not None:
+        if "optimizer_state_dict" in checkpoint:
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        else:
+            logger.warning("Checkpoint has no optimizer state; starting optimizer fresh")
+        if "scheduler_state_dict" in checkpoint:
+            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+        else:
+            logger.warning("Checkpoint has no scheduler state; starting scheduler fresh")
+
+    start_epoch = int(checkpoint.get("epochs_completed", 0)) if checkpoint is not None else 0
+    prev_weight_norm = float(checkpoint.get("prev_weight_norm", 0.0)) if checkpoint is not None else 0.0
+    loss_history: list[float] = _history_list(checkpoint, "loss")
+    profit_history: list[float] = _history_list(checkpoint, "final_profit")
+    grad_norm_history: list[float] = _history_list(checkpoint, "grad_norm")
+    weight_norm_history: list[float] = _history_list(checkpoint, "weight_norm")
+    weight_norm_change_history: list[float] = _history_list(checkpoint, "weight_norm_change")
+    deals_penalty_history: list[float] = _history_list(checkpoint, "deals_penalty")
+    deal_crossings_history: list[float] = _history_list(checkpoint, "deal_crossings")
+    strategy_profit_history: list[float] = _history_list(checkpoint, "strategy_profit")
+    benchmark_profit_history: list[float] = _history_list(checkpoint, "benchmark_profit")
+    if checkpoint is not None and start_epoch != len(loss_history):
+        start_epoch = len(loss_history)
 
     model.train()
     loss_value = 0.0
     final_profit_value = 0.0
-    loss_history: list[float] = []
-    profit_history: list[float] = []
-    grad_norm_history: list[float] = []
-    weight_norm_history: list[float] = []
-    weight_norm_change_history: list[float] = []
-    deals_penalty_history: list[float] = []
-    deal_crossings_history: list[float] = []
-    strategy_profit_history: list[float] = []
-    benchmark_profit_history: list[float] = []
-    prev_weight_norm = 0.0
     benchmark_step_pnl_parts = _compute_benchmark_step_pnl_parts(
         X_tensor,
         open_price_tensor,
@@ -354,7 +451,12 @@ def train_classifier(X_train: np.ndarray,
         benchmark_profit_total = torch.zeros((), dtype=X_tensor.dtype, device=device)
     benchmark_profit_pct = benchmark_profit_total / deposit / bsz * 100
 
-    progress_bar = tqdm(range(num_epochs), desc=bar_description)
+    progress_bar = tqdm(
+        range(num_epochs),
+        desc=bar_description,
+        initial=start_epoch,
+        total=start_epoch + num_epochs,
+    )
     for _ in progress_bar:
         optimizer.zero_grad()
         predicts, step_pnl_parts, valid_mask = _rollout_train_timesteps(
@@ -416,6 +518,9 @@ def train_classifier(X_train: np.ndarray,
         "lr_restart_period": lr_restart_period,
         "lr_min": lr_min,
         "epochs": num_epochs,
+        "epochs_completed_before_resume": start_epoch,
+        "total_epochs": start_epoch + num_epochs,
+        "resumed_from": str(resume_checkpoint) if resume_checkpoint is not None else None,
         "drawdown_lambda": drawdown_lambda,
         "deals_lambda": deals_lambda,
         "benchmark": "buy_and_hold_plus_one",
@@ -447,7 +552,13 @@ def train_classifier(X_train: np.ndarray,
         "deals_penalty": deals_penalty_history,
         "deal_crossings": deal_crossings_history,
     }
-    return model, train_info, train_history
+    training_checkpoint = {
+        "optimizer_state_dict": optimizer.state_dict(),
+        "scheduler_state_dict": scheduler.state_dict(),
+        "epochs_completed": len(loss_history),
+        "prev_weight_norm": prev_weight_norm,
+    }
+    return model, train_info, train_history, training_checkpoint
 
 
 def predict_direction(
@@ -476,11 +587,18 @@ def predict_direction(
 
 
 class SelfLearn:
-    def __init__(self, config: str, output_dir: Path, deposit: float = 1000.0):
+    def __init__(
+        self,
+        config: str,
+        output_dir: Path,
+        deposit: float = 1000.0,
+        resume_checkpoint: Path | None = None,
+    ):
         self.config_path = config
         self.output_dir = output_dir
         self.deposit = deposit
         self.device = resolve_device()
+        self.resume_checkpoint = resume_checkpoint
         self._artifacts: TrainArtifacts | None = None
         self._meta: DatasetMeta | None = None
 
@@ -515,13 +633,14 @@ class SelfLearn:
         deposit_multp_train = deposit_multp[:, :train_size]
         deposit_multp_test = deposit_multp[:, train_size:]
 
-        model, train_info, train_history = train_classifier(
+        model, train_info, train_history, training_checkpoint = train_classifier(
             X_train,
             open_price_train,
             deposit_multp=deposit_multp_train,
             device=self.device,
             deposit=self.deposit,
             bar_description="Training: ",
+            resume_checkpoint=self.resume_checkpoint,
         )
         y_pr_train_panel = predict_direction(
             model,
@@ -575,6 +694,7 @@ class SelfLearn:
             open_price_test=open_price_test,
             train_info=train_info,
             train_history=train_history,
+            training_checkpoint=training_checkpoint,
             model=model,
             metrics=metrics,
             y_pr_train=y_pr_train_panel,
@@ -918,6 +1038,7 @@ class SelfLearn:
         open_price_test = a.open_price_test
         train_info = a.train_info
         train_history = a.train_history
+        training_checkpoint = a.training_checkpoint
         model = a.model
         metrics = a.metrics
         y_pr_train = a.y_pr_train
@@ -929,9 +1050,15 @@ class SelfLearn:
         base_feature_count = int(X_shape[2])
         in_features = base_feature_count + len(AUTOREGRESSIVE_FEATURE_NAMES)
         gru_hidden_size = int(train_info["gru_hidden_size"])
+        assert training_checkpoint is not None
         torch.save(
             {
                 "state_dict": model.state_dict(),
+                "optimizer_state_dict": training_checkpoint["optimizer_state_dict"],
+                "scheduler_state_dict": training_checkpoint["scheduler_state_dict"],
+                "train_history": train_history,
+                "epochs_completed": training_checkpoint["epochs_completed"],
+                "prev_weight_norm": training_checkpoint["prev_weight_norm"],
                 "model_type": "GruPolicy",
                 "in_features": in_features,
                 "base_feature_count": base_feature_count,
@@ -1024,13 +1151,26 @@ def main() -> int:
         default="single",
         help="Training mode: single train/test split, multi-run stability, or cross-validation",
     )
+    parser.add_argument(
+        "--resume",
+        nargs="?",
+        const="",
+        default=None,
+        help="Continue training from checkpoint (default: ML_OUTPUT_DIR/model.pt)",
+    )
     args = parser.parse_args()
 
     if os.environ.get("ML_OUTPUT_DIR") is None:
         logger.error("ML_OUTPUT_DIR is not set")
         return 1
     output_dir = Path(os.environ.get("ML_OUTPUT_DIR")).resolve()
-    self_learner = SelfLearn(config=os.environ.get("CONFIG"), output_dir=output_dir, deposit=float(os.environ.get("DEPOSIT")))
+    resume_checkpoint = resolve_resume_checkpoint(output_dir, cli_path=args.resume)
+    self_learner = SelfLearn(
+        config=os.environ.get("CONFIG"),
+        output_dir=output_dir,
+        deposit=float(os.environ.get("DEPOSIT")),
+        resume_checkpoint=resume_checkpoint,
+    )
     if args.mode == "single":
         metrics = self_learner.train()
     elif args.mode == "multi":
