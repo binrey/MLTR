@@ -285,22 +285,29 @@ def _compute_benchmark_step_pnl_parts(
     return step_pnl_parts
 
 
-def _compute_soft_deal_crossings(
+def _compute_hold_fraction(
     predicts: torch.Tensor,
     valid_mask: torch.Tensor,
 ) -> torch.Tensor:
-    """Differentiable proxy for direction flips; zero when direction never changes sign."""
+    """Soft fraction of saturated same-direction consecutive steps in [0, 1]."""
     pair_valid = valid_mask[:, :-1] & valid_mask[:, 1:]
     if not torch.any(pair_valid):
         return torch.zeros((), dtype=predicts.dtype, device=predicts.device)
-    crossings = torch.relu(-predicts[:, :-1] * predicts[:, 1:])
-    return crossings[pair_valid].sum()
+    same_dir = torch.sigmoid(predicts[:, :-1] * predicts[:, 1:] * 8.0)
+    sat_prev = torch.sigmoid((predicts[:, :-1].abs() - 0.3) * 8.0)
+    sat_next = torch.sigmoid((predicts[:, 1:].abs() - 0.3) * 8.0)
+    return (same_dir * sat_prev * sat_next)[pair_valid].mean()
 
 
-def _compute_deals_penalty(deal_crossings: torch.Tensor, deals_lambda: float) -> torch.Tensor:
-    if deals_lambda == 0.0:
-        return torch.zeros((), dtype=deal_crossings.dtype, device=deal_crossings.device)
-    return deal_crossings.new_tensor(deals_lambda) / (deal_crossings + 1.0)
+def _compute_hold_fraction_penalty(
+    predicts: torch.Tensor,
+    valid_mask: torch.Tensor,
+    hold_lambda: float,
+) -> torch.Tensor:
+    """Penalize saturated buy/sell-and-hold segments (dense gradient at every step)."""
+    if hold_lambda == 0.0:
+        return torch.zeros((), dtype=predicts.dtype, device=predicts.device)
+    return hold_lambda * _compute_hold_fraction(predicts, valid_mask)
 
 
 def _rollout_train_timesteps(model: GruPolicy,
@@ -387,7 +394,7 @@ def train_classifier(X_train: np.ndarray,
     learning_rate = float(os.environ["LR"])
     num_epochs = int(os.environ["EPOCHS"])
     drawdown_lambda = float(os.environ["DRAWDOWN_LAMBDA"])
-    deals_lambda = float(os.environ.get("DEALS_LAMBDA", "0"))
+    hold_lambda = float(os.environ.get("HOLD_LAMBDA", "0"))
     lr_restart_period = int(os.environ.get("LR_RESTART_PERIOD", "50"))
     lr_min = float(os.environ.get("LR_MIN", "1e-6"))
 
@@ -430,8 +437,8 @@ def train_classifier(X_train: np.ndarray,
     grad_norm_history: list[float] = _history_list(checkpoint, "grad_norm")
     weight_norm_history: list[float] = _history_list(checkpoint, "weight_norm")
     weight_norm_change_history: list[float] = _history_list(checkpoint, "weight_norm_change")
-    deals_penalty_history: list[float] = _history_list(checkpoint, "deals_penalty")
-    deal_crossings_history: list[float] = _history_list(checkpoint, "deal_crossings")
+    hold_penalty_history: list[float] = _history_list(checkpoint, "hold_penalty")
+    hold_fraction_history: list[float] = _history_list(checkpoint, "hold_fraction")
     strategy_profit_history: list[float] = _history_list(checkpoint, "strategy_profit")
     benchmark_profit_history: list[float] = _history_list(checkpoint, "benchmark_profit")
     if checkpoint is not None and start_epoch != len(loss_history):
@@ -469,18 +476,22 @@ def train_classifier(X_train: np.ndarray,
 
         sequence_profit = torch.sum(torch.cat(step_pnl_parts))
         strategy_profit_pct = sequence_profit / deposit / bsz * 100
+        hold_fraction = _compute_hold_fraction(predicts, valid_mask)
         excess_profit_pct = strategy_profit_pct - benchmark_profit_pct
-        deal_crossings = _compute_soft_deal_crossings(predicts, valid_mask)
-        deals_penalty = _compute_deals_penalty(deal_crossings, deals_lambda)
-        loss = -excess_profit_pct + deals_penalty
+        hold_penalty = _compute_hold_fraction_penalty(
+            predicts,
+            valid_mask,
+            hold_lambda,
+        )
+        loss = -excess_profit_pct + hold_penalty
         postfix: dict[str, str] = {
             "loss": f"{loss.item():.2f}",
             "outperf": f"{excess_profit_pct.item():.2f}",
             "lr": f"{scheduler.get_last_lr()[0]:.2e}",
         }
-        if deals_lambda != 0.0:
-            postfix["deals"] = f"{deal_crossings.item():.1f}"
-            postfix["deals_pen"] = f"{deals_penalty.item():.3f}"
+        if hold_lambda != 0.0:
+            postfix["hold"] = f"{hold_fraction.item():.2f}"
+            postfix["hold_pen"] = f"{hold_penalty.item():.2f}"
         progress_bar.set_postfix(**postfix)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=float(os.environ["GRAD_MAX_NORM"]))
@@ -504,8 +515,8 @@ def train_classifier(X_train: np.ndarray,
         grad_norm_history.append(grad_norm)
         weight_norm_history.append(weight_norm)
         weight_norm_change_history.append(weight_norm_change)
-        deals_penalty_history.append(float(deals_penalty.item()))
-        deal_crossings_history.append(float(deal_crossings.item()))
+        hold_penalty_history.append(float(hold_penalty.item()))
+        hold_fraction_history.append(float(hold_fraction.item()))
         strategy_profit_history.append(float(strategy_profit_pct.item()))
         benchmark_profit_history.append(float(benchmark_profit_pct.item()))
 
@@ -513,7 +524,7 @@ def train_classifier(X_train: np.ndarray,
         "optimizer": "AdamW",
         "lr_scheduler": "CosineAnnealingWarmRestarts",
         "device": str(device),
-        "loss": "neg_excess_vs_buyhold_plus_deals_penalty",
+        "loss": "neg_excess_vs_buyhold_plus_hold_penalty",
         "learning_rate": learning_rate,
         "lr_restart_period": lr_restart_period,
         "lr_min": lr_min,
@@ -522,7 +533,7 @@ def train_classifier(X_train: np.ndarray,
         "total_epochs": start_epoch + num_epochs,
         "resumed_from": str(resume_checkpoint) if resume_checkpoint is not None else None,
         "drawdown_lambda": drawdown_lambda,
-        "deals_lambda": deals_lambda,
+        "hold_lambda": hold_lambda,
         "benchmark": "buy_and_hold_plus_one",
         "model_type": "GruPolicy",
         "gru_hidden_size": hidden_size,
@@ -536,8 +547,8 @@ def train_classifier(X_train: np.ndarray,
         "final_train_profit": final_profit_value,
         "final_train_strategy_profit": strategy_profit_history[-1] if strategy_profit_history else 0.0,
         "final_benchmark_profit": benchmark_profit_history[-1] if benchmark_profit_history else 0.0,
-        "final_deals_penalty": deals_penalty_history[-1] if deals_penalty_history else 0.0,
-        "final_deal_crossings": deal_crossings_history[-1] if deal_crossings_history else 0.0,
+        "final_hold_penalty": hold_penalty_history[-1] if hold_penalty_history else 0.0,
+        "final_hold_fraction": hold_fraction_history[-1] if hold_fraction_history else 0.0,
         "final_grad_norm": grad_norm_history[-1] if grad_norm_history else 0.0,
         "final_weight_norm": weight_norm_history[-1] if weight_norm_history else 0.0,
     }
@@ -549,8 +560,8 @@ def train_classifier(X_train: np.ndarray,
         "grad_norm": grad_norm_history,
         "weight_norm": weight_norm_history,
         "weight_norm_change": weight_norm_change_history,
-        "deals_penalty": deals_penalty_history,
-        "deal_crossings": deal_crossings_history,
+        "hold_penalty": hold_penalty_history,
+        "hold_fraction": hold_fraction_history,
     }
     training_checkpoint = {
         "optimizer_state_dict": optimizer.state_dict(),
