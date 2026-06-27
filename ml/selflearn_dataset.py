@@ -45,8 +45,9 @@ def build_single_simbol_dataset(cfg: PyConfig) -> tuple[np.ndarray, DatasetMeta]
     """
     hist_size = int(cfg["hist_size"])
     ma_divisors = {
-        "ma_10_period": 10,
-        "ma_40_period": 40,
+        "ma_8_period": 8,
+        "ma_32_period": 32,
+        "ma_128_period": 128,
         }
 
     ma_feature_names = [name[:-7] for name in ma_divisors]
