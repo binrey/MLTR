@@ -20,7 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from common.utils import Logger
+from common.utils import Logger, PyConfig
 from ml.selflearn_dataset import TRAIN_FRAC, DatasetMeta, build_dataset
 from ml.visualization import PredictionVisualizer
 from loguru import logger
@@ -94,6 +94,28 @@ class TimeSeriesSegments:
 
     segments: list[tuple[int, int]]
     valid_rows: np.ndarray
+
+
+@dataclass(frozen=True)
+class PackedYearlyTrainingData:
+    X: np.ndarray
+    open_price: np.ndarray
+    deposit_multp: np.ndarray
+    loss_mask: np.ndarray
+    metadata: dict
+
+
+def resolve_commission_rate_pct(config_path: str | Path | None = None) -> float:
+    """Execution fee as percent of price per deal (matches FeeRate.order_execution_rate)."""
+    env_val = os.environ.get("COMMISSION_PCT", "").strip()
+    if env_val:
+        return float(env_val)
+    if config_path:
+        cfg = PyConfig(str(config_path)).base_config.config
+        fee_rate = cfg.get("fee_rate")
+        if fee_rate is not None:
+            return float(fee_rate.order_execution_rate)
+    return 0.0
 
 
 def resolve_device() -> torch.device:
@@ -206,6 +228,122 @@ def _build_valid_panel_mask(X: np.ndarray, open_price: np.ndarray) -> np.ndarray
     return np.isfinite(open_price) & np.all(np.isfinite(X), axis=2)
 
 
+def _valid_timestamp_mask(timestamps: np.ndarray) -> np.ndarray:
+    if np.issubdtype(timestamps.dtype, np.datetime64):
+        return ~np.isnat(timestamps)
+    return np.ones(timestamps.shape, dtype=bool)
+
+
+def _pack_yearly_training_batch(
+    X_train: np.ndarray,
+    timestamps_train: np.ndarray,
+    open_price_train: np.ndarray,
+    deposit_multp_train: np.ndarray,
+) -> PackedYearlyTrainingData:
+    """Pack (previous year warm-up, current year target) sequences into one batch."""
+    if X_train.ndim != 3:
+        raise ValueError(f"X_train must be 3D (B,T,F), got {X_train.shape}")
+
+    bsz, _, n_features = X_train.shape
+    valid_panel = _build_valid_panel_mask(X_train, open_price_train) & _valid_timestamp_mask(
+        timestamps_train
+    )
+    sequences: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = []
+    sequence_meta: list[dict] = []
+    skipped_first_years: list[dict] = []
+    target_years: set[int] = set()
+    warmup_years: set[int] = set()
+
+    for symbol_idx in range(bsz):
+        valid_idx = np.flatnonzero(valid_panel[symbol_idx])
+        if valid_idx.size == 0:
+            continue
+
+        valid_ts = timestamps_train[symbol_idx, valid_idx]
+        valid_years = pd.DatetimeIndex(valid_ts).year.to_numpy(dtype=np.int64)
+        unique_years = sorted(int(year) for year in np.unique(valid_years))
+        if unique_years:
+            skipped_first_years.append(
+                {"symbol_index": symbol_idx, "year": int(unique_years[0])}
+            )
+
+        year_to_idx = {
+            year: valid_idx[valid_years == year]
+            for year in unique_years
+        }
+        for target_year in unique_years[1:]:
+            warmup_year = target_year - 1
+            if warmup_year not in year_to_idx:
+                continue
+            warmup_idx = year_to_idx[warmup_year]
+            target_idx = year_to_idx[target_year]
+            if warmup_idx.size == 0 or target_idx.size < 2:
+                continue
+
+            seq_idx = np.concatenate([warmup_idx, target_idx])
+            seq_loss_mask = np.zeros(seq_idx.shape[0], dtype=bool)
+            seq_loss_mask[warmup_idx.shape[0]:] = True
+            sequences.append(
+                (
+                    X_train[symbol_idx, seq_idx, :],
+                    open_price_train[symbol_idx, seq_idx],
+                    deposit_multp_train[symbol_idx, seq_idx],
+                    seq_loss_mask,
+                )
+            )
+            warmup_years.add(int(warmup_year))
+            target_years.add(int(target_year))
+            sequence_meta.append(
+                {
+                    "symbol_index": symbol_idx,
+                    "warmup_year": int(warmup_year),
+                    "target_year": int(target_year),
+                    "warmup_rows": int(warmup_idx.size),
+                    "target_rows": int(target_idx.size),
+                }
+            )
+
+    if not sequences:
+        raise ValueError(
+            "No yearly training sequences with a previous calendar year warm-up "
+            "and at least two target rows"
+        )
+
+    max_len = max(seq[0].shape[0] for seq in sequences)
+    packed_bsz = len(sequences)
+    X_packed = np.full((packed_bsz, max_len, n_features), np.nan, dtype=np.float64)
+    open_packed = np.full((packed_bsz, max_len), np.nan, dtype=np.float64)
+    deposit_packed = np.zeros((packed_bsz, max_len), dtype=np.float64)
+    loss_mask = np.zeros((packed_bsz, max_len), dtype=bool)
+
+    for i, (X_seq, open_seq, deposit_seq, seq_loss_mask) in enumerate(sequences):
+        n_seq = X_seq.shape[0]
+        X_packed[i, :n_seq, :] = X_seq
+        open_packed[i, :n_seq] = open_seq
+        deposit_packed[i, :n_seq] = deposit_seq
+        loss_mask[i, :n_seq] = seq_loss_mask
+
+    metadata = {
+        "train_batching": "calendar_year_with_previous_year_warmup",
+        "loss_reduction": "mean_per_year_sequence",
+        "original_batch_size": int(bsz),
+        "original_timesteps": int(X_train.shape[1]),
+        "packed_batch_size": int(packed_bsz),
+        "packed_timesteps": int(max_len),
+        "target_years": sorted(target_years),
+        "warmup_years": sorted(warmup_years),
+        "skipped_first_years": skipped_first_years,
+        "sequences": sequence_meta,
+    }
+    return PackedYearlyTrainingData(
+        X=X_packed,
+        open_price=open_packed,
+        deposit_multp=deposit_packed,
+        loss_mask=loss_mask,
+        metadata=metadata,
+    )
+
+
 def _default_segments(n_rows: int) -> list[tuple[int, int]]:
     return [(0, int(n_rows))] if n_rows > 0 else []
 
@@ -214,12 +352,14 @@ def _compute_step_profit_with_boundaries(timestamps: np.ndarray,
                                          open_price: np.ndarray,
                                          direction: np.ndarray,
                                          deposit_multp: np.ndarray,
-                                         valid_rows: np.ndarray
+                                         valid_rows: np.ndarray,
+                                         commission_rate_pct: float = 0.0,
                                          ) -> np.ndarray:
     """
     Per-step pnl with boundary handling.
 
     Returns length n-1 vector; invalid transitions or sequence boundaries are 0.
+    Commissions: price * |Δposition| * commission_rate_pct / 100 on each deal.
     """
     n = int(open_price.shape[1])
     assert n > 1
@@ -235,6 +375,17 @@ def _compute_step_profit_with_boundaries(timestamps: np.ndarray,
         step_profit[i, step_ok] = (
             open_change[i, step_ok] * direction[i, :n_steps][step_ok] * deposit_multp[i, :n_steps][step_ok]
         )
+        if commission_rate_pct != 0.0:
+            deal_volume = (
+                np.abs(np.diff(direction[i, :n], axis=-1)[step_ok])
+                * deposit_multp[i, :n_steps][step_ok]
+            )
+            step_profit[i, step_ok] -= (
+                open_price[i, :n_steps][step_ok]
+                * deal_volume
+                * commission_rate_pct
+                / 100.0
+            )
     return step_profit
 
 
@@ -264,10 +415,11 @@ def _compute_benchmark_step_pnl_parts(
     X_tensor: torch.Tensor,
     open_price_tensor: torch.Tensor,
     deposit_multp_tensor: torch.Tensor,
-) -> list[torch.Tensor]:
+    loss_mask_tensor: torch.Tensor | None = None,
+) -> torch.Tensor:
     """Buy-and-hold (+1 direction) PnL using the same step logic as training rollout."""
     bsz, tlen, _ = X_tensor.shape
-    step_pnl_parts: list[torch.Tensor] = []
+    sequence_pnl = torch.zeros((bsz,), dtype=X_tensor.dtype, device=X_tensor.device)
     for t in range(tlen):
         valid_t = torch.isfinite(open_price_tensor[:, t]) & torch.all(
             torch.isfinite(X_tensor[:, t, :]), dim=1
@@ -277,52 +429,37 @@ def _compute_benchmark_step_pnl_parts(
                 torch.isfinite(X_tensor[:, t + 1, :]), dim=1
             )
             active = valid_t & valid_next
+            if loss_mask_tensor is not None:
+                active = active & loss_mask_tensor[:, t] & loss_mask_tensor[:, t + 1]
             if torch.any(active):
                 open_change = (
                     open_price_tensor[active, t + 1] - open_price_tensor[active, t]
                 )
-                step_pnl_parts.append(open_change * deposit_multp_tensor[active, t])
-    return step_pnl_parts
-
-
-def _compute_hold_fraction(
-    predicts: torch.Tensor,
-    valid_mask: torch.Tensor,
-) -> torch.Tensor:
-    """Soft fraction of saturated same-direction consecutive steps in [0, 1]."""
-    pair_valid = valid_mask[:, :-1] & valid_mask[:, 1:]
-    if not torch.any(pair_valid):
-        return torch.zeros((), dtype=predicts.dtype, device=predicts.device)
-    same_dir = torch.sigmoid(predicts[:, :-1] * predicts[:, 1:] * 8.0)
-    sat_prev = torch.sigmoid((predicts[:, :-1].abs() - 0.3) * 8.0)
-    sat_next = torch.sigmoid((predicts[:, 1:].abs() - 0.3) * 8.0)
-    return (same_dir * sat_prev * sat_next)[pair_valid].mean()
-
-
-def _compute_hold_fraction_penalty(
-    predicts: torch.Tensor,
-    valid_mask: torch.Tensor,
-    hold_lambda: float,
-) -> torch.Tensor:
-    """Penalize saturated buy/sell-and-hold segments (dense gradient at every step)."""
-    if hold_lambda == 0.0:
-        return torch.zeros((), dtype=predicts.dtype, device=predicts.device)
-    return hold_lambda * _compute_hold_fraction(predicts, valid_mask)
+                step_pnl = open_change * deposit_multp_tensor[active, t]
+                step_full = torch.zeros_like(sequence_pnl)
+                step_full[active] = step_pnl
+                sequence_pnl = sequence_pnl + step_full
+    return sequence_pnl
 
 
 def _rollout_train_timesteps(model: GruPolicy,
                              X_tensor: torch.Tensor,
                              open_price_tensor: torch.Tensor,
                              deposit_multp_tensor: torch.Tensor,
+                             loss_mask_tensor: torch.Tensor | None = None,
                              detach_predictions: bool = True,
-                             ) -> tuple[torch.Tensor | np.ndarray, list[torch.Tensor], torch.Tensor]:
+                             commission_rate_pct: float = 0.0,
+                             ) -> tuple[torch.Tensor | np.ndarray, torch.Tensor, torch.Tensor, torch.Tensor]:
     bsz, tlen, _ = X_tensor.shape
     device = X_tensor.device
     dtype = X_tensor.dtype
-    step_pnl_parts: list[torch.Tensor] = []
+    sequence_gross_pnl = torch.zeros((bsz,), dtype=dtype, device=device)
+    sequence_commission = torch.zeros((bsz,), dtype=dtype, device=device)
     predicts: torch.Tensor = torch.zeros((bsz, tlen), dtype=dtype, device=device)
     valid_mask = torch.zeros((bsz, tlen), dtype=torch.bool, device=device)
     prev_state = torch.zeros((bsz, 2), dtype=dtype, device=device)
+    prev_pred = torch.zeros(bsz, dtype=dtype, device=device)
+    prev_valid = torch.zeros(bsz, dtype=torch.bool, device=device)
     hidden = torch.zeros((bsz, model.hidden_size), dtype=dtype, device=device)
     for t in range(tlen):
         valid_t = torch.isfinite(open_price_tensor[:, t]) & torch.all(
@@ -332,7 +469,14 @@ def _rollout_train_timesteps(model: GruPolicy,
             # No usable rows this timestep: reset hidden autoregressive state.
             prev_state = prev_state * 0.0
             hidden = hidden * 0.0
+            prev_pred = prev_pred * 0.0
+            prev_valid = prev_valid & False
             continue
+        loss_t = (
+            loss_mask_tensor[:, t]
+            if loss_mask_tensor is not None
+            else torch.ones((bsz,), dtype=torch.bool, device=device)
+        )
         valid_mask[:, t] = valid_t
         x_t = X_tensor[:, t, :][valid_t]
         prev_t = prev_state[valid_t]
@@ -343,10 +487,35 @@ def _rollout_train_timesteps(model: GruPolicy,
             predicts[valid_t, t] = predicts_tensor.detach()
         else:
             predicts[valid_t, t] = predicts_tensor
+        if commission_rate_pct > 0.0 and t > 0:
+            prev_loss_t = (
+                loss_mask_tensor[:, t - 1]
+                if loss_mask_tensor is not None
+                else torch.ones((bsz,), dtype=torch.bool, device=device)
+            )
+            transition_valid = valid_t & prev_valid & loss_t & prev_loss_t
+            if torch.any(transition_valid):
+                deal_delta = (
+                    predicts_tensor[transition_valid[valid_t]]
+                    - prev_pred[transition_valid]
+                ).abs()
+                step_fee = (
+                    open_price_tensor[transition_valid, t - 1]
+                    * deal_delta
+                    * deposit_multp_tensor[transition_valid, t - 1]
+                    * (commission_rate_pct / 100.0)
+                )
+                step_full = torch.zeros_like(sequence_commission)
+                step_full[transition_valid] = step_fee
+                sequence_commission = sequence_commission + step_full
         # Update autoregressive state only for active batch elements.
         next_prev_state = prev_state.clone()
         next_prev_state[valid_t, 0] = predicts_tensor
         prev_state = next_prev_state
+        next_prev_pred = prev_pred.clone()
+        next_prev_pred[valid_t] = predicts_tensor.detach() if detach_predictions else predicts_tensor
+        prev_pred = next_prev_pred
+        prev_valid = valid_t.clone()
         next_hidden = hidden.clone()
         next_hidden[valid_t] = hidden_t
         hidden = next_hidden
@@ -355,29 +524,81 @@ def _rollout_train_timesteps(model: GruPolicy,
                 torch.isfinite(X_tensor[:, t + 1, :]), dim=1
             )
             active = valid_t & valid_next
+            if loss_mask_tensor is not None:
+                active = active & loss_t & loss_mask_tensor[:, t + 1]
             if torch.any(active):
                 open_change = (
                     open_price_tensor[active, t + 1] - open_price_tensor[active, t]
                 )
                 dir_active = prev_state[active, 0]
                 step_pnl = open_change * dir_active * deposit_multp_tensor[active, t]
-                step_pnl_parts.append(step_pnl)
+                step_full = torch.zeros_like(sequence_gross_pnl)
+                step_full[active] = step_pnl
+                sequence_gross_pnl = sequence_gross_pnl + step_full
         # Reset states for currently invalid rows (dynamic batch reduction).
         prev_state = prev_state * valid_t[:, None].to(dtype)
         hidden = hidden * valid_t[:, None].to(dtype)
+        prev_pred = prev_pred * valid_t.to(dtype)
+        prev_valid = prev_valid & valid_t
     if detach_predictions:
-        return predicts.detach().cpu().numpy(), step_pnl_parts, valid_mask
-    return predicts, step_pnl_parts, valid_mask
+        return (
+            predicts.detach().cpu().numpy(),
+            sequence_gross_pnl,
+            sequence_commission,
+            valid_mask,
+        )
+    return predicts, sequence_gross_pnl, sequence_commission, valid_mask
 
 
-def train_classifier(X_train: np.ndarray, 
+def _compute_hold_fraction(
+    predicts: torch.Tensor,
+    valid_mask: torch.Tensor,
+    loss_mask: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Per-sequence soft fraction of saturated same-direction consecutive steps."""
+    pair_valid = valid_mask[:, :-1] & valid_mask[:, 1:]
+    if loss_mask is not None:
+        pair_valid = pair_valid & loss_mask[:, :-1] & loss_mask[:, 1:]
+    sequence_valid = torch.any(pair_valid, dim=1)
+    if not torch.any(pair_valid):
+        return (
+            torch.zeros((predicts.shape[0],), dtype=predicts.dtype, device=predicts.device),
+            sequence_valid,
+        )
+    same_dir = torch.sigmoid(predicts[:, :-1] * predicts[:, 1:] * 8.0)
+    sat_prev = torch.sigmoid((predicts[:, :-1].abs() - 0.3) * 8.0)
+    sat_next = torch.sigmoid((predicts[:, 1:].abs() - 0.3) * 8.0)
+    hold_scores = same_dir * sat_prev * sat_next
+    pair_counts = pair_valid.sum(dim=1).clamp_min(1).to(predicts.dtype)
+    hold_fraction = (hold_scores * pair_valid.to(predicts.dtype)).sum(dim=1) / pair_counts
+    hold_fraction = torch.where(sequence_valid, hold_fraction, torch.zeros_like(hold_fraction))
+    return hold_fraction, sequence_valid
+
+
+def _compute_hold_fraction_penalty(
+    predicts: torch.Tensor,
+    valid_mask: torch.Tensor,
+    hold_lambda: float,
+    loss_mask: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Per-sequence penalty for saturated buy/sell-and-hold segments."""
+    hold_fraction, sequence_valid = _compute_hold_fraction(predicts, valid_mask, loss_mask)
+    if hold_lambda == 0.0:
+        return torch.zeros_like(hold_fraction), hold_fraction, sequence_valid
+    return hold_lambda * hold_fraction, hold_fraction, sequence_valid
+
+
+def train_classifier(X_train: np.ndarray,
                      open_price_train: np.ndarray, 
                      deposit_multp: np.ndarray,
                      device: torch.device,
                      deposit: float,
                      bar_description: str = "Training",
+                     loss_mask: np.ndarray | None = None,
+                     training_batch_info: dict | None = None,
                      segments: list[tuple[int, int]] | None = None,
                      resume_checkpoint: Path | None = None,
+                     commission_rate_pct: float = 0.0,
                     ) -> tuple[GruPolicy, dict, dict, dict]:
     if X_train.ndim != 3:
         raise ValueError(f"X_train must be 3D (B,T,F), got {X_train.shape}")
@@ -385,6 +606,11 @@ def train_classifier(X_train: np.ndarray,
     X_tensor = torch.from_numpy(X_train.astype(np.float32)).to(device)
     open_price_tensor = torch.from_numpy(open_price_train.astype(np.float32)).to(device)
     deposit_multp_tensor = torch.tensor(deposit_multp, dtype=torch.float32, device=device)
+    loss_mask_tensor = (
+        torch.from_numpy(loss_mask.astype(bool)).to(device)
+        if loss_mask is not None
+        else None
+    )
     segments = segments if segments is not None else _default_segments(tlen)
     if not segments:
         raise ValueError("No valid segments available for training")
@@ -439,6 +665,7 @@ def train_classifier(X_train: np.ndarray,
     weight_norm_change_history: list[float] = _history_list(checkpoint, "weight_norm_change")
     hold_penalty_history: list[float] = _history_list(checkpoint, "hold_penalty")
     hold_fraction_history: list[float] = _history_list(checkpoint, "hold_fraction")
+    commission_history: list[float] = _history_list(checkpoint, "commission")
     strategy_profit_history: list[float] = _history_list(checkpoint, "strategy_profit")
     benchmark_profit_history: list[float] = _history_list(checkpoint, "benchmark_profit")
     if checkpoint is not None and start_epoch != len(loss_history):
@@ -451,12 +678,25 @@ def train_classifier(X_train: np.ndarray,
         X_tensor,
         open_price_tensor,
         deposit_multp_tensor,
+        loss_mask_tensor,
     )
-    if benchmark_step_pnl_parts:
-        benchmark_profit_total = torch.sum(torch.cat(benchmark_step_pnl_parts))
-    else:
-        benchmark_profit_total = torch.zeros((), dtype=X_tensor.dtype, device=device)
-    benchmark_profit_pct = benchmark_profit_total / deposit / bsz * 100
+    benchmark_profit_pct_by_sequence = benchmark_step_pnl_parts / deposit * 100
+    base_valid_mask = torch.isfinite(open_price_tensor) & torch.all(
+        torch.isfinite(X_tensor), dim=2
+    )
+    target_valid_mask = (
+        base_valid_mask & loss_mask_tensor
+        if loss_mask_tensor is not None
+        else base_valid_mask
+    )
+    sequence_valid_mask = torch.any(target_valid_mask[:, :-1] & target_valid_mask[:, 1:], dim=1)
+    if not torch.any(sequence_valid_mask):
+        raise ValueError("No valid target-year transitions available for training loss")
+    benchmark_profit_pct = benchmark_profit_pct_by_sequence[sequence_valid_mask].mean()
+    if not torch.isfinite(benchmark_profit_pct):
+        raise FloatingPointError(
+            f"Non-finite benchmark profit before training: {benchmark_profit_pct.item()}"
+        )
 
     progress_bar = tqdm(
         range(num_epochs),
@@ -466,24 +706,61 @@ def train_classifier(X_train: np.ndarray,
     )
     for _ in progress_bar:
         optimizer.zero_grad()
-        predicts, step_pnl_parts, valid_mask = _rollout_train_timesteps(
+        predicts, sequence_gross_pnl, sequence_commission, valid_mask = _rollout_train_timesteps(
             model,
             X_tensor,
             open_price_tensor,
             deposit_multp_tensor,
+            loss_mask_tensor=loss_mask_tensor,
             detach_predictions=False,
+            commission_rate_pct=commission_rate_pct,
         )
 
-        sequence_profit = torch.sum(torch.cat(step_pnl_parts))
-        strategy_profit_pct = sequence_profit / deposit / bsz * 100
-        hold_fraction = _compute_hold_fraction(predicts, valid_mask)
-        excess_profit_pct = strategy_profit_pct - benchmark_profit_pct
-        hold_penalty = _compute_hold_fraction_penalty(
+        net_sequence_profit = sequence_gross_pnl - sequence_commission
+        strategy_profit_pct_by_sequence = net_sequence_profit / deposit * 100
+        commission_pct_by_sequence = sequence_commission / deposit * 100
+        hold_penalty_by_sequence, hold_fraction_by_sequence, hold_valid_mask = _compute_hold_fraction_penalty(
             predicts,
             valid_mask,
             hold_lambda,
+            loss_mask_tensor,
         )
-        loss = -excess_profit_pct + hold_penalty
+        valid_loss_sequences = sequence_valid_mask & hold_valid_mask
+        if not torch.any(valid_loss_sequences):
+            raise ValueError("No valid packed yearly sequences available for loss")
+        excess_profit_pct_by_sequence = (
+            strategy_profit_pct_by_sequence - benchmark_profit_pct_by_sequence
+        )
+        sequence_loss = -excess_profit_pct_by_sequence + hold_penalty_by_sequence
+        loss = sequence_loss[valid_loss_sequences].mean()
+        gross_profit = sequence_gross_pnl[valid_loss_sequences].sum()
+        commission_total = sequence_commission[valid_loss_sequences].sum()
+        strategy_profit_pct = strategy_profit_pct_by_sequence[valid_loss_sequences].mean()
+        benchmark_profit_pct = benchmark_profit_pct_by_sequence[valid_loss_sequences].mean()
+        commission_pct = commission_pct_by_sequence[valid_loss_sequences].mean()
+        hold_fraction = hold_fraction_by_sequence[valid_loss_sequences].mean()
+        hold_penalty = hold_penalty_by_sequence[valid_loss_sequences].mean()
+        excess_profit_pct = excess_profit_pct_by_sequence[valid_loss_sequences].mean()
+        loss_components = {
+            "loss": loss,
+            "gross_profit": gross_profit,
+            "commission_total": commission_total,
+            "strategy_profit_pct": strategy_profit_pct,
+            "benchmark_profit_pct": benchmark_profit_pct,
+            "excess_profit_pct": excess_profit_pct,
+            "hold_fraction": hold_fraction,
+            "hold_penalty": hold_penalty,
+        }
+        non_finite_components = [
+            f"{name}={float(value.detach().cpu().item())}"
+            for name, value in loss_components.items()
+            if not torch.isfinite(value)
+        ]
+        if non_finite_components:
+            raise FloatingPointError(
+                "Non-finite training value before backward: "
+                + ", ".join(non_finite_components)
+            )
         postfix: dict[str, str] = {
             "loss": f"{loss.item():.2f}",
             "outperf": f"{excess_profit_pct.item():.2f}",
@@ -492,9 +769,15 @@ def train_classifier(X_train: np.ndarray,
         if hold_lambda != 0.0:
             postfix["hold"] = f"{hold_fraction.item():.2f}"
             postfix["hold_pen"] = f"{hold_penalty.item():.2f}"
+        if commission_rate_pct != 0.0:
+            postfix["fees"] = f"{commission_pct.item():.2f}"
         progress_bar.set_postfix(**postfix)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=float(os.environ["GRAD_MAX_NORM"]))
+        torch.nn.utils.clip_grad_norm_(
+            model.parameters(),
+            max_norm=float(os.environ["GRAD_MAX_NORM"]),
+            error_if_nonfinite=True,
+        )
         grad_sq_sum = 0.0
         for param in model.parameters():
             if param.grad is not None:
@@ -502,6 +785,11 @@ def train_classifier(X_train: np.ndarray,
         grad_norm = grad_sq_sum**0.5
         optimizer.step()
         scheduler.step()
+        for name, param in model.named_parameters():
+            if not torch.isfinite(param).all():
+                raise FloatingPointError(
+                    f"Non-finite model parameter after optimizer step: {name}"
+                )
         weight_sq_sum = 0.0
         for param in model.parameters():
             weight_sq_sum += float(torch.sum(param.detach() ** 2).item())
@@ -517,6 +805,7 @@ def train_classifier(X_train: np.ndarray,
         weight_norm_change_history.append(weight_norm_change)
         hold_penalty_history.append(float(hold_penalty.item()))
         hold_fraction_history.append(float(hold_fraction.item()))
+        commission_history.append(float(commission_pct.item()))
         strategy_profit_history.append(float(strategy_profit_pct.item()))
         benchmark_profit_history.append(float(benchmark_profit_pct.item()))
 
@@ -524,7 +813,17 @@ def train_classifier(X_train: np.ndarray,
         "optimizer": "AdamW",
         "lr_scheduler": "CosineAnnealingWarmRestarts",
         "device": str(device),
-        "loss": "neg_excess_vs_buyhold_plus_hold_penalty",
+        "loss": "neg_excess_vs_buyhold_plus_hold_penalty_minus_commissions",
+        "loss_reduction": (
+            training_batch_info.get("loss_reduction")
+            if training_batch_info is not None
+            else "global_sequence_sum"
+        ),
+        "train_batching": (
+            training_batch_info.get("train_batching")
+            if training_batch_info is not None
+            else "full_panel"
+        ),
         "learning_rate": learning_rate,
         "lr_restart_period": lr_restart_period,
         "lr_min": lr_min,
@@ -534,6 +833,7 @@ def train_classifier(X_train: np.ndarray,
         "resumed_from": str(resume_checkpoint) if resume_checkpoint is not None else None,
         "drawdown_lambda": drawdown_lambda,
         "hold_lambda": hold_lambda,
+        "commission_rate_pct": commission_rate_pct,
         "benchmark": "buy_and_hold_plus_one",
         "model_type": "GruPolicy",
         "gru_hidden_size": hidden_size,
@@ -549,9 +849,12 @@ def train_classifier(X_train: np.ndarray,
         "final_benchmark_profit": benchmark_profit_history[-1] if benchmark_profit_history else 0.0,
         "final_hold_penalty": hold_penalty_history[-1] if hold_penalty_history else 0.0,
         "final_hold_fraction": hold_fraction_history[-1] if hold_fraction_history else 0.0,
+        "final_commission_pct": commission_history[-1] if commission_history else 0.0,
         "final_grad_norm": grad_norm_history[-1] if grad_norm_history else 0.0,
         "final_weight_norm": weight_norm_history[-1] if weight_norm_history else 0.0,
     }
+    if training_batch_info is not None:
+        train_info["training_batch"] = training_batch_info
     train_history = {
         "loss": loss_history,
         "final_profit": profit_history,
@@ -562,6 +865,7 @@ def train_classifier(X_train: np.ndarray,
         "weight_norm_change": weight_norm_change_history,
         "hold_penalty": hold_penalty_history,
         "hold_fraction": hold_fraction_history,
+        "commission": commission_history,
     }
     training_checkpoint = {
         "optimizer_state_dict": optimizer.state_dict(),
@@ -587,7 +891,7 @@ def predict_direction(
     deposit_multp_tensor = torch.from_numpy(deposit_multp.astype(np.float32)).to(device)
     model.eval()
     with torch.no_grad():
-        predicts, _, _ = _rollout_train_timesteps(
+        predicts, _, _, _ = _rollout_train_timesteps(
             model,
             X_tensor,
             open_price_tensor,
@@ -610,6 +914,7 @@ class SelfLearn:
         self.deposit = deposit
         self.device = resolve_device()
         self.resume_checkpoint = resume_checkpoint
+        self.commission_rate_pct = resolve_commission_rate_pct(config)
         self._artifacts: TrainArtifacts | None = None
         self._meta: DatasetMeta | None = None
 
@@ -643,15 +948,24 @@ class SelfLearn:
         deposit_multp[pos_mask] = self.deposit / open_price[pos_mask]
         deposit_multp_train = deposit_multp[:, :train_size]
         deposit_multp_test = deposit_multp[:, train_size:]
+        packed_train = _pack_yearly_training_batch(
+            X_train=X_train,
+            timestamps_train=timestamps_train,
+            open_price_train=open_price_train,
+            deposit_multp_train=deposit_multp_train,
+        )
 
         model, train_info, train_history, training_checkpoint = train_classifier(
-            X_train,
-            open_price_train,
-            deposit_multp=deposit_multp_train,
+            packed_train.X,
+            packed_train.open_price,
+            deposit_multp=packed_train.deposit_multp,
             device=self.device,
             deposit=self.deposit,
             bar_description="Training: ",
+            loss_mask=packed_train.loss_mask,
+            training_batch_info=packed_train.metadata,
             resume_checkpoint=self.resume_checkpoint,
+            commission_rate_pct=self.commission_rate_pct,
         )
         y_pr_train_panel = predict_direction(
             model,
@@ -674,6 +988,7 @@ class SelfLearn:
             direction=y_pr_train_panel,
             deposit_multp=deposit_multp_train,
             valid_rows=valid_train_panel,
+            commission_rate_pct=self.commission_rate_pct,
         )
         test_strategy_step_profit = _compute_step_profit_with_boundaries(
             timestamps=timestamps_test,
@@ -681,6 +996,7 @@ class SelfLearn:
             direction=y_pr_test_panel,
             deposit_multp=deposit_multp_test,
             valid_rows=valid_test_panel,
+            commission_rate_pct=self.commission_rate_pct,
         )
 
         metrics = {
@@ -692,6 +1008,7 @@ class SelfLearn:
                 "test_size": test_size,
                 "valid_rows_train": np.sum(valid_train_panel, axis=1).tolist(),
                 "valid_rows_test": np.sum(valid_test_panel, axis=1).tolist(),
+                "training_batch": packed_train.metadata,
             },
             "training": train_info,
         }
