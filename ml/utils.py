@@ -228,18 +228,14 @@ def compute_buy_hold_step_profit(
     open_price: np.ndarray,
     deposit: float,
 ) -> np.ndarray:
-    """Buy-and-hold PnL for one symbol, using first valid open as entry."""
+    """Always-long PnL with fixed deposit re-sized at every step."""
     n = int(open_price.shape[0])
     if n <= 1:
         return np.array([], dtype=np.float64)
 
     step_profit = np.zeros(n - 1, dtype=np.float64)
     valid_rows = np.isfinite(open_price) & (open_price > 0.0)
-    valid_idx = np.flatnonzero(valid_rows)
-    if valid_idx.size == 0:
-        return step_profit
-
-    units = deposit / float(open_price[valid_idx[0]])
     step_ok = valid_rows[:-1] & valid_rows[1:] & (timestamps[1:] > timestamps[:-1])
-    step_profit[step_ok] = np.diff(open_price)[step_ok] * units
+    step_units = deposit / open_price[:-1][step_ok]
+    step_profit[step_ok] = np.diff(open_price)[step_ok] * step_units
     return step_profit
