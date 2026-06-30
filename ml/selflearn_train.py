@@ -776,13 +776,37 @@ class SelfLearn:
             deposit_multp_train,
             device=self.device,
         )
-        y_pr_test_panel = predict_direction(
-            model,
-            X_test,
-            open_price_test,
-            deposit_multp_test,
-            device=self.device,
-        )
+        test_warmup_rows = int(os.environ.get("TEST_GRU_WARMUP_ROWS", "200"))
+        test_warmup_rows = max(0, min(test_warmup_rows, train_size))
+        if test_warmup_rows > 0:
+            X_test_rollout = np.concatenate(
+                [X_train[:, -test_warmup_rows:, :], X_test],
+                axis=1,
+            )
+            open_price_test_rollout = np.concatenate(
+                [open_price_train[:, -test_warmup_rows:], open_price_test],
+                axis=1,
+            )
+            deposit_multp_test_rollout = np.concatenate(
+                [deposit_multp_train[:, -test_warmup_rows:], deposit_multp_test],
+                axis=1,
+            )
+            y_pr_test_rollout = predict_direction(
+                model,
+                X_test_rollout,
+                open_price_test_rollout,
+                deposit_multp_test_rollout,
+                device=self.device,
+            )
+            y_pr_test_panel = y_pr_test_rollout[:, test_warmup_rows:]
+        else:
+            y_pr_test_panel = predict_direction(
+                model,
+                X_test,
+                open_price_test,
+                deposit_multp_test,
+                device=self.device,
+            )
 
         train_strategy_step_profit = compute_step_profit_with_boundaries(
             timestamps=timestamps_train,
@@ -826,6 +850,7 @@ class SelfLearn:
                 "test_size": test_size,
                 "valid_rows_train": np.sum(valid_train_panel, axis=1).tolist(),
                 "valid_rows_test": np.sum(valid_test_panel, axis=1).tolist(),
+                "test_gru_warmup_rows": int(test_warmup_rows),
                 "training_batch": packed_train.metadata,
             },
             "training": train_info,

@@ -1,4 +1,4 @@
-"""Build MA-based feature dataset from OHLCV."""
+"""Build compact dimensionless feature dataset from OHLCV."""
 
 from __future__ import annotations
 
@@ -18,6 +18,209 @@ from common.utils import PyConfig
 from data_processing.dataloading import MovingWindow
 
 TRAIN_FRAC = 0.8
+EPS = 1e-12
+TRADING_DAYS = 252.0
+FEATURE_CLIP = 5.0
+
+RETURN_PERIODS = [1, 4, 8, 16, 32, 64, 128]
+MOMENTUM_Z_PERIODS = [8, 16, 32, 64, 128]
+MA_PERIODS = [16, 32, 64, 128]
+EFFICIENCY_PERIODS = [8, 16, 32, 64]
+VOL_PERIODS = [8, 16, 32, 64, 128]
+VOL_ASYMMETRY_PERIODS = [32, 64]
+RANGE_PERIODS = [16, 32, 64, 128, 200]
+DRAWDOWN_PERIODS = [32, 64, 128, 200]
+TIME_SINCE_HIGH_PERIODS = [64, 128]
+UP_RATIO_PERIODS = [16, 32, 64]
+ACF_PERIODS = [16, 32, 64]
+SKEW_PERIODS = [32, 64]
+VOLUME_Z_PERIODS = [16, 32, 64]
+SIGNED_VOLUME_PERIODS = [16, 32]
+PRICE_VOLUME_CORR_PERIODS = [32, 64]
+
+
+def _compact_feature_names() -> list[str]:
+    names: list[str] = []
+    names.extend(f"return_{p}" for p in RETURN_PERIODS)
+    names.extend(f"momentum_z_{p}" for p in MOMENTUM_Z_PERIODS)
+    names.extend(f"price_ma_z_{p}" for p in MA_PERIODS)
+    names.extend(["ma_16_32_z", "ma_32_128_z", "ma_16_128_z"])
+    names.extend(f"signed_efficiency_{p}" for p in EFFICIENCY_PERIODS)
+    names.extend(f"volatility_{p}" for p in VOL_PERIODS)
+    names.extend(["vol_ratio_16_64", "vol_ratio_32_128"])
+    names.extend(f"vol_asymmetry_{p}" for p in VOL_ASYMMETRY_PERIODS)
+    names.append("return_shock_32")
+    names.extend(f"range_pos_{p}" for p in RANGE_PERIODS)
+    names.extend(f"drawdown_{p}" for p in DRAWDOWN_PERIODS)
+    names.extend(f"time_since_high_{p}" for p in TIME_SINCE_HIGH_PERIODS)
+    names.extend(f"up_ratio_{p}" for p in UP_RATIO_PERIODS)
+    names.extend(f"return_acf_lag1_{p}" for p in ACF_PERIODS)
+    names.extend(f"return_skew_{p}" for p in SKEW_PERIODS)
+    names.extend(f"volume_z_{p}" for p in VOLUME_Z_PERIODS)
+    names.append("volume_trend_16_64")
+    names.extend(f"signed_volume_{p}" for p in SIGNED_VOLUME_PERIODS)
+    names.extend(f"price_volume_corr_{p}" for p in PRICE_VOLUME_CORR_PERIODS)
+    names.extend(
+        [
+            "intraday_return",
+            "overnight_gap",
+            "daily_range",
+            "candle_body",
+            "upper_shadow",
+            "lower_shadow",
+        ]
+    )
+    return names
+
+
+def _safe_log_ratio(numerator: float, denominator: float) -> float:
+    return float(np.log(max(float(numerator), EPS) / max(float(denominator), EPS)))
+
+
+def _return_over(close: np.ndarray, period: int) -> float:
+    return _safe_log_ratio(float(close[-1]), float(close[-period - 1]))
+
+
+def _std(values: np.ndarray) -> float:
+    if values.size == 0:
+        return 0.0
+    return float(np.std(values, ddof=0))
+
+
+def _corr(x: np.ndarray, y: np.ndarray) -> float:
+    if x.size < 2 or y.size < 2:
+        return 0.0
+    x_std = _std(x)
+    y_std = _std(y)
+    if x_std <= EPS or y_std <= EPS:
+        return 0.0
+    return float(np.mean((x - np.mean(x)) * (y - np.mean(y))) / (x_std * y_std))
+
+
+def _skew(values: np.ndarray) -> float:
+    if values.size < 3:
+        return 0.0
+    centered = values - np.mean(values)
+    std = _std(centered)
+    if std <= EPS:
+        return 0.0
+    return float(np.mean((centered / std) ** 3))
+
+
+def _clip_feature(value: float) -> float:
+    if not np.isfinite(value):
+        return 0.0
+    return float(np.clip(value, -FEATURE_CLIP, FEATURE_CLIP))
+
+
+def _compact_features(
+    open_hist: np.ndarray,
+    high_hist: np.ndarray,
+    low_hist: np.ndarray,
+    close_hist: np.ndarray,
+    volume_hist: np.ndarray,
+) -> list[float]:
+    close = np.asarray(close_hist, dtype=np.float64)
+    open_ = np.asarray(open_hist, dtype=np.float64)
+    high = np.asarray(high_hist, dtype=np.float64)
+    low = np.asarray(low_hist, dtype=np.float64)
+    volume = np.asarray(volume_hist, dtype=np.float64)
+
+    price = float(close[-1])
+    log_returns = np.diff(np.log(np.maximum(close, EPS)))
+    log_volume = np.log1p(np.maximum(volume, 0.0))
+    volume_change = np.diff(log_volume)
+    vol_by_period = {p: _std(log_returns[-p:]) for p in VOL_PERIODS}
+    price_std_by_period = {p: _std(close[-p:]) for p in MA_PERIODS}
+
+    features: list[float] = []
+
+    for p in RETURN_PERIODS:
+        features.append(_return_over(close, p))
+
+    for p in MOMENTUM_Z_PERIODS:
+        ret = _return_over(close, p)
+        denom = vol_by_period[p] * np.sqrt(float(p)) + EPS
+        features.append(ret / denom)
+
+    ma_values = {p: float(np.mean(close[-p:])) for p in MA_PERIODS}
+    for p in MA_PERIODS:
+        features.append((price - ma_values[p]) / (price_std_by_period[p] + EPS))
+
+    features.append((ma_values[16] - ma_values[32]) / (price_std_by_period[32] + EPS))
+    features.append((ma_values[32] - ma_values[128]) / (price_std_by_period[128] + EPS))
+    features.append((ma_values[16] - ma_values[128]) / (price_std_by_period[128] + EPS))
+
+    for p in EFFICIENCY_PERIODS:
+        path = float(np.sum(np.abs(np.diff(close[-(p + 1):]))))
+        features.append((price - float(close[-p - 1])) / (path + EPS))
+
+    for p in VOL_PERIODS:
+        features.append(vol_by_period[p] * np.sqrt(TRADING_DAYS))
+
+    features.append(vol_by_period[16] / (vol_by_period[64] + EPS))
+    features.append(vol_by_period[32] / (vol_by_period[128] + EPS))
+
+    for p in VOL_ASYMMETRY_PERIODS:
+        ret_slice = log_returns[-p:]
+        downside = ret_slice[ret_slice < 0.0]
+        upside = ret_slice[ret_slice > 0.0]
+        features.append(_std(downside) / (_std(upside) + EPS))
+
+    features.append(float(log_returns[-1]) / (vol_by_period[32] + EPS))
+
+    for p in RANGE_PERIODS:
+        price_slice = close[-p:]
+        low_p = float(np.min(price_slice))
+        high_p = float(np.max(price_slice))
+        features.append((price - low_p) / (high_p - low_p + EPS))
+
+    for p in DRAWDOWN_PERIODS:
+        features.append(price / (float(np.max(close[-p:])) + EPS) - 1.0)
+
+    for p in TIME_SINCE_HIGH_PERIODS:
+        price_slice = close[-p:]
+        high_idx = int(np.argmax(price_slice))
+        features.append(float(p - 1 - high_idx) / float(p))
+
+    for p in UP_RATIO_PERIODS:
+        features.append(float(np.mean(log_returns[-p:] > 0.0)))
+
+    for p in ACF_PERIODS:
+        ret_slice = log_returns[-(p + 1):]
+        features.append(_corr(ret_slice[1:], ret_slice[:-1]))
+
+    for p in SKEW_PERIODS:
+        features.append(_skew(log_returns[-p:]))
+
+    for p in VOLUME_Z_PERIODS:
+        log_vol_slice = log_volume[-p:]
+        features.append((float(log_volume[-1]) - float(np.mean(log_vol_slice))) / (_std(log_vol_slice) + EPS))
+
+    features.append(float(np.mean(volume[-16:])) / (float(np.mean(volume[-64:])) + EPS) - 1.0)
+
+    for p in SIGNED_VOLUME_PERIODS:
+        ret_slice = log_returns[-p:]
+        vol_slice = volume[-p:]
+        features.append(float(np.sum(np.sign(ret_slice) * vol_slice)) / (float(np.sum(vol_slice)) + EPS))
+
+    for p in PRICE_VOLUME_CORR_PERIODS:
+        features.append(_corr(log_returns[-p:], volume_change[-p:]))
+
+    last_range = max(float(high[-1] - low[-1]), EPS)
+    prev_close = float(close[-2])
+    features.extend(
+        [
+            _safe_log_ratio(float(close[-1]), float(open_[-1])),
+            _safe_log_ratio(float(open_[-1]), prev_close),
+            (float(high[-1] - low[-1])) / (prev_close + EPS),
+            (float(close[-1] - open_[-1])) / last_range,
+            (float(high[-1] - max(open_[-1], close[-1]))) / last_range,
+            (float(min(open_[-1], close[-1]) - low[-1])) / last_range,
+        ]
+    )
+
+    return [_clip_feature(value) for value in features]
 
 
 @dataclass
@@ -37,40 +240,22 @@ class DatasetMeta:
 
 def build_single_simbol_dataset(cfg: PyConfig) -> tuple[np.ndarray, DatasetMeta]:
     """
-    Load OHLCV and build per-row MA features.
+    Load OHLCV and build per-row compact dimensionless features.
 
     Returns:
         X: (n_samples, n_features) float array
         meta: timestamps, open_price, aligned_rows, feature_names
     """
     hist_size = int(cfg["hist_size"])
-    ma_divisors = {
-        "ma_8_period": 8,
-        "ma_32_period": 32,
-        "ma_128_period": 128,
-        }
+    required_history = max(RANGE_PERIODS + [max(RETURN_PERIODS) + 1])
+    if hist_size < required_history:
+        raise ValueError(
+            f"hist_size={hist_size} is too small for compact features; "
+            f"expected at least {required_history}"
+        )
 
-    ma_feature_names = [name[:-7] for name in ma_divisors]
-    ma_periods = {
-        name: max(1, hist_size // max(1, int(divisor)))
-        for name, divisor in ma_divisors.items()
-    }
-    # Per period: mean(close)/last_close, std(close)/last_close, std(volume)/last_volume
-    # Plus current normalized values and cumulative drawdown stats.
-    n_features = len(ma_feature_names) * 3 + 2
-    feature_names = [
-        label
-        for base in ma_feature_names
-        for label in (base, f"{base}_std", f"{base}_vol_std")
-    ]
-    feature_names.extend(
-        [
-            "last_vol_rel",
-            "last_close_rel",
-            # "drawdown_price",
-            # "drawdown_periods",
-        ]
-    )
+    feature_names = _compact_feature_names()
+    n_features = len(feature_names)
 
     mw = MovingWindow(cfg)
     raw_count = len(mw)
@@ -85,58 +270,19 @@ def build_single_simbol_dataset(cfg: PyConfig) -> tuple[np.ndarray, DatasetMeta]
         open_price = np.empty(n, dtype=np.float64)
 
         k = 0
-        running_peak_close = -np.inf
-        drawdown_periods = 0
-        drawdown_initialized = False
         for window in mw(output_time=False):
-            close_window = window["Close"][:-1]
-            vol_window = window["Volume"][:-1]
-            denom_price = close_window.mean()
-            denom_vol = vol_window.mean()
-            assert denom_price > 1e-15
-            assert denom_vol > 1e-15
-            col = 0
-            for period_name in ma_divisors:
-                p = ma_periods[period_name]
-                close_slice = close_window[-p:]
-                vol_slice = vol_window[-p:]
-
-                # mean close price
-                X[k, col] = float(close_slice.mean()) / denom_price
-                # std close price
-                col += 1
-                X[k, col] = float(np.std(close_slice, ddof=0)) / denom_price
-                # std volume
-                col += 1
-                X[k, col] = float(np.std(vol_slice, ddof=0)) / denom_vol
-                col += 1
-
-            # last volume relative to mean volume
-            X[k, col] = float(vol_slice[-1]) / denom_vol
-
-            # last close price
-            col += 1
-            X[k, col] = float(close_slice[-1]) / denom_price
-
-            # # running peak close price
-            # col += 1
-            # current_close = float(close_window[-1])
-            # if not drawdown_initialized:
-            #     peak_index = int(np.argmax(close_window))
-            #     running_peak_close = float(close_window[peak_index])
-            #     drawdown_periods = int(close_window.shape[0] - 1 - peak_index)
-            #     drawdown_initialized = True
-            # elif current_close >= running_peak_close:
-            #     running_peak_close = current_close
-            #     drawdown_periods = 0
-            # else:
-            #     drawdown_periods += 1
-
-            # X[k, col] = max(0.0, running_peak_close - current_close) / running_peak_close
-
-            # # drawdown periods
-            # col += 1
-            # X[k, col] = float(drawdown_periods) / hist_size
+            features = _compact_features(
+                open_hist=window["Open"][:-1],
+                high_hist=window["High"][:-1],
+                low_hist=window["Low"][:-1],
+                close_hist=window["Close"][:-1],
+                volume_hist=window["Volume"][:-1],
+            )
+            if len(features) != n_features:
+                raise RuntimeError(
+                    f"Feature count mismatch: got {len(features)}, expected {n_features}"
+                )
+            X[k, :] = features
 
             timestamps[k] = window["Date"][-1]
             open_price[k] = float(window["Open"][-1])
@@ -228,7 +374,7 @@ def build_multi_simbol_dataset(cfg: PyConfig) -> tuple[np.ndarray, DatasetMeta]:
 
 def build_dataset(config_path: str | Path | None = None) -> tuple[np.ndarray, DatasetMeta]:
     """
-    Load BTCUSDT (or config-specified symbol) OHLCV and build per-row MA features.
+    Load BTCUSDT (or config-specified symbol) OHLCV and build per-row features.
     Default config: configs/macross/BTCUSDT.py (overridable via MACROSS_RF_CONFIG).
 
     Returns:
