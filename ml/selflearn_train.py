@@ -87,6 +87,8 @@ class TrainArtifacts:
     y_pr_test: np.ndarray | None = None
     train_strategy_step_profit: np.ndarray | None = None
     test_strategy_step_profit: np.ndarray | None = None
+    train_strategy_step_profit_no_fee: np.ndarray | None = None
+    test_strategy_step_profit_no_fee: np.ndarray | None = None
     result: dict | None = None
     run_train_strategy_cum_profit: list[np.ndarray] | None = None
     run_test_strategy_cum_profit: list[np.ndarray] | None = None
@@ -351,6 +353,25 @@ def _compute_hold_fraction(
     return hold_fraction, sequence_valid
 
 
+def _compute_deals_count(
+    predicts: torch.Tensor,
+    valid_mask: torch.Tensor,
+    loss_mask: torch.Tensor | None = None,
+    score_threshold: float = 0.0,
+) -> torch.Tensor:
+    """Per-sequence count of long/short direction flips across valid transitions."""
+    pair_valid = valid_mask[:, :-1] & valid_mask[:, 1:]
+    if loss_mask is not None:
+        pair_valid = pair_valid & loss_mask[:, :-1] & loss_mask[:, 1:]
+    dirs = torch.where(
+        predicts >= score_threshold,
+        torch.ones_like(predicts),
+        -torch.ones_like(predicts),
+    )
+    deals = (dirs[:, 1:] != dirs[:, :-1]) & pair_valid
+    return deals.sum(dim=1).to(predicts.dtype)
+
+
 def _compute_hold_fraction_penalty(
     predicts: torch.Tensor,
     valid_mask: torch.Tensor,
@@ -397,7 +418,7 @@ def train_classifier(X_train: np.ndarray,
     num_epochs = int(os.environ["EPOCHS"])
     drawdown_lambda = float(os.environ["DRAWDOWN_LAMBDA"])
     hold_lambda = float(os.environ.get("HOLD_LAMBDA", "0"))
-    lr_restart_period = int(os.environ.get("LR_RESTART_PERIOD", "50"))
+    lr_restart_period = int(os.environ.get("LR_RESTART_PERIOD", "-1"))
     lr_min = float(os.environ.get("LR_MIN", "1e-6"))
 
     checkpoint: dict | None = None
@@ -418,7 +439,7 @@ def train_classifier(X_train: np.ndarray,
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     scheduler = CosineAnnealingWarmRestarts(
         optimizer,
-        T_0=lr_restart_period,
+        T_0=lr_restart_period if lr_restart_period > 0 else num_epochs,
         T_mult=1,
         eta_min=lr_min,
     )
@@ -501,6 +522,11 @@ def train_classifier(X_train: np.ndarray,
             hold_lambda,
             loss_mask_tensor,
         )
+        deals_count_by_sequence = _compute_deals_count(
+            predicts,
+            valid_mask,
+            loss_mask_tensor,
+        )
         valid_loss_sequences = sequence_valid_mask & hold_valid_mask
         if not torch.any(valid_loss_sequences):
             raise ValueError("No valid packed yearly sequences available for loss")
@@ -516,6 +542,7 @@ def train_classifier(X_train: np.ndarray,
         commission_pct = commission_pct_by_sequence[valid_loss_sequences].mean()
         hold_fraction = hold_fraction_by_sequence[valid_loss_sequences].mean()
         hold_penalty = hold_penalty_by_sequence[valid_loss_sequences].mean()
+        deals_count = deals_count_by_sequence[valid_loss_sequences].mean()
         excess_profit_pct = excess_profit_pct_by_sequence[valid_loss_sequences].mean()
         loss_components = {
             "loss": loss,
@@ -538,13 +565,12 @@ def train_classifier(X_train: np.ndarray,
                 + ", ".join(non_finite_components)
             )
         postfix: dict[str, str] = {
-            "loss": f"{loss.item():.2f}",
             "outperf": f"{excess_profit_pct.item():.2f}",
+            "deals": f"{deals_count.item():.0f}",
             "lr": f"{scheduler.get_last_lr()[0]:.2e}",
         }
         if hold_lambda != 0.0:
             postfix["hold"] = f"{hold_fraction.item():.2f}"
-            postfix["hold_pen"] = f"{hold_penalty.item():.2f}"
         if commission_rate_pct != 0.0:
             postfix["fees"] = f"{commission_pct.item():.2f}"
         progress_bar.set_postfix(**postfix)
@@ -774,6 +800,22 @@ class SelfLearn:
             valid_rows=valid_test_panel,
             commission_rate_pct=self.commission_rate_pct,
         )
+        train_strategy_step_profit_no_fee = compute_step_profit_with_boundaries(
+            timestamps=timestamps_train,
+            open_price=open_price_train,
+            direction=y_pr_train_panel,
+            deposit_multp=deposit_multp_train,
+            valid_rows=valid_train_panel,
+            commission_rate_pct=0.0,
+        )
+        test_strategy_step_profit_no_fee = compute_step_profit_with_boundaries(
+            timestamps=timestamps_test,
+            open_price=open_price_test,
+            direction=y_pr_test_panel,
+            deposit_multp=deposit_multp_test,
+            valid_rows=valid_test_panel,
+            commission_rate_pct=0.0,
+        )
 
         metrics = {
             "dataset": {
@@ -805,6 +847,8 @@ class SelfLearn:
             y_pr_test=y_pr_test_panel,
             train_strategy_step_profit=train_strategy_step_profit,
             test_strategy_step_profit=test_strategy_step_profit,
+            train_strategy_step_profit_no_fee=train_strategy_step_profit_no_fee,
+            test_strategy_step_profit_no_fee=test_strategy_step_profit_no_fee,
         )
 
     def train(self) -> dict:
@@ -1149,6 +1193,8 @@ class SelfLearn:
         y_pr_test = a.y_pr_test
         train_strategy_step_profit = a.train_strategy_step_profit
         test_strategy_step_profit = a.test_strategy_step_profit
+        train_strategy_step_profit_no_fee = a.train_strategy_step_profit_no_fee
+        test_strategy_step_profit_no_fee = a.test_strategy_step_profit_no_fee
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
         base_feature_count = int(X_shape[2])
@@ -1205,6 +1251,18 @@ class SelfLearn:
                 output_path=output_path,
                 buy_hold_cum_train=np.cumsum(buy_hold_train),
                 buy_hold_cum_test=np.cumsum(buy_hold_test),
+                strategy_no_fee_cum_train=(
+                    np.cumsum(train_strategy_step_profit_no_fee[i])
+                    if train_strategy_step_profit_no_fee is not None
+                    and train_strategy_step_profit_no_fee[i].size
+                    else np.array([], dtype=np.float64)
+                ),
+                strategy_no_fee_cum_test=(
+                    np.cumsum(test_strategy_step_profit_no_fee[i])
+                    if test_strategy_step_profit_no_fee is not None
+                    and test_strategy_step_profit_no_fee[i].size
+                    else np.array([], dtype=np.float64)
+                ),
             )
             logger.info(f"Strategy profit plot saved to: {output_path}")
 

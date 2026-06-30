@@ -70,6 +70,8 @@ class PredictionVisualizer:
         output_path: Path,
         buy_hold_cum_train: np.ndarray | None = None,
         buy_hold_cum_test: np.ndarray | None = None,
+        strategy_no_fee_cum_train: np.ndarray | None = None,
+        strategy_no_fee_cum_test: np.ndarray | None = None,
     ) -> None:
         fig, (ax_profit, ax_sign) = plt.subplots(
             nrows=2,
@@ -94,6 +96,26 @@ class PredictionVisualizer:
             color="tab:red",
             linewidth=1.8,
         )
+        if strategy_no_fee_cum_train is not None and strategy_no_fee_cum_train.size > 0:
+            self._plot_series(
+                ax_profit,
+                timestamps_train,
+                strategy_no_fee_cum_train,
+                label="strategy_train_no_fees_cumsum",
+                color="tab:orange",
+                linewidth=1.2,
+                linestyle="--",
+            )
+        if strategy_no_fee_cum_test is not None and strategy_no_fee_cum_test.size > 0:
+            self._plot_series(
+                ax_profit,
+                timestamps_test,
+                strategy_no_fee_cum_test,
+                label="strategy_test_no_fees_cumsum",
+                color="tab:red",
+                linewidth=1.2,
+                linestyle="--",
+            )
         if buy_hold_cum_train is not None and buy_hold_cum_train.size > 0:
             self._plot_series(
                 ax_profit,

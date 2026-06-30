@@ -4,8 +4,8 @@ from common.type import TimePeriod, Symbols
 from common.utils import FeeRate
 
 config = dict(
-    date_start=np.datetime64("2017-01-01T00:00:00"),
-    date_end=np.datetime64("2026-04-01T00:00:00"),
+    date_start=np.datetime64("2018-05-28T00:00:00"),
+    date_end=np.datetime64("2026-06-01T00:00:00"),
     period=TimePeriod.D,
     symbols=[Symbols.BTCUSDT, Symbols.ETHUSDT],
     data_type="bybit",

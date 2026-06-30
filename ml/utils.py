@@ -3,11 +3,14 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import pandas as pd
 
 from common.utils import PyConfig
+
+BatchPeriod = Literal["year", "month"]
 
 
 @dataclass(frozen=True)
@@ -34,7 +37,44 @@ def resolve_commission_rate_pct(config_path: str | Path | None = None) -> float:
 
 def calendar_years_from_timestamps(timestamps: np.ndarray) -> np.ndarray:
     """Per-row calendar year as int64 (numpy/pandas datetime64 bars)."""
-    return pd.DatetimeIndex(np.asarray(timestamps)).year.to_numpy(dtype=np.int64)
+    return calendar_period_keys_from_timestamps(timestamps, period="year")
+
+
+def calendar_months_from_timestamps(timestamps: np.ndarray) -> np.ndarray:
+    """Per-row calendar month key as int64 (year * 12 + month - 1)."""
+    return calendar_period_keys_from_timestamps(timestamps, period="month")
+
+
+def calendar_period_keys_from_timestamps(
+    timestamps: np.ndarray,
+    period: BatchPeriod = "year",
+) -> np.ndarray:
+    """Per-row calendar period key (year int or month-encoded int)."""
+    dt_index = pd.DatetimeIndex(np.asarray(timestamps))
+    if period == "year":
+        return dt_index.year.to_numpy(dtype=np.int64)
+    if period == "month":
+        return (
+            dt_index.year.astype(np.int64) * 12
+            + (dt_index.month - 1).astype(np.int64)
+        )
+    raise ValueError(f"Unsupported batch period: {period!r}")
+
+
+def _previous_period_key(period_key: int, period: BatchPeriod) -> int:
+    return int(period_key) - 1
+
+
+def _batch_period_metadata(period: BatchPeriod) -> tuple[str, str]:
+    if period == "year":
+        return (
+            "calendar_year_with_previous_year_warmup",
+            "mean_per_year_sequence",
+        )
+    return (
+        "calendar_month_with_previous_month_warmup",
+        "mean_per_month_sequence",
+    )
 
 
 def cv_fold_stats(values: list[float]) -> dict:
@@ -74,10 +114,13 @@ def pack_yearly_training_batch(
     timestamps_train: np.ndarray,
     open_price_train: np.ndarray,
     deposit_multp_train: np.ndarray,
+    period: BatchPeriod = "month",
 ) -> PackedYearlyTrainingData:
-    """Pack (previous year warm-up, current year target) sequences into one batch."""
+    """Pack (previous period warm-up, current period target) sequences into one batch."""
     if X_train.ndim != 3:
         raise ValueError(f"X_train must be 3D (B,T,F), got {X_train.shape}")
+    if period not in {"year", "month"}:
+        raise ValueError(f"Unsupported batch period: {period!r}")
 
     bsz, _, n_features = X_train.shape
     valid_panel = build_valid_panel_mask(X_train, open_price_train) & valid_timestamp_mask(
@@ -85,9 +128,10 @@ def pack_yearly_training_batch(
     )
     sequences: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = []
     sequence_meta: list[dict] = []
-    skipped_first_years: list[dict] = []
-    target_years: set[int] = set()
-    warmup_years: set[int] = set()
+    skipped_first_periods: list[dict] = []
+    target_periods: set[int] = set()
+    warmup_periods: set[int] = set()
+    period_label = "year" if period == "year" else "month"
 
     for symbol_idx in range(bsz):
         valid_idx = np.flatnonzero(valid_panel[symbol_idx])
@@ -95,23 +139,26 @@ def pack_yearly_training_batch(
             continue
 
         valid_ts = timestamps_train[symbol_idx, valid_idx]
-        valid_years = pd.DatetimeIndex(valid_ts).year.to_numpy(dtype=np.int64)
-        unique_years = sorted(int(year) for year in np.unique(valid_years))
-        if unique_years:
-            skipped_first_years.append(
-                {"symbol_index": symbol_idx, "year": int(unique_years[0])}
+        valid_period_keys = calendar_period_keys_from_timestamps(valid_ts, period=period)
+        unique_periods = sorted(int(key) for key in np.unique(valid_period_keys))
+        if unique_periods:
+            skipped_first_periods.append(
+                {
+                    "symbol_index": symbol_idx,
+                    period_label: int(unique_periods[0]),
+                }
             )
 
-        year_to_idx = {
-            year: valid_idx[valid_years == year]
-            for year in unique_years
+        period_to_idx = {
+            period_key: valid_idx[valid_period_keys == period_key]
+            for period_key in unique_periods
         }
-        for target_year in unique_years[1:]:
-            warmup_year = target_year - 1
-            if warmup_year not in year_to_idx:
+        for target_period in unique_periods[1:]:
+            warmup_period = _previous_period_key(target_period, period)
+            if warmup_period not in period_to_idx:
                 continue
-            warmup_idx = year_to_idx[warmup_year]
-            target_idx = year_to_idx[target_year]
+            warmup_idx = period_to_idx[warmup_period]
+            target_idx = period_to_idx[target_period]
             if warmup_idx.size == 0 or target_idx.size < 2:
                 continue
 
@@ -126,13 +173,13 @@ def pack_yearly_training_batch(
                     seq_loss_mask,
                 )
             )
-            warmup_years.add(int(warmup_year))
-            target_years.add(int(target_year))
+            warmup_periods.add(int(warmup_period))
+            target_periods.add(int(target_period))
             sequence_meta.append(
                 {
                     "symbol_index": symbol_idx,
-                    "warmup_year": int(warmup_year),
-                    "target_year": int(target_year),
+                    f"warmup_{period_label}": int(warmup_period),
+                    f"target_{period_label}": int(target_period),
                     "warmup_rows": int(warmup_idx.size),
                     "target_rows": int(target_idx.size),
                 }
@@ -140,8 +187,8 @@ def pack_yearly_training_batch(
 
     if not sequences:
         raise ValueError(
-            "No yearly training sequences with a previous calendar year warm-up "
-            "and at least two target rows"
+            f"No {period_label}ly training sequences with a previous calendar "
+            f"{period_label} warm-up and at least two target rows"
         )
 
     max_len = max(seq[0].shape[0] for seq in sequences)
@@ -158,16 +205,18 @@ def pack_yearly_training_batch(
         deposit_packed[i, :n_seq] = deposit_seq
         loss_mask[i, :n_seq] = seq_loss_mask
 
+    train_batching, loss_reduction = _batch_period_metadata(period)
     metadata = {
-        "train_batching": "calendar_year_with_previous_year_warmup",
-        "loss_reduction": "mean_per_year_sequence",
+        "batch_period": period,
+        "train_batching": train_batching,
+        "loss_reduction": loss_reduction,
         "original_batch_size": int(bsz),
         "original_timesteps": int(X_train.shape[1]),
         "packed_batch_size": int(packed_bsz),
         "packed_timesteps": int(max_len),
-        "target_years": sorted(target_years),
-        "warmup_years": sorted(warmup_years),
-        "skipped_first_years": skipped_first_years,
+        f"target_{period_label}s": sorted(target_periods),
+        f"warmup_{period_label}s": sorted(warmup_periods),
+        f"skipped_first_{period_label}s": skipped_first_periods,
         "sequences": sequence_meta,
     }
     return PackedYearlyTrainingData(
