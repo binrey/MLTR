@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import sys
 from copy import deepcopy
@@ -9,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
+from loguru import logger
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -21,6 +25,8 @@ TRAIN_FRAC = 0.8
 EPS = 1e-12
 TRADING_DAYS = 252.0
 FEATURE_CLIP = 5.0
+CACHE_VERSION = 1
+CACHE_ROOT = REPO_ROOT / ".cache" / "selflearn_dataset"
 
 RETURN_PERIODS = [1, 4, 8, 16, 32, 64, 128]
 MOMENTUM_Z_PERIODS = [8, 16, 32, 64, 128]
@@ -37,6 +43,116 @@ SKEW_PERIODS = [32, 64]
 VOLUME_Z_PERIODS = [16, 32, 64]
 SIGNED_VOLUME_PERIODS = [16, 32]
 PRICE_VOLUME_CORR_PERIODS = [32, 64]
+
+
+def _feature_spec_hash() -> str:
+    payload = json.dumps(_compact_feature_names(), sort_keys=True)
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+
+def _resolve_data_file(cfg: PyConfig) -> Path:
+    database = Path(os.environ.get("FINDATA", "../fin_data"))
+    p = database / cfg["data_type"] / cfg["period"].value
+    flist = [f for f in p.glob("*") if cfg["symbol"].ticker in f.stem]
+    if not flist:
+        raise FileNotFoundError(f"No data for {cfg['symbol'].ticker} in {p}")
+    return flist[np.argmin([len(f.name) for f in flist])]
+
+
+def _dataset_cache_params(cfg: PyConfig) -> dict:
+    source = _resolve_data_file(cfg)
+    return {
+        "cache_version": CACHE_VERSION,
+        "hist_size": int(cfg["hist_size"]),
+        "date_start": str(np.datetime64(cfg["date_start"])),
+        "date_end": str(np.datetime64(cfg["date_end"])),
+        "period": cfg["period"].value,
+        "data_type": cfg["data_type"],
+        "symbol": cfg["symbol"].ticker,
+        "feature_spec": _feature_spec_hash(),
+        "source_path": str(source.resolve()),
+        "source_mtime": float(source.stat().st_mtime),
+    }
+
+
+def _dataset_cache_dir(params: dict) -> Path:
+    digest = hashlib.sha256(
+        json.dumps(params, sort_keys=True).encode()
+    ).hexdigest()[:32]
+    return CACHE_ROOT / digest
+
+
+def _try_load_single_from_cache(
+    cfg: PyConfig, feature_names: list[str]
+) -> tuple[np.ndarray, DatasetMeta] | None:
+    params = _dataset_cache_params(cfg)
+    cache_dir = _dataset_cache_dir(params)
+    csv_path = cache_dir / "dataset.csv"
+    params_path = cache_dir / "params.json"
+    if not csv_path.exists() or not params_path.exists():
+        return None
+
+    stored_params = json.loads(params_path.read_text())
+    if stored_params != params:
+        logger.info(
+            f"Selflearn dataset cache stale for {cfg['symbol'].ticker}, rebuilding"
+        )
+        return None
+
+    df = pd.read_csv(csv_path, parse_dates=["timestamp"])
+    expected_cols = {"timestamp", "open_price", *feature_names}
+    if set(df.columns) != expected_cols:
+        logger.info(
+            f"Selflearn dataset cache columns mismatch for {cfg['symbol'].ticker}, rebuilding"
+        )
+        return None
+
+    n_features = len(feature_names)
+    X = df[feature_names].to_numpy(dtype=np.float64)
+    if X.shape[1] != n_features:
+        return None
+
+    timestamps = pd.to_datetime(df["timestamp"]).to_numpy(dtype="datetime64[ms]")
+    open_price = df["open_price"].to_numpy(dtype=np.float64)
+    meta = DatasetMeta(
+        timestamps=timestamps,
+        open_price=open_price,
+        aligned_rows=int(X.shape[0]),
+        feature_names=feature_names,
+        symbols=[cfg["symbol"]],
+    )
+    logger.info(
+        f"Loaded selflearn dataset cache for {cfg['symbol'].ticker} "
+        f"({X.shape[0]} rows) from {csv_path}"
+    )
+    return X, meta
+
+
+def _save_single_to_cache(
+    cfg: PyConfig,
+    X: np.ndarray,
+    meta: DatasetMeta,
+    feature_names: list[str],
+) -> None:
+    params = _dataset_cache_params(cfg)
+    cache_dir = _dataset_cache_dir(params)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = cache_dir / "dataset.csv"
+    params_path = cache_dir / "params.json"
+
+    frame = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(meta.timestamps),
+            "open_price": meta.open_price,
+            **{name: X[:, i] for i, name in enumerate(feature_names)},
+        }
+    )
+    frame.to_csv(csv_path, index=False)
+    params_path.write_text(json.dumps(params, indent=2, sort_keys=True))
+    logger.info(
+        f"Saved selflearn dataset cache for {cfg['symbol'].ticker} "
+        f"({X.shape[0]} rows) to {csv_path}"
+    )
 
 
 def _compact_feature_names() -> list[str]:
@@ -257,6 +373,10 @@ def build_single_simbol_dataset(cfg: PyConfig) -> tuple[np.ndarray, DatasetMeta]
     feature_names = _compact_feature_names()
     n_features = len(feature_names)
 
+    cached = _try_load_single_from_cache(cfg, feature_names)
+    if cached is not None:
+        return cached
+
     mw = MovingWindow(cfg)
     raw_count = len(mw)
     n = raw_count
@@ -301,6 +421,7 @@ def build_single_simbol_dataset(cfg: PyConfig) -> tuple[np.ndarray, DatasetMeta]
         feature_names=feature_names,
         symbols=[cfg["symbol"]],
     )
+    _save_single_to_cache(cfg, X, meta, feature_names)
     return X, meta
 
 
